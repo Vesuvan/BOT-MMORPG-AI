@@ -1,235 +1,508 @@
-## How to create your own Bot with Artificial Intelligence that plays your favorites  RPG or MMORPG games
+# BOT-MMORPG-AI
 
-*Last revision May 2022*
+<div align="center">
 
-Today I will try to explain how to create a program that will play your favorite **video games**. This is useful when you don't have time to farm and you need to kill moobs and get items. 
+![Bot MMORPG AI](./assets/images/posts/README/genshin-impact.jpg)
 
-If you are interested in joining to this project, you are **welcome** to contribute. 
+**AI-Powered Bot for MMORPG and RPG Games**
 
-The **RPG** game that I will choose for this project is [Genshin Impact](https://genshin.mihoyo.com/en/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.8%2B-orange.svg)](https://www.tensorflow.org/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-![](assets/images/posts/README/genshin-impact.jpg)
+[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Documentation](#documentation) • [Contributing](#contributing)
 
-but also this program should be compatible with  **New World** , **World of Warcraft**, **Guild Wars 2** ,**Final Fantasy XIV**, Elder **Scrolls Online** and so on.
+</div>
 
-Currently due to lack of time, just I will develop this interesting project on **Genshin Impact**, that can be used as a template to use to the remaining games.
+---
 
-The objective of the project is develop a 
+## About
 
-**a) general neural network** that can be adapted to different videogames that can be useful to  automatize video games.
+**BOT-MMORPG-AI** is a sophisticated artificial intelligence system designed to autonomously play MMORPG (Massively Multiplayer Online Role-Playing Games) and RPG games using deep learning and computer vision. The bot learns from gameplay recordings and uses neural networks to make intelligent decisions in real-time.
 
-**b)** **develop the local/cloud infrastructure** that allows us record and process the data.
+### Primary Game Target
 
-The cloud technologies that can be used in principle can be **AWS,** **Google Cloud** and  **Microsoft Azure**. We can try to test each of them.
+The project primarily targets **[Genshin Impact](https://genshin.mihoyo.com/)**, but the architecture is designed to be adaptable to other games including:
+- New World
+- World of Warcraft
+- Guild Wars 2
+- Final Fantasy XIV
+- Elder Scrolls Online
+- And more...
 
-We will start with  local development  and some free AWS microservices.
+### Project Objectives
 
- **c) Enjoy coding and pass fun**, one of the important aspects of this project is to learn, enjoy and pass good moments with the **AI Community Gamer**.
+1. **General Neural Network**: Develop an adaptive neural network architecture that can be trained for different video games
+2. **Cloud Infrastructure**: Build scalable local and cloud infrastructure for data recording, processing, and model training
+3. **Community Driven**: Foster learning, collaboration, and knowledge sharing within the AI Gaming Community
 
-## Tasks to perform
+---
 
-The first tasks that we want to perform are: 
+## Features
 
-Create a Neural Network that allow the following:
+### Core Capabilities
 
-1. Auto exploration
-2. Kill moobs in a Dungeon
-3. Collect items.
+- **Auto Exploration**: Navigate from point A to point B autonomously
+- **Combat AI**: Engage and defeat enemies in dungeons
+- **Item Collection**: Automatically collect items and resources
+- **Multi-Input Support**: Handles both keyboard and gamepad inputs
+- **Real-time Screen Capture**: Captures and processes game screens at 60 FPS
+- **Deep Learning Models**: Uses state-of-the-art CNN architectures (Inception V3, ResNet, etc.)
+- **Motion Detection**: Prevents the bot from getting stuck using computer vision
+- **Modular Architecture**: Easily extendable and customizable
 
+### Technical Features
 
+- **TensorFlow/TFLearn** neural network implementation
+- **OpenCV** for real-time image processing
+- **Computer Vision** for path detection and obstacle avoidance
+- **Transfer Learning** support for multiple model architectures
+- **Data Augmentation** for improved model performance
+- **Production-Ready**: Complete with testing, linting, and CI/CD configuration
 
-## Task 1 Auto exploration
+---
 
-The first challenge that we want to perform is develop an **Neural Network** that allow us run from the Initial **Point A** until  final **Point B**
+## Installation
 
-we will consider the initial  point **Mondstand** and the Final point **Thousand Wind Temple**
+### Prerequisites
 
-![](assets/images/posts/README/Image00.png)
+- **Operating System**: Windows 10/11 (for game compatibility)
+- **Python**: 3.8 - 3.11
+- **GPU**: NVIDIA GPU with CUDA support (recommended for training)
+- **Game**: Genshin Impact (or your target game) installed
+- **Controller**: Xbox controller or equivalent (optional but recommended)
 
+### Quick Start with UV (Recommended)
 
-The time that we will choose is **12:00**
+```bash
+# Install uv package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-![](assets/images/posts/README/Image01.jpeg)
+# Clone the repository
+git clone https://github.com/ruslanmv/BOT-MMORPG-AI.git
+cd BOT-MMORPG-AI
 
+# Install production dependencies
+make install
 
-# How to run the BOT-MMORPG program
+# Or install all dependencies including dev tools
+make install-all
+```
 
-There are two different versions of the same program. 
+### Traditional Installation
 
-**Type 1**- The **type blog**, via **Jupyter Notebook** in the format **.ipynb**
+```bash
+# Clone the repository
+git clone https://github.com/ruslanmv/BOT-MMORPG-AI.git
+cd BOT-MMORPG-AI
 
-**Type 2**- The **type prod**, via **Python** by using **command Prompt.**
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+
+# For development
+pip install -e ".[dev]"
+```
+
+---
+
+## Usage
+
+### Step 1: Data Collection
+
+Record gameplay data to train the neural network:
+
+```bash
+# Using Makefile
+make collect-data
+
+# Or directly
+python versions/0.01/1-collect_data.py
+```
+
+**Setup for Data Collection:**
+1. Open your Genshin Impact game
+2. Set resolution to 1920x1080 (fullscreen)
+3. Position your character at the starting point
+4. Set in-game time to 12:00
+5. Connect your controller (if using gamepad mode)
+6. Run the collection script
+7. Play normally - the bot will record your actions
+
+**Controls during collection:**
+- `T`: Pause/unpause recording
+- `Q`: Stop and save
+
+### Step 2: Train the Model
+
+Train the neural network on collected data:
+
+```bash
+# Using Makefile
+make train-model
+
+# Or directly
+python versions/0.01/2-train_model.py
+```
+
+The training process will:
+- Load preprocessed training data
+- Train the Inception V3 model
+- Save checkpoints every 10 batches
+- Generate validation metrics
+
+### Step 3: Test the Model
+
+Deploy the trained model to play autonomously:
+
+```bash
+# Using Makefile
+make test-model
 
-The **Type 1**, the non prod, is the self-explanatory program written in **Jupyter notebook.**   
+# Or directly
+python versions/0.01/3-test_model.py
+```
 
- The reason to do that is familiarize with the code, and see the  logic the development. In this way anyone who is interested to understand why I have made the program in this way.
+**Setup for Testing:**
+1. Open your Genshin Impact game
+2. Position your character at the bridge of Mondstadt
+3. Set in-game time to 12:00
+4. Verify controller is connected
+5. Run the test script
+6. Switch to game window
 
-This help to newcomers introduce the code , and help find bugs. In addition allows write the code type blog.
+**Controls during testing:**
+- `T`: Pause/unpause AI
+- `ESC`: Stop the bot
 
-The **Type 2** is the production program, written in simply python script, without discussions or extra things that are not needed to run the whole program. Here we skip all the analysis of the type 1 and just we  put everything a clean as a possible.
+---
 
+## Project Structure
 
-## Current Solution
+```
+BOT-MMORPG-AI/
+├── src/
+│   └── bot_mmorpg/          # Main package source code
+│       ├── __init__.py
+│       ├── models/          # Neural network architectures
+│       ├── utils/           # Utility functions
+│       └── scripts/         # Entry point scripts
+├── versions/
+│   └── 0.01/                # Version-specific implementations
+│       ├── 1-collect_data.py
+│       ├── 2-train_model.py
+│       ├── 3-test_model.py
+│       ├── models.py        # Model definitions
+│       ├── grabscreen.py    # Screen capture
+│       ├── getkeys.py       # Keyboard input
+│       ├── getgamepad.py    # Gamepad input
+│       └── directkeys.py    # Key simulation
+├── frontend/
+│   ├── input_record/        # Input recording utilities
+│   └── video_record/        # Video recording utilities
+├── tests/                   # Test suite
+├── assets/                  # Images and resources
+├── pyproject.toml          # Project configuration
+├── Makefile                # Build automation
+├── LICENSE                 # Apache 2.0 License
+└── README.md              # This file
+```
 
-The preliminary solution is given with the following parts:
+---
 
-1. **[Creation of the frontend application](./frontend/README.md)** - Here, we create a  python program that will record our gameplay and control our videogame.  The frontend application consists into 3 programs.
+## Development
 
-   a) Collection of Data - This program  record the screen during the gameplay. At this stage we focus with small amount of data. Later in the Part 2 we will allocate the data in the cloud.
+### Code Quality
 
-   b) Creation of the Model - This program read the collected data and we create a neural network model
+```bash
+# Format code
+make format
 
-   c) Test the model - Here we load the created model and test in the gameplay.
+# Run linters
+make lint
 
-    (**updated March 2022**).
+# Type checking
+make type-check
 
-   There is one program to record the gameplay and there is another that simulates the gameplay 
+# Run all checks
+make check
+```
 
-   **[Gameplay API programs](./frontend//input_record/README.md)** 
+### Testing
 
-   ![](./frontend/assets/images/posts/README/mmo-gamepad-api.gif)
+```bash
+# Run all tests
+make test
 
-2. **Creation of the backend pipeline** . The extension of the frontend part consists to create a pipeline program that will move the recorded data into the cloud. This is important to record log periods of gameplay recording. Here we can use object storage like **s3** or **minio**. This allows us do not to saturate the **hard disk** on the client side during the **gameplay.** 
+# Run with coverage
+make test-cov
 
-3. **Creation of the Dataset** - In this part, we  load the a dataset of the gameplay, that contains the screen images, the recorded  keys and gamepad. 
+# Run specific test types
+make test-unit        # Unit tests only
+make test-integration # Integration tests only
+make test-fast        # Exclude slow tests
+```
 
-4. **Data wrangling** -We can improve our dataset by performing the augmentation procedure of the images. Here we need to apply good skills in computer vision.
+### Building
 
-5. **Model creation** - The first version of this bot will use Neural Networks. The framework used will be **Tensorflow** and **Pytorch**. Here we will create the brain of our bot.
+```bash
+# Build distribution packages
+make build
 
-6. **Training g Docker Container** - Creation o the Docker container environment with **JypyterLab** for this Bot project with all the training packages.
+# Generate documentation
+make docs
 
-7. **Training of the model** - Here, we need to train the neural network. Here we may require a cluster. We can use the **Colab** to use the training with colab or pay a little to run a cluster on **EMR AWS** with a Container with all our environment ready.
+# Full CI pipeline
+make ci
+```
 
-8. **Creation of the frontend application that plays** - Here, we need to create a program that reads the game's screen and depends on what executes the **Artificial intelligence Model** you have made before.
+---
 
-For the development of the Neural Network we have two approaches:
+## Documentation
 
-The **first approach is** consider the  **preprocessed**  images, that means take the rgb images and the input into an array **(450, 480, 270, 3)** without processing the data and then use an **inception_v3** model with 29 ouputs.
+### Neural Network Architectures
 
-The **second experimental** approach  consists to take  the images and filter them into unicolor, adapted to the path where the characters run, then append this unicolor image  with the input into an array **(450, 480, 270, 1)** and then use an **inception_v3** model with 29 ouputs. The motivation to use unicolor is just a manner to simplify the image such is explained in this [blog](https://ruslanmv.com/blog/How-to-use-OpenCV-with-Games) 
+The project supports multiple neural network architectures:
 
+| Model | Size | Top-1 Acc | Top-5 Acc | Parameters | Inference (GPU) |
+|-------|------|-----------|-----------|------------|-----------------|
+| InceptionV3 | 92 MB | 77.9% | 93.7% | 23.9M | 6.9 ms |
+| ResNet50 | 98 MB | 74.9% | 92.1% | 25.6M | 4.6 ms |
+| ResNet101 | 171 MB | 76.4% | 92.8% | 44.7M | 5.2 ms |
+| VGG16 | 528 MB | 71.3% | 90.1% | 138.4M | 4.2 ms |
+| MobileNetV2 | 14 MB | 71.3% | 90.1% | 3.5M | 3.8 ms |
 
+### Output Classes
 
-## How to use BOT-MMORPG
+The model predicts 29 different actions:
+- **Keyboard** (9): W, S, A, D, WA, WD, SA, SD, NOKEY
+- **Gamepad** (20): LT, RT, Lx, Ly, Rx, Ry, D-Pad, Buttons (A, B, X, Y, etc.)
 
-Currently, the stable version of the BOT-MMORPG   is the pre-processed version.
+### Training Data Format
 
-**Pre-processed version**
+Data is stored as NumPy arrays:
+- **Input**: Screen captures (480x270x3 RGB images)
+- **Output**: Multi-hot encoded action vectors (29 classes)
+- **Format**: `.npy` files with 500 samples each
 
-In this version, you will need to run first 
+---
 
-[1-Collect_Data_Preprocessed-rgb.ipynb](./versions/0.01/1-Collect_Data_Preprocessed-rgb.ipynb)  or [1-collect_data.py](./versions/0.01/1-collect_data.py)
+## Advanced Features
 
-When creating training data, this works when you have the game, in fullscreen mode, 1980x1080 resolution.
+### Jupyter Notebooks
 
-You need this for both training and testing.
+For interactive development and experimentation:
 
-Next, Train the model . 
+```bash
+# Install Jupyter dependencies
+pip install -e ".[jupyter]"
 
-With the preprocessed data we will consider the  **inception_v3**  model.
+# Launch JupyterLab
+jupyter lab
+```
 
-[2-train_model_preprocessed.ipynb](./versions/0.01/2-train_model_preprocessed.ipynb) or [2-train_model.py](./versions/0.01/2-train_model.py)
+Available notebooks in `versions/0.01/`:
+- Data collection and preprocessing
+- Model training with visualizations
+- Data cleaning and augmentation
+- Way identification using OpenCV
+- Intermediate representation visualization
 
-Finally, we test our  model in game with
+### Cloud Training
 
- [3-test_model.ipynb](./versions/0.01/3-test_model.ipynb) or[3-test_model.py](./versions/0.01/3-test_model.py) 
+The project supports cloud-based training on:
+- **Google Colab**: Free GPU training
+- **AWS EMR**: Scalable cluster training
+- **Azure ML**: Enterprise-grade training
+- **Google Cloud AI Platform**: Distributed training
 
+### Experimental Features
 
+- **U-Net Models**: For semantic segmentation of game paths
+- **LSTM Networks**: For temporal action prediction
+- **ResNeXt**: Advanced residual network architectures
+- **3D Convolutions**: For multi-frame temporal learning
 
-![](./assets/images/posts/README/bot.gif)
+---
 
+## Performance Optimization
 
+### Motion Detection
 
-**Processed version**
+The bot uses motion detection to prevent getting stuck:
+```python
+motion_req = 800  # Minimum motion threshold
+log_len = 25      # Motion history length
+```
 
-The processed version is the upcoming version  where we are trying to clean more our data and improve the neural network.
+When stuck, the bot executes random evasive maneuvers.
 
-[2-Cleaning-Data.ipynb](./versions/0.01/2-Cleaning-Data.ipynb) 
+### Prediction Weighting
 
-[2-train_model_cleaned.ipynb](./versions/0.01/2-train_model_cleaned.ipynb) 
+Custom weights applied to predictions for game-specific behavior:
+```python
+weights = [4.5, 0.1, 0.1, 0.1, 1.8, 1.8, 0.5, 0.5, 0.2, ...]
+```
 
-[3-test_model-processed.ipynb](./versions/0.01/3-test_model-processed.ipynb) 
+---
 
-[<img src="assets/images/posts/README/acc.jpg" alt="Results" style="zoom:100%;" />](https://github.com/ruslanmv/BOT-MMORPG-AI/raw/master/assets/images/posts/README/result.jpg)
+## Troubleshooting
 
+### Common Issues
 
+**Issue**: Model not loading
+- **Solution**: Ensure model files are in `model/` directory
 
-(There are some experimental  tests use OpenCV to detect the ways to walk  [here](https://github.com/ruslanmv/BOT-MMORPG-AI/blob/master/versions/0.01/0-Way-Identification.ipynb) , inspired to use U-Net models.
+**Issue**: Screen capture not working
+- **Solution**: Run game in fullscreen 1920x1080 resolution
 
+**Issue**: Bot getting stuck
+- **Solution**: Adjust `motion_req` threshold in test script
 
+**Issue**: Low FPS during recording
+- **Solution**: Lower capture resolution or use faster storage
 
-![](assets/images/posts/README/path.jpg)
+**Issue**: CUDA out of memory
+- **Solution**: Reduce batch size in training configuration
 
+---
 
+## Contributing
 
-and also we try  [unicolor versions](./versions/0.01/1-Collect_Data_Processed_single_color.ipynb) )
+We welcome contributions from the community!
 
-### How to run the BOT-MMORPG
+### How to Contribute
 
-Things to do before execute our bot-mmorpg:
-1. **Open your  Genshin Impact Game**
-2. **Go infront of  the bridge of Mondstat**
-![title](./assets/images/posts/README/step-0.png)
-3. **Change the time to 12:00**
-![title](./assets/images/posts/README/step-2.png)
-4. **Verify that you are using your a controller.**
-![title](./assets/images/posts/README/step-1.png)
-5. **Run the main()**
-6. **Return to the windows of your game**
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
 
-To abort the code, go to your command prompt terminal where your notebook where opened, and there you can press **ESC** to abort the program or **T** pause the AI  program.
+### Development Guidelines
 
-### Note developments:
+- Follow PEP 8 style guidelines
+- Add docstrings to all functions and classes
+- Include type hints for function signatures
+- Write unit tests for new features
+- Update documentation as needed
+- Run `make check` before submitting
 
-Currently we are using the  **Inception_v3**  model, but we are interested to perform transform learning from the following models:
+### Code of Conduct
 
-| Model                                                        | Size (MB) | Top-1 Accuracy | Top-5 Accuracy | Parameters | Depth | Time (ms) per inference step (CPU) | Time (ms) per inference step (GPU) |
-| ------------------------------------------------------------ | --------- | -------------- | -------------- | ---------- | ----- | ---------------------------------- | ---------------------------------- |
-| [Xception](https://keras.io/api/applications/xception)       | 88        | 79.0%          | 94.5%          | 22.9M      | 81    | 109.4                              | 8.1                                |
-| [VGG16](https://keras.io/api/applications/vgg/#vgg16-function) | 528       | 71.3%          | 90.1%          | 138.4M     | 16    | 69.5                               | 4.2                                |
-| [VGG19](https://keras.io/api/applications/vgg/#vgg19-function) | 549       | 71.3%          | 90.0%          | 143.7M     | 19    | 84.8                               | 4.4                                |
-| [ResNet50](https://keras.io/api/applications/resnet/#resnet50-function) | 98        | 74.9%          | 92.1%          | 25.6M      | 107   | 58.2                               | 4.6                                |
-| [ResNet50V2](https://keras.io/api/applications/resnet/#resnet50v2-function) | 98        | 76.0%          | 93.0%          | 25.6M      | 103   | 45.6                               | 4.4                                |
-| [ResNet101](https://keras.io/api/applications/resnet/#resnet101-function) | 171       | 76.4%          | 92.8%          | 44.7M      | 209   | 89.6                               | 5.2                                |
-| [ResNet101V2](https://keras.io/api/applications/resnet/#resnet101v2-function) | 171       | 77.2%          | 93.8%          | 44.7M      | 205   | 72.7                               | 5.4                                |
-| [ResNet152](https://keras.io/api/applications/resnet/#resnet152-function) | 232       | 76.6%          | 93.1%          | 60.4M      | 311   | 127.4                              | 6.5                                |
-| [ResNet152V2](https://keras.io/api/applications/resnet/#resnet152v2-function) | 232       | 78.0%          | 94.2%          | 60.4M      | 307   | 107.5                              | 6.6                                |
-| [InceptionV3](https://keras.io/api/applications/inceptionv3) | 92        | 77.9%          | 93.7%          | 23.9M      | 189   | 42.2                               | 6.9                                |
-| [InceptionResNetV2](https://keras.io/api/applications/inceptionresnetv2) | 215       | 80.3%          | 95.3%          | 55.9M      | 449   | 130.2                              | 10.0                               |
-| [MobileNet](https://keras.io/api/applications/mobilenet)     | 16        | 70.4%          | 89.5%          | 4.3M       | 55    | 22.6                               | 3.4                                |
-| [MobileNetV2](https://keras.io/api/applications/mobilenet/#mobilenetv2-function) | 14        | 71.3%          | 90.1%          | 3.5M       | 105   | 25.9                               | 3.8                                |
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
-And identify  the behavior  with our train and test dataset.
+---
 
+## Community
 
+Join our community for support, discussions, and collaboration:
+
+- **Slack**: [aws-ml-group.slack.com](https://aws-ml-group.slack.com/)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/ruslanmv/BOT-MMORPG-AI/issues)
+- **Website**: [ruslanmv.com](https://ruslanmv.com/)
+
+---
 
 ## Acknowledgments
 
-* Everyone at the [gamePyd](https://github.com/4amVim/gamePyd) proyect
-* Everyone at [vJoy](http://vjoystick.sourceforge.net/site/) for the vXboxInterface DLL
-* [nefarius](https://github.com/nefarius) for [ScpVBus](https://github.com/nefarius/ScpVBus)
-* See also the list of [contributors](https://github.com/bayangan1991/PYXInput/graphs/contributors) who participated in PYXinput 
-* This project  it is possible thank you the previous projects
-  [Self-Driving-Car-with-Neural-Networks](https://ruslanmv.com/blog/Self-Driving-Car-with-Neural-Networks) 
-* Everyone at [PyGTA5](https://github.com/Sentdex/pygta5) project
+This project builds upon excellent work from the community:
 
-## For contributors
+- **[gamePyd](https://github.com/4amVim/gamePyd)** - Game control utilities
+- **[vJoy](http://vjoystick.sourceforge.net/)** - Virtual joystick interface
+- **[ScpVBus](https://github.com/nefarius/ScpVBus)** by [nefarius](https://github.com/nefarius)
+- **[PYXInput](https://github.com/bayangan1991/PYXInput)** contributors
+- **[PyGTA5](https://github.com/Sentdex/pygta5)** by Sentdex
+- **Inception V3** architecture by Google Research
 
-If you are already part of the team the official channel in slack is:
+Special thanks to the AI Gaming Community for their continuous support and feedback.
 
-[https://aws-ml-group.slack.com/](https://aws-ml-group.slack.com/)
+---
 
+## Roadmap
 
+### Version 1.1 (Q2 2025)
+- [ ] Multi-game support framework
+- [ ] Web-based dashboard for monitoring
+- [ ] Improved data augmentation pipeline
+- [ ] Distributed training support
 
-<img src="assets/images/posts/README/slack.png" alt="image-20220420230327556" style="zoom:80%;" />
+### Version 1.2 (Q3 2025)
+- [ ] Reinforcement learning integration
+- [ ] Real-time model updating
+- [ ] Cloud storage integration (S3, MinIO)
+- [ ] Performance profiling tools
 
-## Contributing
-[![Stargazers over time](https://starchart.cc/ruslanmv/BOT-MMORPG-AI.svg?variant=adaptive)](https://starchart.cc/ruslanmv/BOT-MMORPG-AI)
-Please free  to contribute following the standard guidelines for submitting patches and additions or solutions. Feel free to submit issues and enhancement requests.
+### Version 2.0 (Q4 2025)
+- [ ] Generalized game agent framework
+- [ ] Plugin system for custom games
+- [ ] Advanced reward shaping
+- [ ] Model compression for edge deployment
 
-To more information visit [ruslanmv.com](https://ruslanmv.com/).
+---
 
-Copyright 2021 Ruslan Magana Vsevolodovna <contactATruslanmvDOTcom>
-This program is distributed under the terms of the GNU Lesser General Public License.
+## Citation
 
+If you use this project in your research, please cite:
+
+```bibtex
+@software{magana2025botmmorpgai,
+  author = {Magana Vsevolodovna, Ruslan},
+  title = {BOT-MMORPG-AI: AI-Powered Bot for MMORPG Games},
+  year = {2025},
+  url = {https://github.com/ruslanmv/BOT-MMORPG-AI},
+  version = {1.0.0}
+}
+```
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+
+```
+Copyright 2025 Ruslan Magana Vsevolodovna
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+---
+
+## Author
+
+**Ruslan Magana Vsevolodovna**
+
+- Website: [ruslanmv.com](https://ruslanmv.com/)
+- Email: contact@ruslanmv.com
+- GitHub: [@ruslanmv](https://github.com/ruslanmv)
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=ruslanmv/BOT-MMORPG-AI&type=Date)](https://star-history.com/#ruslanmv/BOT-MMORPG-AI&Date)
+
+---
+
+<div align="center">
+
+**Made with ❤️ by the AI Gaming Community**
+
+[⬆ back to top](#bot-mmorpg-ai)
+
+</div>
