@@ -1,0 +1,228 @@
+[project]
+name = "bot-mmorpg-ai"
+version = "1.0.0"
+description = "AI-powered bot for MMORPG and RPG games using deep learning and computer vision"
+authors = [
+    {name = "Ruslan Magana Vsevolodovna", email = "contact@ruslanmv.com"}
+]
+maintainers = [
+    {name = "Ruslan Magana Vsevolodovna", email = "contact@ruslanmv.com"}
+]
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.8,<3.12"
+keywords = [
+    "ai",
+    "machine-learning",
+    "gaming",
+    "mmorpg",
+    "bot",
+    "computer-vision",
+    "deep-learning",
+    "tensorflow",
+    "automation"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Games/Entertainment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+dependencies = [
+    "numpy>=1.19.0,<2.0.0",
+    "pandas>=1.3.0,<3.0.0",
+    "tensorflow>=2.8.0,<2.17.0",
+    "opencv-python>=4.5.0,<5.0.0",
+    "tflearn>=0.5.0",
+    "pillow>=9.0.0,<11.0.0",
+    "pywin32>=300; platform_system=='Windows'",
+    "pynput>=1.7.0,<2.0.0",
+    "mss>=6.1.0,<10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<9.0.0",
+    "pytest-cov>=3.0.0,<6.0.0",
+    "black>=22.0.0,<25.0.0",
+    "flake8>=4.0.0,<8.0.0",
+    "mypy>=0.950,<1.15.0",
+    "isort>=5.10.0,<6.0.0",
+    "pylint>=2.13.0,<4.0.0",
+]
+
+docs = [
+    "sphinx>=4.5.0,<9.0.0",
+    "sphinx-rtd-theme>=1.0.0,<3.0.0",
+]
+
+jupyter = [
+    "jupyter>=1.0.0,<2.0.0",
+    "jupyterlab>=3.0.0,<5.0.0",
+    "matplotlib>=3.5.0,<4.0.0",
+]
+
+all = [
+    "bot-mmorpg-ai[dev,docs,jupyter]",
+]
+
+[project.urls]
+Homepage = "https://ruslanmv.com"
+Documentation = "https://github.com/ruslanmv/BOT-MMORPG-AI"
+Repository = "https://github.com/ruslanmv/BOT-MMORPG-AI"
+Issues = "https://github.com/ruslanmv/BOT-MMORPG-AI/issues"
+
+[project.scripts]
+bot-mmorpg-collect = "bot_mmorpg.scripts.collect_data:main"
+bot-mmorpg-train = "bot_mmorpg.scripts.train_model:main"
+bot-mmorpg-play = "bot_mmorpg.scripts.test_model:main"
+
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bot_mmorpg"]
+
+[tool.hatch.version]
+path = "src/bot_mmorpg/__init__.py"
+
+# Black configuration
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | frontend/assets/backup
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = ["*/frontend/assets/backup/*", "*/build/*", "*/dist/*"]
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=bot_mmorpg",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/bot_mmorpg"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    "*/frontend/assets/backup/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "normal"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tflearn.*",
+    "cv2.*",
+    "mss.*",
+    "pynput.*",
+    "win32api.*",
+    "win32con.*",
+]
+ignore_missing_imports = true
+
+# Pylint configuration
+[tool.pylint.main]
+py-version = "3.8"
+jobs = 0
+ignore = ["CVS", "frontend/assets/backup", ".git", "__pycache__"]
+persistent = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0103",  # Invalid name
+    "C0114",  # Missing module docstring
+    "C0115",  # Missing class docstring
+    "C0116",  # Missing function docstring
+    "R0913",  # Too many arguments
+    "R0914",  # Too many local variables
+    "W0105",  # String statement has no effect
+]
+
+[tool.pylint.format]
+max-line-length = 100
+indent-string = "    "
+
+[tool.pylint.design]
+max-args = 10
+max-locals = 20
+max-branches = 15
+max-statements = 60
