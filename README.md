@@ -541,7 +541,7 @@ Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 **Get Help, Share Tips, Show Off Your Bots!**
 
-- 💬 **Slack**: [aws-ml-group.slack.com](https://ruslanmv.slack.com/archives/C0A5N63DKSS) - Live chat with other gamers
+- 💬 **Slack**: [#bot-mmorpg-ai](https://ruslanmv.slack.com/archives/C0A5N63DKSS) - Live chat with other gamers
 - 🐛 **Report Issues**: [GitHub Issues](https://github.com/ruslanmv/BOT-MMORPG-AI/issues) - Found a bug?
 - 🌐 **Website**: [ruslanmv.com](https://ruslanmv.com/) - Tutorials and guides
 - 📧 **Email**: contact@ruslanmv.com - Direct support
