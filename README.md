@@ -264,15 +264,6 @@ make test-model
 - `T`: Pause/resume the AI
 - `ESC`: Stop the bot completely
 
-### Launcher 
-
-
-Here is the complete **Launcher** section for your `README.md`.
-
-It includes the installation steps, configuration instructions, and how to run it.
-
----
-
 ## 🎮 Interactive Launcher
 
 ![](assets/2025-12-26-22-05-39.png)
