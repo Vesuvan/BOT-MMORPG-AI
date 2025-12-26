@@ -72,6 +72,11 @@ jupyter = [
     "matplotlib>=3.5.0,<4.0.0",
 ]
 
+launcher =[
+    "eel>=0.16.0",
+    "python-dotenv>=1.0.0"
+]
+
 all = [
     "bot-mmorpg-ai[dev,docs,jupyter]",
 ]
