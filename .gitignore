@@ -1,25 +1,24 @@
-
-frontend/recorder/*
-frontend/dev/atbswp/*
-__pycache__/
-**/__pycache__/
-
-#### joe made this: http://goel.io/joe
-
-#####=== Python ===#####
-
-# Byte-compiled / optimized / DLL files
+# ==========================================
+# Python & Compilation
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
-# numpy extensions
-*.npy
-# C extensions
 *.so
+*.pyd
+*.pyc
 
-# Distribution / packaging
-.Python
+# ==========================================
+# Environments & Configuration
+# ==========================================
+# Virtual Environments (Standard & uv)
+.env
+.venv
 env/
+venv/
+ENV/
+
+# Distribution / Packaging
 build/
 develop-eggs/
 dist/
@@ -34,18 +33,12 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
+# ==========================================
+# Testing & Code Quality
+# ==========================================
+# Coverage reports
 htmlcov/
 .tox/
 .coverage
@@ -53,37 +46,54 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-*,cover
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
+*.cover
 *.log
 
-# Sphinx documentation
+# Type checking & Testing caches
+.mypy_cache/
+.pytest_cache/
+.dmypy.json
+dmypy.json
+
+# ==========================================
+# Documentation
+# ==========================================
 docs/_build/
 
-# PyBuilder
-target/
+# ==========================================
+# IDE & System Files
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
-#Jupyter Notebook checkpoints
+# ==========================================
+# Project Specific (Data & Recordings)
+# ==========================================
+
+# Jupyter Notebooks
 *.ipynb_checkpoints/
-versions/0.01/backup/0-collect_data(testing).ipynb
-# backup
+
+# Frontend / Recorder Data
+frontend/recorder/*
+frontend/dev/atbswp/*
+frontend/video_record/keyboard.py
+
+# Backups and Temporary Data
 backup/
-#
+versions/0.01/backup/
+versions/0.01/backup/0-collect_data(testing).ipynb
+
+# Logs & Temporary Folders
 log/
 remove/
-#experimental
 experimental/
 model_test/
 classes/
 clean/
-frontend/video_record/keyboard.py
-frontend/video_record/keyboard.py
-frontend/video_record/keyboard.py
+
+# Training Data (Huge CSVs)
 versions/0.01/data_reduced/x_training_data.csv
 versions/0.01/data_reduced/y_training_data.csv
 versions/0.01/data_reduced/undersampling/x_training_data.csv
