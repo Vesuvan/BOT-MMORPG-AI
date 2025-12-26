@@ -264,6 +264,48 @@ make test-model
 - `T`: Pause/resume the AI
 - `ESC`: Stop the bot completely
 
+## 🎮 Interactive Launcher
+
+![](assets/2025-12-26-22-05-39.png)
+
+The **BOT-MMORPG-AI Launcher** is a gaming-style dashboard that lets you manage the entire AI lifecycle without touching the command line. Built with `Eel`, it acts as a central control panel where you can collect data, train your models, and run the bot with a single click.
+
+It features real-time terminal feedback, automatic API key loading, and process management to start or stop tasks instantly.
+
+### 1. Installation
+
+First, install the launcher dependencies (specifically `Eel` and `Chromium` wrappers):
+
+```bash
+make install-launcher
+
+```
+
+### 2. Configuration
+
+Ensure you have your API keys set up. Create a `.env` file in the project root (see `.env.example`) and add your Google Gemini API key:
+
+```ini
+GEMINI_API_KEY=your_key_here
+
+```
+![](assets/2025-12-26-22-12-56.png)
+### 3. How to Run
+
+Launch the dashboard using the following command:
+
+```bash
+uv run python launcher/launcher.py
+
+```
+
+### 4. Dashboard Features
+
+* **🔴 Start Recording:** Runs `1-collect_data.py` to capture screen data and user inputs for the dataset.
+* **🧠 Train Model:** Runs `2-train_model.py` to process the data and train the deep learning model. You will see real-time training logs in the launcher terminal.
+* **▶️ Start Bot:** Runs `3-test_model.py` to activate the AI agent and let it play the game autonomously.
+
+![](assets/2025-12-26-22-13-23.png)
 ---
 
 ## 🎥 Complete Tutorial Video
@@ -495,11 +537,11 @@ Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 ### Join Our Gaming Community!
 
-![Slack Community](./assets/images/posts/README/slack.png)
+![Slack Community](./assets/2025-12-26-22-17-39.png)
 
 **Get Help, Share Tips, Show Off Your Bots!**
 
-- 💬 **Slack**: [aws-ml-group.slack.com](https://aws-ml-group.slack.com/) - Live chat with other gamers
+- 💬 **Slack**: [#bot-mmorpg-ai](https://ruslanmv.slack.com/archives/C0A5N63DKSS) - Live chat with other gamers
 - 🐛 **Report Issues**: [GitHub Issues](https://github.com/ruslanmv/BOT-MMORPG-AI/issues) - Found a bug?
 - 🌐 **Website**: [ruslanmv.com](https://ruslanmv.com/) - Tutorials and guides
 - 📧 **Email**: contact@ruslanmv.com - Direct support
