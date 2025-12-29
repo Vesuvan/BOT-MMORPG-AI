@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-uv clean lint format type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test check all
+.PHONY: help install install-dev install-uv venv sync clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher install-all collect-data train-model test-model
 
 # Default target
 .DEFAULT_GOAL := help
@@ -8,6 +8,13 @@
 SYS_PYTHON := python
 # RUN_PYTHON: Uses 'uv run' to ensure code runs inside the virtual env
 RUN_PYTHON := uv run python
+
+# OS detection
+ifeq ($(OS),Windows_NT)
+	IS_WINDOWS := 1
+else
+	IS_WINDOWS := 0
+endif
 
 ##@ General
 
@@ -25,8 +32,13 @@ help: ## Display this help message
 
 install-uv: ## Install uv package manager
 	@echo Installing uv package manager...
-	@powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+ifeq ($(IS_WINDOWS),1)
+	@powershell -NoProfile -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
+else
+	@sh -c "curl -LsSf https://astral.sh/uv/install.sh | sh"
+endif
 	@echo uv is installed
+	@echo If 'uv' is not found, restart your terminal so PATH updates take effect.
 
 venv: ## Create the virtual environment (Forces Python 3.10 for TensorFlow Windows compatibility)
 	@echo Creating virtual environment with Python 3.10...
