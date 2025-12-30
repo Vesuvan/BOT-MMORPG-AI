@@ -571,19 +571,14 @@ Special thanks to the AI Gaming Community for their continuous support and feedb
 
 ## Roadmap
 
-### Version 1.1 (Q2 2025)
 - [ ] Multi-game support framework
 - [ ] Web-based dashboard for monitoring
 - [ ] Improved data augmentation pipeline
 - [ ] Distributed training support
-
-### Version 1.2 (Q3 2025)
 - [ ] Reinforcement learning integration
 - [ ] Real-time model updating
 - [ ] Cloud storage integration (S3, MinIO)
 - [ ] Performance profiling tools
-
-### Version 2.0 (Q4 2025)
 - [ ] Generalized game agent framework
 - [ ] Plugin system for custom games
 - [ ] Advanced reward shaping
