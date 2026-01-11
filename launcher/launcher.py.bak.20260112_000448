@@ -4,14 +4,6 @@ BOT-MMORPG-AI Launcher
 A gaming-style frontend launcher for the BOT-MMORPG-AI project
 """
 import eel
-
-# PATCH_PROJECT: module fallback
-# If legacy scripts in versions/0.01 are missing, run installed package modules instead.
-
-def _module_command(module_name: str) -> list[str]:
-    import sys
-    return [sys.executable, "-m", module_name]
-
 import subprocess
 import os
 import sys
