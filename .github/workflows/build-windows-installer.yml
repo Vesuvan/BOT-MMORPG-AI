@@ -50,7 +50,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^1.0"
+        run: cargo install tauri-cli --version "^1.0" --force
 
       - name: Install Python dependencies
         run: |
@@ -105,7 +105,7 @@ jobs:
           Write-Host "File size: $((Get-Item $tauriSidecar).Length / 1MB) MB"
         shell: pwsh
 
-      - name: Copy driver installers
+      - name: Copy driver installers and scripts
         run: |
           # Create directories
           New-Item -Force -ItemType Directory "src-tauri/drivers/interception" | Out-Null
@@ -116,8 +116,9 @@ jobs:
           Copy-Item -Force "frontend/input_record/install-interception.exe" "src-tauri/drivers/interception/install-interception.exe"
           Copy-Item -Force "versions/0.01/pyvjoy/vJoySetup.exe" "src-tauri/drivers/vjoy/vJoySetup.exe"
 
-          # Copy PowerShell installer script
+          # Copy PowerShell installer scripts
           Copy-Item -Force "scripts/install_drivers.ps1" "src-tauri/resources/scripts/install_drivers.ps1"
+          Copy-Item -Force "scripts/download_models.ps1" "src-tauri/resources/scripts/download_models.ps1"
 
           Write-Host "✓ Driver installers and scripts copied"
         shell: pwsh
