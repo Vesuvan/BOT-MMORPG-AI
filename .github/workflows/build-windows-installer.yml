@@ -2,10 +2,16 @@ name: Build Windows Installer
 
 on:
   push:
-    branches: [ main, develop, claude/** ]
+    branches: [ master, develop ]
+    tags:
+      - 'v*'  # Trigger release when a tag (e.g., v1.0.0) is pushed
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, develop ]
   workflow_dispatch:
+
+# REQUIRED: Permission to create releases and upload assets
+permissions:
+  contents: write
 
 env:
   RUST_BACKTRACE: 1
@@ -59,6 +65,7 @@ jobs:
           pip install -e .
 
       - name: Verify driver installers exist
+        shell: pwsh
         run: |
           $interceptionPath = "frontend/input_record/install-interception.exe"
           $vjoyPath = "versions/0.01/pyvjoy/vJoySetup.exe"
@@ -67,7 +74,6 @@ jobs:
             Write-Host "::warning::Interception installer not found at $interceptionPath"
             Write-Host "Creating placeholder for build..."
             New-Item -Force -ItemType Directory (Split-Path $interceptionPath -Parent) | Out-Null
-            # Create a minimal placeholder exe for CI build
             Set-Content -Path $interceptionPath -Value "Placeholder" -NoNewline
           }
 
@@ -75,12 +81,11 @@ jobs:
             Write-Host "::warning::vJoy installer not found at $vjoyPath"
             Write-Host "Creating placeholder for build..."
             New-Item -Force -ItemType Directory (Split-Path $vjoyPath -Parent) | Out-Null
-            # Create a minimal placeholder exe for CI build
             Set-Content -Path $vjoyPath -Value "Placeholder" -NoNewline
           }
-        shell: pwsh
 
       - name: Build Python backend sidecar
+        shell: pwsh
         run: |
           Write-Host "Building Python backend with PyInstaller..."
           pyinstaller --noconfirm --clean --onefile --name main-backend backend/main_backend.py
@@ -91,9 +96,9 @@ jobs:
           }
 
           Write-Host "✓ Backend sidecar built successfully"
-        shell: pwsh
 
       - name: Prepare Tauri sidecar binary
+        shell: pwsh
         run: |
           $target = "x86_64-pc-windows-msvc"
           $tauriSidecar = "src-tauri/binaries/main-backend-$target.exe"
@@ -102,10 +107,9 @@ jobs:
           Copy-Item -Force "dist/main-backend.exe" $tauriSidecar
 
           Write-Host "✓ Sidecar copied to: $tauriSidecar"
-          Write-Host "File size: $((Get-Item $tauriSidecar).Length / 1MB) MB"
-        shell: pwsh
 
       - name: Copy driver installers and scripts
+        shell: pwsh
         run: |
           # Create directories
           New-Item -Force -ItemType Directory "src-tauri/drivers/interception" | Out-Null
@@ -118,15 +122,19 @@ jobs:
 
           # Copy PowerShell installer scripts
           Copy-Item -Force "scripts/install_drivers.ps1" "src-tauri/resources/scripts/install_drivers.ps1"
-          Copy-Item -Force "scripts/download_models.ps1" "src-tauri/resources/scripts/download_models.ps1"
+          # Optional: Check if download script exists before copying
+          if (Test-Path "scripts/download_models.ps1") {
+             Copy-Item -Force "scripts/download_models.ps1" "src-tauri/resources/scripts/download_models.ps1"
+          }
 
           Write-Host "✓ Driver installers and scripts copied"
-        shell: pwsh
 
       - name: Build Tauri application
+        shell: pwsh
         run: |
           Push-Location src-tauri
           try {
+            # Build release bundle
             cargo tauri build --verbose
             if ($LASTEXITCODE -ne 0) {
               Write-Error "Tauri build failed with exit code $LASTEXITCODE"
@@ -135,9 +143,9 @@ jobs:
           } finally {
             Pop-Location
           }
-        shell: pwsh
 
       - name: Verify installer was created
+        shell: pwsh
         run: |
           $installerDir = "src-tauri/target/release/bundle/nsis"
 
@@ -160,8 +168,8 @@ jobs:
             Write-Host "  Path: $($installer.FullName)"
           }
           Write-Host "==============================`n"
-        shell: pwsh
 
+      # 1. Upload as Artifact (For testing/debugging in Actions tab)
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -170,21 +178,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
+      # 2. Upload to GitHub Releases (Permanent download link)
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
         with:
-          name: build-logs
-          path: |
-            src-tauri/target/release/build.log
-            *.log
-          if-no-files-found: ignore
-          retention-days: 7
+          files: src-tauri/target/release/bundle/nsis/*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
 
   test-installer:
     name: Test Installer
     needs: build-windows
     runs-on: windows-latest
+    # Only run tests if it's NOT a release tag (to save time on release)
+    if: "!startsWith(github.ref, 'refs/tags/')"
 
     steps:
       - name: Checkout repository
@@ -196,13 +205,8 @@ jobs:
           name: windows-installer
           path: ./installer-test
 
-      - name: List downloaded files
-        run: |
-          Write-Host "Downloaded installer files:"
-          Get-ChildItem -Path ./installer-test -Recurse
-        shell: pwsh
-
       - name: Basic installer validation
+        shell: pwsh
         run: |
           $installers = Get-ChildItem -Path ./installer-test -Filter "*.exe"
 
@@ -214,14 +218,14 @@ jobs:
           foreach ($installer in $installers) {
             Write-Host "Validating: $($installer.Name)"
 
-            # Check file size (should be at least 10MB for a real installer)
+            # Check file size (should be at least 1MB for a real installer)
             if ($installer.Length -lt 1MB) {
               Write-Warning "Installer size is suspiciously small: $($installer.Length / 1MB) MB"
             } else {
               Write-Host "✓ Size check passed: $($installer.Length / 1MB) MB"
             }
 
-            # Check if it's a valid PE executable
+            # Check valid PE header
             $header = Get-Content -Path $installer.FullName -Encoding Byte -TotalCount 2
             if ($header[0] -eq 0x4D -and $header[1] -eq 0x5A) {
               Write-Host "✓ Valid PE executable header"
@@ -230,6 +234,4 @@ jobs:
               exit 1
             }
           }
-
           Write-Host "`n✓ All installer validation checks passed!"
-        shell: pwsh
