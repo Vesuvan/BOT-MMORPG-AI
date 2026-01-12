@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio, Child};
 use std::sync::{Arc, Mutex};
 use std::thread;
-// FIXED: Removed 'Manager' from imports to clear the unused import warning
-use tauri::{Window, AppHandle}; 
+// FIXED: Removed 'Manager' to resolve "unused import" warning
+use tauri::{Window, AppHandle};
 use serde_json::json;
 
 // --- STATE MANAGEMENT ---
@@ -26,11 +26,9 @@ struct AiConfig {
 
 // --- HELPER: Parse .env manually ---
 fn get_env_var(key: &str) -> String {
-    // Try to find .env in the current working directory (usually where the binary is)
+    // Try to find .env in the current working directory
     let path = Path::new(".env");
     
-    // In production, we might need to look relative to the executable or resource path
-    // For now, we assume .env is next to the executable
     if let Ok(content) = fs::read_to_string(path) {
         for line in content.lines() {
             if line.starts_with(key) {
@@ -74,48 +72,63 @@ fn run_python_script(
     state: tauri::State<AppState>
 ) -> String {
     
-    // 1. Resolve the script path
-    // Try to find it in resources (production) or local versions folder (dev)
+    // 1. Resolve Script Path
+    // In dev: looks in absolute path relative to Cargo.toml (fallback)
+    // In prod: looks in the bundled resource directory
     let resource_path = app.path_resolver()
         .resolve_resource(format!("versions/0.01/{}", script_name));
 
     let script_path_buf: PathBuf = match resource_path {
         Some(path) => path,
         None => {
-            // Fallback for dev environment if resource not found
-            PathBuf::from(format!("versions/0.01/{}", script_name))
+            // Fallback for dev if resource resolver fails
+            PathBuf::from(format!("../versions/0.01/{}", script_name))
         }
     };
 
     let script_path = script_path_buf.to_string_lossy().to_string();
 
+    // Log to UI for debugging
+    let _ = window.emit("terminal_update", format!("[System] Locating script: {}", script_path));
+
     if !script_path_buf.exists() {
-        return format!("Error: Script not found at {}", script_path);
+        let err_msg = format!("Error: Script file not found at: {}", script_path);
+        let _ = window.emit("terminal_update", err_msg.clone());
+        return err_msg;
     }
     
-    // 2. Stop any existing process
+    // 2. Stop existing
     stop_process(state.clone());
 
-    // 3. Spawn new process
-    // Note: 'python' works on Windows/Mac usually. On some Linux distros you might need 'python3'
+    // 3. Determine Python Interpreter
+    // In production, we assume python is in PATH or bundled
     let cmd_name = if cfg!(target_os = "windows") { "python" } else { "python3" };
 
-    let child = Command::new(cmd_name)
-        .arg(&script_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped()) // Capture stderr too
-        .spawn();
+    // 4. Spawn Process
+    let mut command = Command::new(cmd_name);
+    command.arg(&script_path);
+    
+    // IMPORTANT: Capture outputs
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    
+    // Fix: Ensure we run in a windowless mode on Windows to avoid popping up shells
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
-    match child {
+    match command.spawn() {
         Ok(mut child_process) => {
             let stdout = child_process.stdout.take().unwrap();
             let stderr = child_process.stderr.take().unwrap();
             let process_handle = state.current_process.clone();
             
-            // Store the child
             *process_handle.lock().unwrap() = Some(child_process);
 
-            // Thread to read STDOUT and emit to UI
+            // STDOUT Thread
             let window_clone = window.clone();
             thread::spawn(move || {
                 let reader = BufReader::new(stdout);
@@ -126,13 +139,12 @@ fn run_python_script(
                 }
             });
 
-            // Thread to read STDERR and emit to UI
+            // STDERR Thread (Critical for debugging crashes)
             let window_clone_err = window.clone();
             thread::spawn(move || {
                 let reader = BufReader::new(stderr);
                 for line in reader.lines() {
                     if let Ok(l) = line {
-                        // Prefix error lines so UI knows
                         window_clone_err.emit("terminal_update", format!("(stderr) {}", l)).unwrap_or(());
                     }
                 }
@@ -140,7 +152,11 @@ fn run_python_script(
 
             format!("Started {}", script_name)
         }
-        Err(e) => format!("Failed to start script: {}", e),
+        Err(e) => {
+            let err_msg = format!("Failed to spawn python process: {}", e);
+            let _ = window.emit("terminal_update", err_msg.clone());
+            err_msg
+        }
     }
 }
 
@@ -185,7 +201,6 @@ fn start_bot(app: AppHandle, window: Window, state: tauri::State<AppState>) -> S
 fn stop_process(state: tauri::State<AppState>) -> String {
     let mut handle = state.current_process.lock().unwrap();
     if let Some(mut child) = handle.take() {
-        // Try to kill
         match child.kill() {
             Ok(_) => return "Process stopped".to_string(),
             Err(e) => return format!("Error killing process: {}", e),
@@ -205,10 +220,9 @@ fn install_drivers(app: tauri::AppHandle) -> serde_json::Value {
 
     let script = match resource_path {
       Some(p) => p,
-      None => return json!({"ok": false, "error": "Could not find install_drivers.ps1 in resources"}),
+      None => return json!({"ok": false, "error": "Could not find install_drivers.ps1"}),
     };
 
-    // Construct PowerShell command to run as Admin
     let ps = format!(
       "Start-Process PowerShell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"'",
       script.display()
@@ -219,20 +233,12 @@ fn install_drivers(app: tauri::AppHandle) -> serde_json::Value {
       .output();
 
     match out {
-      Ok(o) => json!({
-        "ok": o.status.success(),
-        "code": o.status.code(),
-        "stdout": String::from_utf8_lossy(&o.stdout),
-        "stderr": String::from_utf8_lossy(&o.stderr)
-      }),
+      Ok(o) => json!({ "ok": o.status.success(), "code": o.status.code() }),
       Err(e) => json!({"ok": false, "error": e.to_string()}),
     }
   }
-
   #[cfg(not(target_os = "windows"))]
-  {
-    json!({"ok": false, "error": "Drivers are Windows-only"})
-  }
+  { json!({"ok": false, "error": "Drivers are Windows-only"}) }
 }
 
 fn main() {
