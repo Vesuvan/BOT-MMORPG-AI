@@ -1,9 +1,10 @@
 {
   "build": {
-    "beforeBuildCommand": "",
     "beforeDevCommand": "",
+    "beforeBuildCommand": "",
     "devPath": "../tauri-ui",
-    "distDir": "../tauri-ui"
+    "distDir": "../tauri-ui",
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "BOT-MMORPG-AI",
@@ -11,40 +12,47 @@
   },
   "tauri": {
     "allowlist": {
+      "all": false,
       "shell": {
-        "all": true
+        "all": false,
+        "execute": true,
+        "sidecar": false
+      },
+      "fs": {
+        "all": true,
+        "scope": ["$APP/*", ".env"]
       }
     },
     "bundle": {
       "active": true,
+      "category": "Game",
       "targets": "all",
-      "externalBin": [
-        "binaries/main-backend"
-      ],
-      "identifier": "com.botmmorpg.ai",
+      "identifier": "com.bot.mmorpg.ai",
       "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "windows": {
-        "nsis": {
-          "installMode": "perMachine"
-        }
-      },
       "resources": [
         "resources/**",
-        "drivers/**"
+        "drivers/**",
+        "../versions/**",
+        "../.env"
       ]
     },
     "windows": [
       {
-        "title": "BOT MMORPG AI",
-        "width": 1100,
-        "height": 700,
-        "resizable": true
+        "title": "BOT-MMORPG-AI Launcher",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; media-src 'self' data: blob:;"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com",
+      "freezePrototype": true
     }
   }
 }
