@@ -107,6 +107,7 @@ jobs:
           Copy-Item -Force "dist/main-backend.exe" $tauriSidecar
 
           Write-Host "✓ Sidecar copied to: $tauriSidecar"
+          Write-Host "File size: $((Get-Item $tauriSidecar).Length / 1MB) MB"
 
       - name: Copy driver installers and scripts
         shell: pwsh
@@ -122,6 +123,7 @@ jobs:
 
           # Copy PowerShell installer scripts
           Copy-Item -Force "scripts/install_drivers.ps1" "src-tauri/resources/scripts/install_drivers.ps1"
+          
           # Optional: Check if download script exists before copying
           if (Test-Path "scripts/download_models.ps1") {
              Copy-Item -Force "scripts/download_models.ps1" "src-tauri/resources/scripts/download_models.ps1"
@@ -178,6 +180,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            src-tauri/target/release/build.log
+            *.log
+          if-no-files-found: ignore
+          retention-days: 7
+
       # 2. Upload to GitHub Releases (Permanent download link)
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -204,6 +217,12 @@ jobs:
         with:
           name: windows-installer
           path: ./installer-test
+
+      - name: List downloaded files
+        shell: pwsh
+        run: |
+          Write-Host "Downloaded installer files:"
+          Get-ChildItem -Path ./installer-test -Recurse
 
       - name: Basic installer validation
         shell: pwsh
