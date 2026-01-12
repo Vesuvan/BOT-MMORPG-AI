@@ -197,6 +197,26 @@ Log-Info ("Build started at: {0}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 Write-Host ""
 
 # ---- Prereqs ----
+
+# ================================
+# STEP 1: UI Smoke Tests (pre-build)
+# ================================
+$__hasLog = (Get-Command Log-Step -ErrorAction SilentlyContinue) -ne $null
+if ($__hasLog) { Log-Step 1 "UI Smoke Tests (pre-build)" } else { Write-Host "[STEP 1] UI Smoke Tests (pre-build)" }
+
+try {
+  if ($__hasLog) { Log-Info "Running UI/installer smoke tests..." } else { Write-Host "[INFO] Running UI/installer smoke tests..." }
+
+  # Bypass 'uv run' to avoid tensorflow dependency issues on Windows
+  # Tests are standard library only.
+  & python tests/test_tauri_ui_smoke.py
+  if ($LASTEXITCODE -ne 0) { throw "UI smoke tests failed (exit code $LASTEXITCODE)" }
+
+  if ($__hasLog) { Log-Ok "UI smoke tests passed" } else { Write-Host "[OK] UI smoke tests passed" }
+} catch {
+  if ($__hasLog) { Log-Fail "$_" } else { Write-Host "[FAIL] $($_.Exception.Message)" }
+  exit 1
+}
 Log-Step 0 "Checking Prerequisites"
 
 # Python

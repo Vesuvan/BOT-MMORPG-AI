@@ -545,3 +545,72 @@ function installDrivers() {
       throw err;
     });
 }
+
+/* ============================================================
+ * PATCH: UI event wiring (no inline onclick required)
+ * ============================================================
+ */
+(function () {
+  function patchedShowTab(tabId) {
+    const target =
+      document.getElementById(tabId) ||
+      document.getElementById(`tab-${tabId}`) ||
+      document.getElementById(`${tabId}-tab`) ||
+      document.querySelector(`[data-page="${tabId}"]`);
+
+    const pages = Array.from(document.querySelectorAll("[data-page], .tab-content, .page"));
+    if (pages.length) {
+      pages.forEach(p => (p.style.display = "none"));
+      if (target) target.style.display = "";
+    } else if (target) {
+      const parent = target.parentElement;
+      if (parent) Array.from(parent.children).forEach(c => (c.style.display = "none"));
+      target.style.display = "";
+    }
+
+    document.querySelectorAll("button[data-tab]").forEach(b => b.classList.remove("active"));
+    const activeBtn = document.querySelector(`button[data-tab="${tabId}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+  }
+
+  window.showTab = window.showTab || patchedShowTab;
+
+  function wireUi() {
+    document.querySelectorAll("button[data-tab]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const tab = btn.getAttribute("data-tab");
+        if (tab) window.showTab(tab);
+      });
+    });
+
+    const bindClick = (id, fnName) => {
+        const el = document.getElementById(id);
+        if (el && typeof window[fnName] === "function") {
+            el.addEventListener("click", () => window[fnName](el));
+        }
+    };
+
+    bindClick("btnRecord", "toggleRecord");
+    bindClick("btnStartTraining", "startTraining");
+    bindClick("btnStartBot", "toggleBot");
+    bindClick("btnInstallDrivers", "installDrivers");
+
+    const sendBtn = document.getElementById("btnSendChat");
+    if (sendBtn) {
+      const fn = window.sendChatMessage || window.sendMessage || window.sendChat;
+      if (typeof fn === "function") sendBtn.addEventListener("click", () => fn());
+    }
+
+    const first = document.querySelector("button[data-tab]");
+    if (first) {
+      const tab = first.getAttribute("data-tab");
+      if (tab) window.showTab(tab);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireUi);
+  } else {
+    wireUi();
+  }
+})();
