@@ -6,27 +6,28 @@ __pycache__/
 *$py.class
 *.so
 *.pyd
-*.pyc
+*.dll
+*.pdb
+
+# PyInstaller / build artifacts
+build/
+dist/
+*.spec
 
 # ==========================================
 # Environments & Configuration
 # ==========================================
-# Virtual Environments (Standard & uv)
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 
 # Distribution / Packaging
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -38,22 +39,25 @@ MANIFEST
 # ==========================================
 # Testing & Code Quality
 # ==========================================
-# Coverage reports
 htmlcov/
 .tox/
 .coverage
 .coverage.*
-.cache
+.cache/
 nosetests.xml
 coverage.xml
 *.cover
 *.log
 
-# Type checking & Testing caches
 .mypy_cache/
 .pytest_cache/
 .dmypy.json
 dmypy.json
+
+# ==========================================
+# Jupyter / Notebooks
+# ==========================================
+.ipynb_checkpoints/
 
 # ==========================================
 # Documentation
@@ -67,17 +71,57 @@ docs/_build/
 .idea/
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# ==========================================
+# Node / Frontend
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# common frontend build dirs
+frontend/dist/
+frontend/build/
+tauri-ui/dist/
+tauri-ui/build/
+
+# ==========================================
+# Rust / Tauri
+# ==========================================
+# Cargo builds
+**/target/
+src-tauri/target/
+
+# Tauri generated build artifacts / bundles (do not commit installers)
+src-tauri/target/**/bundle/
+src-tauri/target/**/nsis/
+src-tauri/target/**/msi/
+
+# Sidecar binaries created by pipeline (generated)
+src-tauri/binaries/
+binaries/
+
+# ==========================================
+# Installer outputs (generated)
+# ==========================================
+*.msi
+*.exe
+*.dmg
+*.app
+*.deb
+*.rpm
+*.AppImage
 
 # ==========================================
 # Project Specific (Data & Recordings)
 # ==========================================
 
-# Jupyter Notebooks
-*.ipynb_checkpoints/
-
-# Frontend / Recorder Data
-frontend/recorder/*
-frontend/dev/atbswp/*
+# Frontend / Recorder Data (generated)
+frontend/recorder/**
+frontend/dev/atbswp/**
+# If this is a real source file you need, remove this line:
 frontend/video_record/keyboard.py
 
 # Backups and Temporary Data
@@ -93,8 +137,55 @@ model_test/
 classes/
 clean/
 
-# Training Data (Huge CSVs)
+# ==========================================
+# Training / ML artifacts (big, generated)
+# ==========================================
+runs/
+wandb/
+mlruns/
+lightning_logs/
+tensorboard/
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.h5
+*.npz
+*.npy
+*.tfrecord
+
+# Large datasets archives (general)
+data/
+dataset/
+datasets/
+recordings/
+captures/
+replays/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Your known huge CSVs (keep explicit)
 versions/0.01/data_reduced/x_training_data.csv
 versions/0.01/data_reduced/y_training_data.csv
 versions/0.01/data_reduced/undersampling/x_training_data.csv
 versions/0.01/data_reduced/undersampling/y_training_data.csv
+
+# ==========================================
+# Safety: DO NOT ignore docs images globally
+# ==========================================
+# We intentionally do NOT ignore *.png/*.jpg so README/notebooks keep images.
+
+# ==========================================
+# Misc temp files
+# ==========================================
+*.tmp
+*.bak
+*.old
+*.swp
+*.swo
+!*.exe
+* copy*
