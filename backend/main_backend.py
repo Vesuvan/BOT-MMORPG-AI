@@ -22,6 +22,24 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+# PATCH: process management
+RUNNING_PROCESSES = {
+    # key -> subprocess.Popen
+    # 'collect' and 'play' are long-running/toggle actions
+}
+
+def _kill_process(key: str):
+    p = RUNNING_PROCESSES.get(key)
+    if not p:
+        return False
+    try:
+        p.terminate()
+    except Exception:
+        pass
+    RUNNING_PROCESSES.pop(key, None)
+    return True
+
+
 APP_VERSION = "0.1.5"
 
 
@@ -83,6 +101,76 @@ def _run_action(action: str) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+
+    def handle_stop(self):
+        # stop long-running actions (collect/play) if running
+        stopped_any = False
+        for key in list(RUNNING_PROCESSES.keys()):
+            stopped_any = _kill_process(key) or stopped_any
+        self._send_json({"ok": True, "stopped": stopped_any})
+
+    def handle_legacy_action(self, legacy_path: str):
+        # Map /collect,/train,/play to /action/*
+        mapping = {
+            "/collect": "/action/collect",
+            "/train": "/action/train",
+            "/play": "/action/play",
+        }
+        self.path = mapping.get(legacy_path, legacy_path)
+        # fall through to main action handler
+        return self.handle_action()
+
+    def handle_action(self):
+        """
+        Existing project expects /action/<name>.
+        We support:
+          - collect, play: start/stop toggle style (background)
+          - train: run and wait (foreground)
+        """
+        # extract action name
+        parts = self.path.split("/")
+        action = parts[-1] if parts else ""
+        action = action.strip()
+
+        # Existing code likely already implements /action routes.
+        # We try to call original implementation if it exists.
+        orig = getattr(self, "_handle_action_original", None)
+        if callable(orig):
+            return orig()
+
+        # Minimal default implementation (if original not found):
+        script_map = {
+            "collect": ("python", "-m", "bot_mmorpg.scripts.collect_data"),
+            "train": ("python", "-m", "bot_mmorpg.scripts.train_model"),
+            "play": ("python", "-m", "bot_mmorpg.scripts.test_model"),
+        }
+        cmd = script_map.get(action)
+        if not cmd:
+            self._send_json({"ok": False, "error": f"Unknown action: {action}"}, code=404)
+            return
+
+        if action in ("collect", "play"):
+            # toggle: if running -> stop, else start
+            if action in RUNNING_PROCESSES:
+                _kill_process(action)
+                self._send_json({"ok": True, "action": action, "running": False})
+                return
+            try:
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                RUNNING_PROCESSES[action] = p
+                self._send_json({"ok": True, "action": action, "running": True})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, code=500)
+            return
+
+        # train: run foreground
+        try:
+            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+            self._send_json({"ok": True, "action": action, "output": out})
+        except subprocess.CalledProcessError as e:
+            self._send_json({"ok": False, "action": action, "output": e.output}, code=500)
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, code=500)
     def _send(self, code: int, payload: dict):
         body = json.dumps(payload).encode("utf-8")
         self.send_response(code)
@@ -101,6 +189,11 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
+        # PATCH: support /stop and legacy endpoints
+        if self.path == '/stop':
+            return self.handle_stop()
+        if self.path in ('/collect', '/train', '/play'):
+            return self.handle_legacy_action(self.path)
         if self.path.startswith("/action/"):
             action = self.path.split("/", 2)[2]
             result = _run_action(action)

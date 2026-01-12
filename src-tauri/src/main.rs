@@ -9,7 +9,7 @@ fn install_drivers(app: tauri::AppHandle) -> serde_json::Value {
   {
     let resource_path = app
       .path_resolver()
-      .resolve_resource("scripts/install_drivers.ps1");
+      .resolve_resource("resources/scripts/install_drivers.ps1");
 
     let script = match resource_path {
       Some(p) => p,

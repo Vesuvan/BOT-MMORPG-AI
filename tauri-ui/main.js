@@ -1,7 +1,8 @@
-import { Command } from '@tauri-apps/api/shell';
-import { invoke } from '@tauri-apps/api/tauri';
-
 // State
+const __TAURI__ = window.__TAURI__;
+const { invoke } = __TAURI__.tauri;
+const { Command } = __TAURI__.shell;
+
 let backendPort = null;
 let isRecording = false;
 let isRunning = false;
@@ -187,7 +188,7 @@ window.toggleRecord = async function(btn) {
       logToTerminal('Starting data collection...', 'info');
       btn.disabled = true;
 
-      const result = await fetchJSON('/collect', { method: 'POST' });
+      const result = await fetchJSON('/action/collect', { method: 'POST' });
 
       btn.innerHTML = "<span>■</span> Stop Recording";
       btn.style.background = "#333";
@@ -238,7 +239,7 @@ window.startTraining = async function() {
     if (progressBar) progressBar.style.width = "0%";
     if (pctDisplay) pctDisplay.textContent = "0%";
 
-    const result = await fetchJSON('/train', { method: 'POST' });
+    const result = await fetchJSON('/action/train', { method: 'POST' });
 
     if (result.stdout) {
       const lines = result.stdout.split('\n');
@@ -344,7 +345,7 @@ window.toggleBot = async function(btn) {
       logToTerminal('Starting bot automation...', 'info');
       btn.disabled = true;
 
-      const result = await fetchJSON('/play', { method: 'POST' });
+      const result = await fetchJSON('/action/play', { method: 'POST' });
 
       btn.innerText = "■ STOP BOT";
       btn.style.background = "var(--accent)";
@@ -529,3 +530,18 @@ init().catch(error => {
   logToTerminal(`Initialization failed: ${error.message}`, 'error');
   updateBackendStatus('Failed', 'Init failed');
 });
+
+/* Patch override: installDrivers via Tauri invoke */
+function installDrivers() {
+  const log = document.getElementById("logOutput");
+  if (log) log.textContent += "\n[Drivers] Starting driver installation...";
+  return invoke("install_drivers")
+    .then((res) => {
+      if (log) log.textContent += "\n[Drivers] " + (res?.message || JSON.stringify(res));
+      return res;
+    })
+    .catch((err) => {
+      if (log) log.textContent += "\n[Drivers][ERROR] " + (err?.toString?.() || JSON.stringify(err));
+      throw err;
+    });
+}
