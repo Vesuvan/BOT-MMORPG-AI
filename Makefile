@@ -174,6 +174,31 @@ test-model: ## Run model testing/playing script
 	@echo Starting model testing...
 	@$(RUN_PYTHON) versions/0.01/3-test_model.py
 
+##@ Running the Application
+
+run: ## Run the application in development mode
+	@echo "========================================"
+	@echo " Starting BOT MMORPG AI"
+	@echo "========================================"
+	@echo "Frontend: tauri-ui/ (HTML/CSS/JavaScript)"
+	@echo "Backend: Python sidecar (auto-started)"
+	@echo ""
+ifeq ($(IS_WINDOWS),1)
+	@echo "Starting Tauri development server..."
+	@cd src-tauri && cargo tauri dev
+else
+	@echo "Checking prerequisites..."
+	@which cargo >/dev/null 2>&1 || (echo "ERROR: Rust/Cargo not found. Install from https://rustup.rs/" && exit 1)
+	@echo "Starting Tauri development server..."
+	@cd src-tauri && cargo tauri dev
+endif
+
+dev: run ## Alias for 'run' - Start development server
+
+run-backend: ## Run only the Python backend (for testing)
+	@echo "Starting backend API server..."
+	@$(RUN_PYTHON) backend/main_backend.py
+
 ##@ Installer (Windows Only)
 
 artifact: build-installer verify-installer ## Build Windows installer artifact (complete workflow)

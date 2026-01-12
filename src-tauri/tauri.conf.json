@@ -6,7 +6,7 @@
     "distDir": "../tauri-ui"
   },
   "package": {
-    "productName": "BOT MMORPG AI",
+    "productName": "BOT-MMORPG-AI",
     "version": "0.1.5"
   },
   "tauri": {

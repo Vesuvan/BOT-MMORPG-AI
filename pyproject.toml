@@ -78,7 +78,7 @@ launcher =[
 ]
 
 all = [
-    "bot-mmorpg-ai[dev,docs,jupyter]",
+    "bot-mmorpg-ai[dev,docs,jupyter,launcher]",
 ]
 
 [project.urls]

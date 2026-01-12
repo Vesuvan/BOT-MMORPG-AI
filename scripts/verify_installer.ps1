@@ -74,7 +74,7 @@ if (Test-Path $vjoyPath) {
     $errors += "Missing vJoy driver installer"
 }
 
-# Check 3: PowerShell driver install script
+# Check 3: PowerShell install scripts
 Write-Info "Checking install scripts..."
 
 $installScriptPath = Join-Path $root "src-tauri\resources\scripts\install_drivers.ps1"
@@ -83,6 +83,14 @@ if (Test-Path $installScriptPath) {
 } else {
     Write-Failure "Install drivers script not found: $installScriptPath"
     $errors += "Missing install_drivers.ps1 script"
+}
+
+$modelsScriptPath = Join-Path $root "src-tauri\resources\scripts\download_models.ps1"
+if (Test-Path $modelsScriptPath) {
+    Write-Success "Download models script exists"
+} else {
+    Write-Failure "Download models script not found: $modelsScriptPath"
+    $errors += "Missing download_models.ps1 script"
 }
 
 # Check 4: Tauri application binary

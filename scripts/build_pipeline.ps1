@@ -435,6 +435,15 @@ if (Test-Path $installScriptSrc) {
   Log-Warn "Install drivers script not found: $installScriptSrc"
 }
 
+$modelsScriptSrc = Join-Path $root "scripts\download_models.ps1"
+$modelsScriptDst = Join-Path $resScripts "download_models.ps1"
+if (Test-Path $modelsScriptSrc) {
+  Copy-Item -Force $modelsScriptSrc $modelsScriptDst
+  Log-Ok "Download models script copied"
+} else {
+  Log-Warn "Download models script not found: $modelsScriptSrc"
+}
+
 # ---- Build Tauri ----
 if (-not $SkipTauri) {
   Log-Step 4 "Building Tauri Application"
