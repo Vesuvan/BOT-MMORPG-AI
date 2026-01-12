@@ -37,7 +37,7 @@ RequestExecutionLevel admin
 ; Custom text for finish page
 !define MUI_FINISHPAGE_TITLE "Installation Complete"
 !define MUI_FINISHPAGE_TEXT "BOT MMORPG AI has been installed successfully.$\r$\n$\r$\nYou can now launch the application from your Start Menu or Desktop.$\r$\n$\r$\nThank you for choosing BOT MMORPG AI!"
-!define MUI_FINISHPAGE_RUN "$INSTDIR\{{main_binary_name}}.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\\{{main_binary_name}}.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch BOT MMORPG AI"
 
 ; --- Wizard Pages ---
@@ -104,7 +104,7 @@ Section "BOT MMORPG AI (UI + Backend)" SecCore
   ; Add to Windows Programs list
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "DisplayName" "BOT MMORPG AI"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "UninstallString" "$INSTDIR\Uninstall.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "DisplayIcon" "$INSTDIR\{{main_binary_name}}.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "DisplayIcon" "$INSTDIR\\{{main_binary_name}}.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "Publisher" "BOT MMORPG AI Team"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "DisplayVersion" "{{version}}"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\BOT-MMORPG-AI" "NoModify" 1
@@ -113,9 +113,9 @@ Section "BOT MMORPG AI (UI + Backend)" SecCore
   ; --- Shortcuts ---
   DetailPrint "Creating shortcuts..."
   CreateDirectory "$SMPROGRAMS\BOT-MMORPG-AI"
-  CreateShortCut "$SMPROGRAMS\BOT-MMORPG-AI\BOT-MMORPG-AI.lnk" "$INSTDIR\{{main_binary_name}}.exe" "" "$INSTDIR\{{main_binary_name}}.exe" 0
+  CreateShortCut "$SMPROGRAMS\BOT-MMORPG-AI\BOT-MMORPG-AI.lnk" "$INSTDIR\\{{main_binary_name}}.exe" "" "$INSTDIR\\{{main_binary_name}}.exe" 0
   CreateShortCut "$SMPROGRAMS\BOT-MMORPG-AI\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
-  CreateShortCut "$DESKTOP\BOT-MMORPG-AI.lnk" "$INSTDIR\{{main_binary_name}}.exe" "" "$INSTDIR\{{main_binary_name}}.exe" 0
+  CreateShortCut "$DESKTOP\BOT-MMORPG-AI.lnk" "$INSTDIR\\{{main_binary_name}}.exe" "" "$INSTDIR\\{{main_binary_name}}.exe" 0
 
   ; --- Driver installers ---
   ; Interception
@@ -233,7 +233,7 @@ Section "Uninstall"
   keep_data:
     DetailPrint "Keeping user data and models..."
     ; Remove application files but keep models and dev folders
-    Delete "$INSTDIR\{{main_binary_name}}.exe"
+    Delete "$INSTDIR\\{{main_binary_name}}.exe"
     Delete "$INSTDIR\Uninstall.exe"
     RMDir /r "$INSTDIR\drivers"
     RMDir /r "$INSTDIR\resources"

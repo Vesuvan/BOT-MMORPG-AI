@@ -518,26 +518,26 @@
         </div>
 
         <nav class="nav-menu">
-            <button onclick="showTab('dashboard')" class="nav-btn active" id="btn-dashboard">
+            <button class="nav-btn active" id="btn-dashboard" data-tab="dashboard">
                 <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
                 Dashboard
             </button>
-            <button onclick="showTab('teach')" class="nav-btn" id="btn-teach">
+            <button class="nav-btn" id="btn-teach" data-tab="teach">
                 <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                 Teach (Record)
             </button>
-            <button onclick="showTab('train')" class="nav-btn" id="btn-train">
+            <button class="nav-btn" id="btn-train" data-tab="train">
                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
                 Train Brain
             </button>
-            <button onclick="showTab('run')" class="nav-btn" id="btn-run">
+            <button class="nav-btn" id="btn-run" data-tab="run">
                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 Run Bot
             </button>
-            <button onclick="showTab('strategist')" class="nav-btn" id="btn-strategist">
+            <button class="nav-btn" id="btn-strategist" data-tab="strategist">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
                 AI Strategist ✨
-            </button>
+            AI 
         </nav>
 
         <div class="sidebar-footer">
@@ -568,27 +568,27 @@
                     <h2 style="color: var(--secondary)">System Ready</h2>
                     <p id="backend-status">Backend initializing...</p>
                 </div>
-                <button class="btn" onclick="showTab('run')">Quick Start</button>
+                <button class="btn" id="nav-teach">Quick Start</button>
             </div>
 
             <h3 style="margin-bottom: 15px; color: var(--text-dim);">Quick Actions</h3>
             <div class="grid-container">
-                <div class="card" onclick="showTab('teach')">
+                <div class="card">
                     <div class="card-icon" style="color: #FF5252;">🎥</div>
                     <h3>Create New Route</h3>
                     <p>Record your movement and actions to teach the AI a new farming path.</p>
                 </div>
-                <div class="card" onclick="showTab('train')">
+                <div class="card">
                     <div class="card-icon" style="color: #FFB74D;">🧠</div>
                     <h3>Retrain Model</h3>
                     <p>Update the neural network with the latest recorded gameplay data.</p>
                 </div>
-                <div class="card" onclick="showTab('run')">
+                <div class="card">
                     <div class="card-icon" style="color: #69F0AE;">⚡</div>
                     <h3>Run Automation</h3>
                     <p>Execute the current model. Sit back and watch it play.</p>
                 </div>
-                <div class="card" onclick="showTab('strategist')">
+                <div class="card">
                     <div class="card-icon" style="color: #FFD700;">✨</div>
                     <h3>Ask AI Strategist</h3>
                     <p>Get instant advice on routes, builds, and bot configuration.</p>
@@ -620,7 +620,7 @@
             </div>
 
             <div style="display: flex; gap: 15px; align-items: center;">
-                <button class="btn btn-danger" id="btnRecord" onclick="toggleRecord(this)">
+                <button class="btn btn-danger" id="btnRecord">
                     <span>●</span> Start Recording
                 </button>
                 <span style="color: var(--text-dim);" id="record-status">Press to start capturing data...</span>
@@ -635,10 +635,10 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn" id="btnStartTraining" style="background: var(--primary); color: white;" onclick="startTraining()">
+                    <button class="btn" id="btnStartTraining" style="background: var(--primary); color: white;">
                         <span>⚙️</span> Start Training
                     </button>
-                    <button class="btn btn-ai" id="btnAnalyzeLogs" onclick="analyzeLogs()">
+                    <button class="btn btn-ai" id="btnAnalyzeLogs">
                         <span>✨</span> Analyze Logs
                     </button>
                 </div>
@@ -665,10 +665,10 @@
             </div>
 
             <div style="display: flex; gap: 20px;">
-                <button class="btn btn-success" id="btnStartBot" style="flex: 1; height: 60px; font-size: 18px;" onclick="toggleBot(this)">
+                <button class="btn btn-success" id="btnStartBot" style="flex: 1; height: 60px; font-size: 18px;">
                     ▶ START BOT
                 </button>
-                <button class="btn" id="btnInstallDrivers" style="background: #333; color: white; min-width: 120px;" onclick="installDrivers()">
+                <button class="btn" id="btnInstallDrivers" style="background: #333; color: white; min-width: 120px;">
                     🔧 Drivers
                 </button>
             </div>
@@ -699,7 +699,7 @@
                 </div>
                 <div class="chat-input-area">
                     <input type="text" id="chat-input" class="chat-input" placeholder="Ask about farming routes or bot settings..." onkeypress="handleChatEnter(event)">
-                    <button class="btn" id="btnSendChat" onclick="sendChatMessage()">Send</button>
+                    <button class="btn" id="btnSendChat">Send</button>
                     <div class="spinner" id="chat-spinner"></div>
                 </div>
             </div>
