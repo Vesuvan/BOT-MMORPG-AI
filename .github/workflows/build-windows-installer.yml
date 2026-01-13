@@ -201,12 +201,18 @@ jobs:
             Write-Error "No installer found!"
             exit 1
           }
+
           foreach ($installer in $installers) {
             Write-Host "Validating: $($installer.Name)"
+
             if ($installer.Length -lt 1MB) {
               Write-Warning "Installer size is suspiciously small"
             }
-            $header = Get-Content -Path $installer.FullName -Encoding Byte -TotalCount 2
+
+            # FIX: PowerShell 7 does NOT support -Encoding Byte
+            $bytes  = [System.IO.File]::ReadAllBytes($installer.FullName)
+            $header = $bytes[0..1]
+
             if ($header[0] -eq 0x4D -and $header[1] -eq 0x5A) {
               Write-Host "✓ Valid PE executable header"
             } else {
