@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-uv venv sync clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher install-all collect-data train-model test-model
+.PHONY: help install install-dev install-uv venv sync clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
 
 # Default target
 .DEFAULT_GOAL := help
@@ -19,14 +19,14 @@ endif
 ##@ General
 
 help: ## Display this help message
-	@echo =======================================================================
-	@echo  BOT-MMORPG-AI - AI Bot for MMORPG Games
-	@echo =======================================================================
+	@echo "======================================================================="
+	@echo " BOT-MMORPG-AI - AI Bot for MMORPG Games"
+	@echo "======================================================================="
 	@$(SYS_PYTHON) -c "import sys, re; \
 	lines = [l.strip() for l in sys.stdin]; \
 	print('Available commands:'); \
 	[print(f'  {m.group(1):<20} {m.group(2)}') for l in lines if (m := re.match(r'^([a-zA-Z_-]+):.*?## (.*)$$', l))]" < $(MAKEFILE_LIST)
-	@echo.
+	@echo ""
 
 ##@ Installation & Setup
 
@@ -173,6 +173,115 @@ train-model: ## Run model training script
 test-model: ## Run model testing/playing script
 	@echo Starting model testing...
 	@$(RUN_PYTHON) versions/0.01/3-test_model.py
+
+##@ Running the Application
+
+run: ## Run the application in development mode
+	@echo "========================================"
+	@echo " Starting BOT MMORPG AI"
+	@echo "========================================"
+	@echo "Frontend: tauri-ui/ (HTML/CSS/JavaScript)"
+	@echo "Backend: Python sidecar (auto-started)"
+	@echo ""
+ifeq ($(IS_WINDOWS),1)
+	@echo "Starting Tauri development server..."
+	@cd src-tauri && cargo tauri dev
+else
+	@echo "Checking prerequisites..."
+	@which cargo >/dev/null 2>&1 || (echo "ERROR: Rust/Cargo not found. Install from https://rustup.rs/" && exit 1)
+	@echo "Starting Tauri development server..."
+	@cd src-tauri && cargo tauri dev
+endif
+
+dev: run ## Alias for 'run' - Start development server
+
+run-backend: ## Run only the Python backend (for testing)
+	@echo "Starting backend API server..."
+	@$(RUN_PYTHON) backend/main_backend.py
+
+##@ Installer (Windows Only)
+
+artifact: build-installer verify-installer ## Build Windows installer artifact (complete workflow)
+	@echo ""
+	@echo "========================================"
+	@echo " Installer Build Complete!"
+	@echo "========================================"
+	@echo "Installer location: src-tauri/target/release/bundle/nsis/"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Test installer: make test-installer"
+	@echo "  2. Test on Windows VM"
+	@echo "  3. Create release: git tag v1.0.0 && git push origin v1.0.0"
+	@echo ""
+
+build-installer: ## Build the Windows installer
+ifeq ($(IS_WINDOWS),1)
+	@echo "========================================"
+	@echo " Building Windows Installer"
+	@echo "========================================"
+	@echo "This will:"
+	@echo "  1. Build Python backend with PyInstaller"
+	@echo "  2. Build Tauri desktop application"
+	@echo "  3. Create NSIS installer package"
+	@echo ""
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_pipeline.ps1
+else
+	@echo "========================================"
+	@echo " Windows Installer Build"
+	@echo "========================================"
+	@echo "ERROR: Installer build is only supported on Windows."
+	@echo ""
+	@echo "To build the installer:"
+	@echo "  1. Use a Windows machine or VM"
+	@echo "  2. Install prerequisites: Python 3.10+, Rust, Tauri CLI"
+	@echo "  3. Run: make artifact"
+	@echo ""
+	@echo "Or use GitHub Actions:"
+	@echo "  - Push to GitHub: git push"
+	@echo "  - Check Actions tab for build artifacts"
+	@echo "  - Download installer from workflow run"
+	@echo ""
+	@exit 1
+endif
+
+verify-installer: ## Verify installer was built correctly
+ifeq ($(IS_WINDOWS),1)
+	@echo "========================================"
+	@echo " Verifying Installer Build"
+	@echo "========================================"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_installer.ps1
+else
+	@echo "========================================"
+	@echo " Installer Verification"
+	@echo "========================================"
+	@echo "Verification is only available on Windows."
+	@echo "Use GitHub Actions to verify builds on CI."
+	@echo ""
+endif
+
+test-installer: ## Test the installer package
+ifeq ($(IS_WINDOWS),1)
+	@echo "========================================"
+	@echo " Testing Installer Package"
+	@echo "========================================"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test_installer.ps1
+else
+	@echo "========================================"
+	@echo " Installer Testing"
+	@echo "========================================"
+	@echo "Testing is only available on Windows."
+	@echo "Use GitHub Actions to test builds on CI."
+	@echo ""
+endif
+
+clean-installer: ## Clean installer build artifacts
+	@echo Cleaning installer artifacts...
+ifeq ($(IS_WINDOWS),1)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist, build, src-tauri/target, src-tauri/binaries, src-tauri/drivers, src-tauri/resources, *.spec"
+else
+	@rm -rf dist build src-tauri/target src-tauri/binaries src-tauri/drivers src-tauri/resources *.spec 2>/dev/null || true
+endif
+	@echo Installer artifacts cleaned
 
 ##@ Complete Workflows
 
