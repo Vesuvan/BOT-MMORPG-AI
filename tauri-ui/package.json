@@ -1,0 +1,15 @@
+{
+  "name": "tauri-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.5.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
