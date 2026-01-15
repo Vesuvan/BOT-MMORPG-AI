@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager, Window};
 // CONSTANTS / DEFAULTS
 // ---------------------------
 const DEFAULT_GAME_ID: &str = "genshin_impact";
-//const SCRIPTS_DIR_REL: &str = "versions/0.01"; // keep your tree exactly
+const DEFAULT_VERSION: &str = "0.01";
 
 // ---------------------------
 // APP STATE
@@ -52,6 +52,7 @@ struct AiConfig {
 // CONFIG (.env) HELPERS
 // ---------------------------
 fn env_file_path(app: &AppHandle) -> PathBuf {
+    // DEV convenience: prefer repo root .env if present
     if cfg!(debug_assertions) {
         if let Ok(cwd) = std::env::current_dir() {
             let candidate = cwd.join("..").join(".env");
@@ -75,7 +76,8 @@ fn ensure_default_env(app: &AppHandle) {
     if path.exists() {
         return;
     }
-    let default_content = "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\nPYTHON_PATH=\"\"\n";
+    let default_content =
+        "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\nPYTHON_PATH=\"\"\n";
     let _ = fs::write(path, default_content);
 }
 
@@ -139,7 +141,11 @@ fn is_windows() -> bool {
 }
 
 fn path_sep() -> &'static str {
-    if is_windows() { ";" } else { ":" }
+    if is_windows() {
+        ";"
+    } else {
+        ":"
+    }
 }
 
 fn normalize_game_id(game_id: Option<String>) -> String {
@@ -151,7 +157,7 @@ fn normalize_game_id(game_id: Option<String>) -> String {
     }
 }
 
-// Dev repo root helper (src-tauri parent)
+/// Dev repo root helper (src-tauri parent)
 fn dev_repo_root() -> PathBuf {
     std::env::current_dir()
         .ok()
@@ -175,14 +181,16 @@ fn venv_bin_from_root(root: &Path) -> PathBuf {
     }
 }
 
-/// Optional bundled python (recommended if you choose to ship it later)
+/// Optional bundled python (if you ever ship it)
 fn bundled_python_path(app: &AppHandle) -> Option<PathBuf> {
     let rel = if is_windows() {
         "resources/python/python.exe"
     } else {
         "resources/python/bin/python3"
     };
-    app.path_resolver().resolve_resource(rel).and_then(|p| if p.exists() { Some(p) } else { None })
+    app.path_resolver()
+        .resolve_resource(rel)
+        .and_then(|p| if p.exists() { Some(p) } else { None })
 }
 
 fn find_python_for_app(app: &AppHandle) -> Result<PathBuf, String> {
@@ -230,9 +238,13 @@ fn apply_dev_venv_env(cmd: &mut Command, repo_root: &Path) {
     new_path.push(path_sep());
     new_path.push(old_path);
     cmd.env("PATH", new_path);
+}
 
+/// Apply stable Python env (both dev + prod), avoids Windows stdout weirdness.
+fn apply_stable_python_env(cmd: &mut Command) {
     cmd.env("PYTHONUNBUFFERED", "1");
     cmd.env("PYTHONUTF8", "1");
+    cmd.env("PYTHONIOENCODING", "utf-8");
 }
 
 /// Writable runtime directory (datasets/models/logs)
@@ -245,42 +257,42 @@ fn work_dir(app: &AppHandle) -> PathBuf {
     p
 }
 
-/// Try multiple resource mappings (because ../versions/** may land under resources/ or at root)
-fn resolve_versions_dir(app: &AppHandle) -> Option<PathBuf> {
-    // Attempt 1: direct versions/ (common)
-    if let Some(p) = app.path_resolver().resolve_resource("versions") {
-        if p.exists() { return Some(p); }
-    }
-    // Attempt 2: resources/versions/ (also common)
-    if let Some(p) = app.path_resolver().resolve_resource("resources/versions") {
-        if p.exists() { return Some(p); }
-    }
-    None
-}
-
-/// Resolve scripts from original tree without moving anything:
-/// - PROD: bundled versions directory (resolve_versions_dir)
-/// - DEV: repo_root/versions/0.01/<script>
+/// Resolve scripts from *bundled resources* in production:
+///   resolve_resource("versions/0.01/<script>.py")
+/// and fallback to repo tree in debug.
 fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
-    // PROD
+    // PROD: resolve via Tauri resource resolver
     if !cfg!(debug_assertions) {
-        if let Some(versions_root) = resolve_versions_dir(app) {
-            let candidate = versions_root.join("0.01").join(script_name);
-            if candidate.exists() {
-                return Ok(candidate);
+        let rel = format!("versions/{}/{}", DEFAULT_VERSION, script_name);
+        if let Some(p) = app.path_resolver().resolve_resource(&rel) {
+            if p.exists() {
+                return Ok(p);
             }
         }
-    }
-
-    // DEV
-    if cfg!(debug_assertions) {
-        let candidate = dev_repo_root().join("versions").join("0.01").join(script_name);
-        if candidate.exists() {
-            return Ok(candidate);
+        // Some builds end up nesting in resources/
+        let rel2 = format!("resources/versions/{}/{}", DEFAULT_VERSION, script_name);
+        if let Some(p) = app.path_resolver().resolve_resource(&rel2) {
+            if p.exists() {
+                return Ok(p);
+            }
         }
+
+        return Err(format!(
+            "Script not found in bundled resources: versions/{}/{}",
+            DEFAULT_VERSION, script_name
+        ));
     }
 
-    Err(format!("Script not found (bundled or dev): {}", script_name))
+    // DEV: repo tree
+    let candidate = dev_repo_root()
+        .join("versions")
+        .join(DEFAULT_VERSION)
+        .join(script_name);
+    if candidate.exists() {
+        Ok(candidate)
+    } else {
+        Err(format!("Script not found (dev): {}", candidate.display()))
+    }
 }
 
 // ---------------------------
@@ -306,27 +318,6 @@ fn parse_ready_line(line: &str) -> Option<SidecarApi> {
     }
 }
 
-/// Resolve sidecar entrypoint:
-/// - PROD: resource sidecar script if bundled (recommended)
-/// - DEV: repo modelhub/tauri.py (fallback to backend/main_backend.py)
-fn resolve_sidecar_entry(app: &AppHandle) -> Option<PathBuf> {
-    // PROD: if you bundle modelhub as resource later, it will be found here
-    if !cfg!(debug_assertions) {
-        if let Some(p) = app.path_resolver().resolve_resource("modelhub/tauri.py") {
-            if p.exists() { return Some(p); }
-        }
-        if let Some(p) = app.path_resolver().resolve_resource("resources/modelhub/tauri.py") {
-            if p.exists() { return Some(p); }
-        }
-    }
-
-    // DEV
-    let root = dev_repo_root();
-    let a = root.join("modelhub").join("tauri.py");
-    let b = root.join("backend").join("main_backend.py");
-    if a.exists() { Some(a) } else if b.exists() { Some(b) } else { None }
-}
-
 fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
     let token = {
         let pid = std::process::id();
@@ -342,31 +333,27 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         .path_resolver()
         .app_data_dir()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let _ = fs::create_dir_all(&data_root);
 
     // Read-only resources directory (where bundled resources live in production)
-    // NOTE: in Tauri v1, resource_dir() returns the directory that contains bundled resources.
     let resource_root = app
         .path_resolver()
         .resource_dir()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     // Build the command:
-    // - DEV: run python script from repo using your venv-aware python finder
+    // - DEV: run python script from repo (modelhub/tauri.py) via python
     // - PROD: run bundled PyInstaller sidecar exe from resources
     let mut cmd = if cfg!(debug_assertions) {
         let py = find_python_for_app(app)?;
 
-        // Prefer repo-root modelhub/tauri.py; fallback to resolved resource if you keep it bundled in dev too.
-        let script = {
-            let a = dev_repo_root().join("modelhub").join("tauri.py");
-            if a.exists() {
-                a
-            } else {
-                resolve_sidecar_entry(app).ok_or_else(|| {
-                    "Sidecar entrypoint not found (dev). Expected modelhub/tauri.py".to_string()
-                })?
-            }
-        };
+        let script = dev_repo_root().join("modelhub").join("tauri.py");
+        if !script.exists() {
+            return Err(format!(
+                "Sidecar entrypoint not found in dev (expected {} )",
+                script.display()
+            ));
+        }
 
         if let Some(w) = app.get_window("main") {
             let _ = w.emit::<String>("terminal_update", format!("[System] Sidecar Python: {}", py.display()));
@@ -377,6 +364,7 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
 
         let mut c = Command::new(&py);
         apply_dev_venv_env(&mut c, &dev_repo_root());
+        apply_stable_python_env(&mut c);
         c.arg(script);
         c
     } else {
@@ -394,15 +382,11 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         }
 
         let mut c = Command::new(sidecar_exe);
-        // Helpful defaults for predictable logging in production
-        c.env("PYTHONUNBUFFERED", "1");
-        c.env("PYTHONUTF8", "1");
+        apply_stable_python_env(&mut c);
         c
     };
 
-    // IMPORTANT:
-    // modelhub/tauri.py expects: --port --token --resource-root --data-root
-    // (NOT --project-root)
+    // IMPORTANT: modelhub/tauri.py expects: --port --token --resource-root --data-root
     cmd.args([
         "--port",
         "0",
@@ -414,7 +398,7 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         &data_root.to_string_lossy(),
     ]);
 
-    // Optional: also set env vars (your tauri.py reads these too)
+    // Optional: also set env vars (tauri.py reads these too)
     cmd.env("MODELHUB_RESOURCE_ROOT", &resource_root);
     cmd.env("MODELHUB_DATA_ROOT", &data_root);
 
@@ -481,7 +465,6 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         Err(_) => Err("Timed out waiting for sidecar READY line".to_string()),
     }
 }
-
 
 // ---------------------------
 // HTTP HELPERS
@@ -608,10 +591,8 @@ fn run_python_script(
 
     if cfg!(debug_assertions) {
         apply_dev_venv_env(&mut cmd, &dev_repo_root());
-    } else {
-        cmd.env("PYTHONUNBUFFERED", "1");
-        cmd.env("PYTHONUTF8", "1");
     }
+    apply_stable_python_env(&mut cmd);
 
     // AI settings
     let provider = {
@@ -797,16 +778,21 @@ fn get_ai_config(app: AppHandle) -> AiConfig {
     }
 }
 
+/// FIX ✅
+/// - provider is always saved
+/// - api_key is OPTIONAL: if empty, we keep existing saved key
+///   (this allows UI to switch provider without forcing key input)
 #[tauri::command]
-fn save_configuration(app: AppHandle, provider: String, api_key: String) -> Result<bool, String> {
+fn save_configuration(app: AppHandle, provider: String, api_key: Option<String>) -> Result<bool, String> {
     let provider = provider.trim().to_lowercase();
-    let api_key = api_key.trim().to_string();
-
-    if api_key.is_empty() {
-        return Err("API key is empty".to_string());
-    }
+    let api_key = api_key.unwrap_or_default().trim().to_string();
 
     update_env_file(&app, "AI_PROVIDER", &provider)?;
+
+    // If UI didn't send a key (or sent empty), do NOT error; just save provider.
+    if api_key.is_empty() {
+        return Ok(true);
+    }
 
     match provider.as_str() {
         "gemini" => update_env_file(&app, "GEMINI_API_KEY", &api_key)?,
@@ -1031,7 +1017,7 @@ fn main() {
                         let _ = w.emit::<String>("terminal_update", format!("[Fatal] Sidecar failed: {}", e));
                         let _ = w.emit::<String>(
                             "terminal_update",
-                            "[Hint] In PROD you must bundle sidecar entry (modelhub/tauri.py) or ship a sidecar exe, and bundle python or set PYTHON_PATH.".to_string(),
+                            "[Hint] In PROD you must bundle the sidecar EXE at resources/sidecar/main-backend/main-backend.exe and bundle versions/0.01/*.py in resources so resolve_resource() can find them.".to_string(),
                         );
                     }
                 }
