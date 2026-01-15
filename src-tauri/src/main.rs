@@ -1,318 +1,693 @@
+// src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use std::fs;
 use std::io::{BufRead, BufReader};
-// FIXED: Removed 'Path' from import to solve unused import warning
-use std::path::PathBuf; 
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Window};
-use serde_json::json;
+use std::time::Duration;
 
-// --- STATE MANAGEMENT ---
+use tauri::{AppHandle, Manager, Window}; // ✅ FIX: Manager trait in scope (state/get_window)
+use reqwest::Client;
 
+// ---------------------------
+// CONSTANTS / DEFAULTS
+// ---------------------------
+const DEFAULT_GAME_ID: &str = "genshin_impact";
+const SCRIPTS_DIR_REL: &str = "versions/0.01";
+
+// ---------------------------
+// APP STATE (Arc inner + SidecarApi stored there)
+// ---------------------------
+
+#[derive(Clone, Debug)]
+struct SidecarApi {
+  base_url: String,
+  token: String,
+}
+
+struct AppStateInner {
+  current_process: Mutex<Option<Child>>,
+  sidecar: Mutex<Option<SidecarApi>>,
+  http: Client,
+}
+
+#[derive(Clone)]
 struct AppState {
-    current_process: Arc<Mutex<Option<Child>>>,
+  inner: Arc<AppStateInner>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct AiConfig {
-    provider: String,
-    gemini_key: String,
-    openai_key: String,
+  provider: String,
+  gemini_key: String,
+  openai_key: String,
 }
 
-// --- CONFIG (.env) HELPERS ---
+// ---------------------------
+// CONFIG (.env) HELPERS
+// ---------------------------
 
-/// Determines the correct path for the .env file.
-/// DEV: Checks project root (../.env) for shared config with Python.
-/// PROD: Uses the OS-specific App Config folder.
 fn env_file_path(app: &AppHandle) -> PathBuf {
-    // 1) Dev convenience: use project root .env if present
-    if cfg!(debug_assertions) {
-        if let Ok(cwd) = std::env::current_dir() {
-            // Typically cwd is ".../src-tauri" when running `cargo tauri dev`
-            let candidate = cwd.join("..").join(".env");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
+  // dev convenience: ../.env
+  if cfg!(debug_assertions) {
+    if let Ok(cwd) = std::env::current_dir() {
+      let candidate = cwd.join("..").join(".env");
+      if candidate.exists() {
+        return candidate;
+      }
     }
+  }
 
-    // 2) Production-safe: per-user config directory
-    let cfg_dir = app
-        .path_resolver()
-        .app_config_dir()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+  // production-safe
+  let cfg_dir = app
+    .path_resolver()
+    .app_config_dir()
+    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-    if let Err(_) = fs::create_dir_all(&cfg_dir) {
-        // fall back to current dir if config dir cannot be created
-        return PathBuf::from(".env");
-    }
-
-    cfg_dir.join(".env")
+  let _ = fs::create_dir_all(&cfg_dir);
+  cfg_dir.join(".env")
 }
 
 fn ensure_default_env(app: &AppHandle) {
-    let path = env_file_path(app);
-    if path.exists() {
-        return;
-    }
-    // Default values
-    let default_content = "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\n";
-    let _ = fs::write(path, default_content);
+  let path = env_file_path(app);
+  if path.exists() {
+    return;
+  }
+  let default_content = "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\n";
+  let _ = fs::write(path, default_content);
 }
 
-fn get_env_var(app: &AppHandle, key: &str) -> Option<String> {
-    ensure_default_env(app);
-    let env_path = env_file_path(app);
-    let content = fs::read_to_string(&env_path).ok()?;
-    
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') { continue; }
-        
-        if let Some((k, v)) = line.split_once('=') {
-            if k.trim() == key {
-                let mut value = v.trim().to_string();
-                // Strip optional quotes
-                if (value.starts_with('"') && value.ends_with('"')) || (value.starts_with('\'') && value.ends_with('\'')) {
-                    value = value[1..value.len()-1].to_string();
-                }
-                return Some(value);
-            }
-        }
+fn get_env_var(app: &AppHandle, key: &str) -> String {
+  ensure_default_env(app);
+  let env_path = env_file_path(app);
+  let content = fs::read_to_string(&env_path).unwrap_or_default();
+
+  for line in content.lines() {
+    let line = line.trim();
+    if line.is_empty() || line.starts_with('#') {
+      continue;
     }
-    None
+    if let Some((k, v)) = line.split_once('=') {
+      if k.trim() == key {
+        let mut value = v.trim().to_string();
+        if (value.starts_with('"') && value.ends_with('"'))
+          || (value.starts_with('\'') && value.ends_with('\''))
+        {
+          value = value[1..value.len() - 1].to_string();
+        }
+        return value;
+      }
+    }
+  }
+  String::new()
 }
 
 fn update_env_file(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
-    ensure_default_env(app);
-    let env_path = env_file_path(app);
+  ensure_default_env(app);
+  let env_path = env_file_path(app);
 
-    let mut lines: Vec<String> = fs::read_to_string(&env_path)
-        .unwrap_or_default()
-        .lines()
-        .map(|s| s.to_string())
-        .collect();
+  let mut lines: Vec<String> = fs::read_to_string(&env_path)
+    .unwrap_or_default()
+    .lines()
+    .map(|s| s.to_string())
+    .collect();
 
-    let mut found = false;
-    for line in lines.iter_mut() {
-        if let Some((k, _)) = line.split_once('=') {
-            if k.trim() == key {
-                // Escape quotes if necessary
-                *line = format!("{}=\"{}\"", key, value.replace('"', "\\\""));
-                found = true;
-                break;
-            }
-        }
+  let mut found = false;
+  for line in lines.iter_mut() {
+    if let Some((k, _)) = line.split_once('=') {
+      if k.trim() == key {
+        *line = format!("{}=\"{}\"", key, value.replace('"', "\\\""));
+        found = true;
+        break;
+      }
     }
-    if !found {
-        lines.push(format!("{}=\"{}\"", key, value.replace('"', "\\\"")));
-    }
+  }
+  if !found {
+    lines.push(format!("{}=\"{}\"", key, value.replace('"', "\\\"")));
+  }
 
-    fs::write(&env_path, lines.join("\n") + "\n").map_err(|e| e.to_string())
+  fs::write(&env_path, lines.join("\n") + "\n").map_err(|e| e.to_string())
 }
 
-// --- HELPER: Run Python Script ---
+// ---------------------------
+// UTILS
+// ---------------------------
 
-fn run_python_script(
-    app: AppHandle,
-    script_name: &str, 
-    window: Window, 
-    state: tauri::State<AppState>
-) -> String {
-    
-    // 1. Resolve Script Path
-    let resource_path = app.path_resolver()
-        .resolve_resource(format!("versions/0.01/{}", script_name));
+fn normalize_game_id(game_id: Option<String>) -> String {
+  let gid = game_id.unwrap_or_default().trim().to_string();
+  if gid.is_empty() {
+    DEFAULT_GAME_ID.to_string()
+  } else {
+    gid
+  }
+}
 
-    let script_path_buf: PathBuf = match resource_path {
-        Some(path) => path,
-        None => {
-            // Fallback for dev if resource resolver fails
-            PathBuf::from(format!("../versions/0.01/{}", script_name))
-        }
-    };
+fn scripts_dir_path(app: &AppHandle) -> PathBuf {
+  let resolved = app.path_resolver().resolve_resource(SCRIPTS_DIR_REL);
+  resolved.unwrap_or_else(|| PathBuf::from(format!("../{}", SCRIPTS_DIR_REL)))
+}
 
-    let script_path = script_path_buf.to_string_lossy().to_string();
+fn python_interpreter() -> &'static str {
+  if cfg!(target_os = "windows") {
+    "python"
+  } else {
+    "python3"
+  }
+}
 
-    // Log to UI
-    let _ = window.emit("terminal_update", format!("[System] Locating script: {}", script_path));
+// ---------------------------
+// SIDE-CAR (modelhub/tauri.py) STARTUP
+// ---------------------------
 
-    if !script_path_buf.exists() {
-        let err_msg = format!("Error: Script file not found at: {}", script_path);
-        let _ = window.emit("terminal_update", err_msg.clone());
-        return err_msg;
+fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
+  let token = {
+    let pid = std::process::id();
+    let now = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap_or_default()
+      .as_nanos();
+    format!("tkn-{}-{}", pid, now)
+  };
+
+  let mut cmd = if cfg!(debug_assertions) {
+    let script_a = PathBuf::from("../modelhub/tauri.py");
+    let script_b = PathBuf::from("../backend/main_backend.py");
+    let script = if script_a.exists() { script_a } else { script_b };
+
+    let mut c = Command::new(python_interpreter());
+    c.arg(script);
+    c
+  } else {
+    Command::new("main-backend")
+  };
+
+  let project_root = if cfg!(debug_assertions) {
+    std::env::current_dir()
+      .ok()
+      .and_then(|p| p.parent().map(|x| x.to_path_buf()))
+      .unwrap_or_else(|| PathBuf::from(".."))
+  } else {
+    app
+      .path_resolver()
+      .app_config_dir()
+      .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+  };
+
+  cmd.args([
+    "--serve",
+    "--port",
+    "0",
+    "--token",
+    &token,
+    "--project-root",
+    &project_root.to_string_lossy(),
+  ]);
+
+  cmd.stdout(Stdio::piped());
+  cmd.stderr(Stdio::piped());
+
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+  }
+
+  let mut child = cmd.spawn().map_err(|e| format!("Failed to start sidecar: {e}"))?;
+  let stdout = child.stdout.take().ok_or("Sidecar stdout unavailable".to_string())?;
+  let stderr = child.stderr.take().ok_or("Sidecar stderr unavailable".to_string())?;
+
+  let (tx, rx) = std::sync::mpsc::channel::<Result<SidecarApi, String>>();
+
+  let tx_out = tx.clone();
+  thread::spawn(move || {
+    let reader = BufReader::new(stdout);
+    for line in reader.lines().flatten() {
+      if let Some(api) = parse_ready_line(&line) {
+        let _ = tx_out.send(Ok(api));
+        return;
+      }
     }
-    
-    // 2. Stop existing process if running
-    stop_process(state.clone());
+    let _ = tx_out.send(Err("Sidecar exited without READY line (stdout)".to_string()));
+  });
 
-    // 3. Determine Python Interpreter
-    let cmd_name = if cfg!(target_os = "windows") { "python" } else { "python3" };
+  let tx_err = tx.clone();
+  thread::spawn(move || {
+    let reader = BufReader::new(stderr);
+    for line in reader.lines().flatten() {
+      if line.starts_with("FAILED ") {
+        let _ = tx_err.send(Err(format!("Sidecar failed: {}", line)));
+        return;
+      }
+    }
+  });
 
-    // 4. Spawn Process
-    let mut command = Command::new(cmd_name);
-    command.arg(&script_path);
+  let timeout = Duration::from_secs(15);
+  match rx.recv_timeout(timeout) {
+    Ok(Ok(api)) => {
+      let _ = child;
+      Ok(api)
+    }
+    Ok(Err(e)) => Err(e),
+    Err(_) => Err("Timed out waiting for sidecar READY line".to_string()),
+  }
+}
 
-    // Pass config to Python as environment variables
-    let provider = get_env_var(&app, "AI_PROVIDER").unwrap_or_else(|| "gemini".to_string());
-    let gemini_key = get_env_var(&app, "GEMINI_API_KEY").unwrap_or_default();
-    let openai_key = get_env_var(&app, "OPENAI_API_KEY").unwrap_or_default();
-    
-    command.env("AI_PROVIDER", provider);
-    command.env("GEMINI_API_KEY", gemini_key);
-    command.env("OPENAI_API_KEY", openai_key);
-    
-    // IMPORTANT: Capture outputs
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
-    
-    // Windows: Prevent shell window popup
-    #[cfg(target_os = "windows")]
+fn parse_ready_line(line: &str) -> Option<SidecarApi> {
+  let line = line.trim();
+  if !line.starts_with("READY ") {
+    return None;
+  }
+  let mut url: Option<String> = None;
+  let mut token: Option<String> = None;
+  for part in line.split_whitespace() {
+    if let Some(v) = part.strip_prefix("url=") {
+      url = Some(v.to_string());
+    } else if let Some(v) = part.strip_prefix("token=") {
+      token = Some(v.to_string());
+    }
+  }
+  match (url, token) {
+    (Some(base_url), Some(token)) => Some(SidecarApi { base_url, token }),
+    _ => None,
+  }
+}
+
+// ---------------------------
+// HTTP CALL HELPERS
+// ---------------------------
+
+async fn api_get_with(inner: &Arc<AppStateInner>, path: &str) -> Result<Value, String> {
+  let api = inner
+    .sidecar
+    .lock()
+    .unwrap()
+    .clone()
+    .ok_or_else(|| "Sidecar API not ready".to_string())?;
+
+  let url = format!("{}{}", api.base_url, path);
+
+  let res = inner
+    .http
+    .get(url)
+    .header("X-Auth-Token", api.token)
+    .send()
+    .await
+    .map_err(|e| e.to_string())?;
+
+  let status = res.status();
+  let body = res.json::<Value>().await.map_err(|e| e.to_string())?;
+
+  if !status.is_success() {
+    return Err(body.to_string());
+  }
+  Ok(body)
+}
+
+async fn api_post_with(inner: &Arc<AppStateInner>, path: &str, payload: Value) -> Result<Value, String> {
+  let api = inner
+    .sidecar
+    .lock()
+    .unwrap()
+    .clone()
+    .ok_or_else(|| "Sidecar API not ready".to_string())?;
+
+  let url = format!("{}{}", api.base_url, path);
+
+  let res = inner
+    .http
+    .post(url)
+    .header("X-Auth-Token", api.token)
+    .json(&payload)
+    .send()
+    .await
+    .map_err(|e| e.to_string())?;
+
+  let status = res.status();
+  let body = res.json::<Value>().await.map_err(|e| e.to_string())?;
+
+  if !status.is_success() {
+    return Err(body.to_string());
+  }
+  Ok(body)
+}
+
+// ---------------------------
+// PROCESS MANAGEMENT
+// ---------------------------
+
+fn ensure_monitor_thread(app: AppHandle, window: Window, inner: Arc<AppStateInner>) {
+  thread::spawn(move || loop {
+    thread::sleep(Duration::from_millis(250));
+
+    let mut maybe_exit_code: Option<i32> = None;
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
+      let mut guard = inner.current_process.lock().unwrap();
+      if let Some(child) = guard.as_mut() {
+        match child.try_wait() {
+          Ok(Some(status)) => {
+            maybe_exit_code = status.code();
+            let _ = guard.take();
+          }
+          Ok(None) => {}
+          Err(_) => {
+            let _ = guard.take();
+          }
+        }
+      }
     }
 
-    match command.spawn() {
-        Ok(mut child_process) => {
-            let stdout = child_process.stdout.take().unwrap();
-            let stderr = child_process.stderr.take().unwrap();
-            let process_handle = state.current_process.clone();
-            
-            *process_handle.lock().unwrap() = Some(child_process);
-
-            // STDOUT Thread
-            let window_clone = window.clone();
-            thread::spawn(move || {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    if let Ok(l) = line {
-                        window_clone.emit("terminal_update", l).unwrap_or(());
-                    }
-                }
-            });
-
-            // STDERR Thread
-            let window_clone_err = window.clone();
-            thread::spawn(move || {
-                let reader = BufReader::new(stderr);
-                for line in reader.lines() {
-                    if let Ok(l) = line {
-                        window_clone_err.emit("terminal_update", format!("(stderr) {}", l)).unwrap_or(());
-                    }
-                }
-            });
-
-            format!("Started {}", script_name)
-        }
-        Err(e) => {
-            let err_msg = format!("Failed to spawn python process: {}", e);
-            let _ = window.emit("terminal_update", err_msg.clone());
-            err_msg
-        }
+    if let Some(code) = maybe_exit_code {
+      let inner2 = inner.clone();
+      let window2 = window.clone();
+      tauri::async_runtime::spawn(async move {
+        let _ = api_post_with(&inner2, "/session/finalize", json!({})).await;
+        let _ = window2.emit("process_finished", format!("exit_code={}", code));
+      });
     }
+
+    let _ = app;
+  });
 }
 
-// --- COMMANDS ---
+fn stop_process_inner(window: &Window, inner: &Arc<AppStateInner>) -> String {
+  let mut guard = inner.current_process.lock().unwrap();
+  if let Some(mut child) = guard.take() {
+    let _ = window.emit("terminal_update", format!("[System] Stopping PID {}", child.id()));
+    let _ = child.kill();
+    return "Process stopped".to_string();
+  }
+  "No process running".to_string()
+}
+
+fn run_python_script(app: AppHandle, script_name: &str, window: Window, inner: Arc<AppStateInner>) -> Result<String, String> {
+  let resource_path = app
+    .path_resolver()
+    .resolve_resource(format!("{}/{}", SCRIPTS_DIR_REL, script_name));
+
+  let script_path = resource_path.unwrap_or_else(|| PathBuf::from(format!("../{}/{}", SCRIPTS_DIR_REL, script_name)));
+  let scripts_dir = scripts_dir_path(&app);
+
+  let _ = window.emit("terminal_update", format!("[System] Script: {}", script_path.display()));
+  let _ = window.emit("terminal_update", format!("[System] CWD: {}", scripts_dir.display()));
+
+  if !script_path.exists() {
+    let msg = format!("Error: Script not found at {}", script_path.display());
+    let _ = window.emit("terminal_update", msg.clone());
+    return Err(msg);
+  }
+
+  let _ = stop_process_inner(&window, &inner);
+
+  let mut cmd = Command::new(python_interpreter());
+  cmd.arg(&script_path);
+  cmd.current_dir(&scripts_dir);
+
+  let provider = {
+    let p = get_env_var(&app, "AI_PROVIDER");
+    if p.is_empty() { "gemini".to_string() } else { p }
+  };
+  let gemini_key = get_env_var(&app, "GEMINI_API_KEY");
+  let openai_key = get_env_var(&app, "OPENAI_API_KEY");
+
+  cmd.env("AI_PROVIDER", provider);
+  cmd.env("GEMINI_API_KEY", gemini_key);
+  cmd.env("OPENAI_API_KEY", openai_key);
+
+  cmd.stdout(Stdio::piped());
+  cmd.stderr(Stdio::piped());
+
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+  }
+
+  match cmd.spawn() {
+    Ok(mut child) => {
+      let stdout = child.stdout.take().unwrap();
+      let stderr = child.stderr.take().unwrap();
+
+      *inner.current_process.lock().unwrap() = Some(child);
+
+      let w1 = window.clone();
+      thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines().flatten() {
+          let _ = w1.emit("terminal_update", line);
+        }
+      });
+
+      let w2 = window.clone();
+      thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines().flatten() {
+          let _ = w2.emit("terminal_update", format!("(stderr) {}", line));
+        }
+      });
+
+      ensure_monitor_thread(app, window, inner);
+
+      Ok(format!("Started {}", script_name))
+    }
+    Err(e) => {
+      let msg = format!("Failed to spawn python: {}", e);
+      let _ = window.emit("terminal_update", msg.clone());
+      Err(msg)
+    }
+  }
+}
+
+// ---------------------------
+// TAURI COMMANDS
+// ---------------------------
 
 #[tauri::command]
 fn get_ai_config(app: AppHandle) -> AiConfig {
-    AiConfig {
-        provider: get_env_var(&app, "AI_PROVIDER").unwrap_or_default(),
-        gemini_key: get_env_var(&app, "GEMINI_API_KEY").unwrap_or_default(),
-        openai_key: get_env_var(&app, "OPENAI_API_KEY").unwrap_or_default(),
-    }
+  AiConfig {
+    provider: get_env_var(&app, "AI_PROVIDER"),
+    gemini_key: get_env_var(&app, "GEMINI_API_KEY"),
+    openai_key: get_env_var(&app, "OPENAI_API_KEY"),
+  }
 }
 
 #[tauri::command]
 fn save_configuration(app: AppHandle, provider: String, api_key: String) -> bool {
-    let _ = update_env_file(&app, "AI_PROVIDER", &provider);
-    if provider == "gemini" {
-        let _ = update_env_file(&app, "GEMINI_API_KEY", &api_key);
-    } else if provider == "openai" {
-        let _ = update_env_file(&app, "OPENAI_API_KEY", &api_key);
+  let _ = update_env_file(&app, "AI_PROVIDER", &provider);
+  if provider == "gemini" {
+    let _ = update_env_file(&app, "GEMINI_API_KEY", api_key.trim());
+  } else if provider == "openai" {
+    let _ = update_env_file(&app, "OPENAI_API_KEY", api_key.trim());
+  }
+  true
+}
+
+#[tauri::command]
+async fn start_recording(
+  state: tauri::State<'_, AppState>,
+  app: AppHandle,
+  window: Window,
+  game_id: Option<String>,
+  dataset_name: Option<String>,
+) -> Result<String, String> {
+  let gid = normalize_game_id(game_id);
+  let name = dataset_name.unwrap_or_else(|| "Untitled".to_string());
+  let inner = state.inner.clone();
+
+  if let Err(e) = api_post_with(&inner, "/session/begin_recording", json!({"game_id": gid, "dataset_name": name})).await {
+    let _ = window.emit("terminal_update", format!("[Warning] begin_recording failed: {}", e));
+  }
+
+  run_python_script(app, "1-collect_data.py", window, inner)
+}
+
+#[tauri::command]
+async fn start_training(
+  state: tauri::State<'_, AppState>,
+  app: AppHandle,
+  window: Window,
+  game_id: Option<String>,
+  model_name: Option<String>,
+  dataset_id: Option<String>,
+  arch: Option<String>,
+) -> Result<String, String> {
+  let gid = normalize_game_id(game_id);
+  let mname = model_name.unwrap_or_else(|| "New Model".to_string());
+  let did = dataset_id.unwrap_or_default();
+  let a = arch.unwrap_or_else(|| "custom".to_string());
+  let inner = state.inner.clone();
+
+  if let Err(e) = api_post_with(
+    &inner,
+    "/session/begin_training",
+    json!({"game_id": gid, "model_name": mname, "dataset_id": did, "arch": a}),
+  ).await {
+    let _ = window.emit("terminal_update", format!("[Warning] begin_training failed: {}", e));
+  }
+
+  run_python_script(app, "2-train_model.py", window, inner)
+}
+
+#[tauri::command]
+fn start_bot(app: AppHandle, window: Window, state: tauri::State<AppState>) -> Result<String, String> {
+  run_python_script(app, "3-test_model.py", window, state.inner.clone())
+}
+
+#[tauri::command]
+async fn stop_process(state: tauri::State<'_, AppState>, window: Window) -> Result<String, String> {
+  let inner = state.inner.clone();
+  let msg = stop_process_inner(&window, &inner);
+
+  if let Err(e) = api_post_with(&inner, "/session/finalize", json!({})).await {
+    let _ = window.emit("terminal_update", format!("[Warning] finalize failed: {}", e));
+  }
+
+  Ok(msg)
+}
+
+#[tauri::command]
+async fn modelhub_is_available(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+  api_get_with(&state.inner, "/modelhub/available").await
+}
+
+#[tauri::command]
+async fn modelhub_list_games(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+  api_get_with(&state.inner, "/modelhub/games").await
+}
+
+#[tauri::command]
+async fn mh_get_catalog_data(state: tauri::State<'_, AppState>, game_id: Option<String>) -> Result<Value, String> {
+  let gid = normalize_game_id(game_id);
+  api_get_with(&state.inner, &format!("/modelhub/catalog?game_id={}", urlencoding::encode(&gid))).await
+}
+
+#[tauri::command]
+async fn mh_set_active(
+  state: tauri::State<'_, AppState>,
+  game_id: Option<String>,
+  model_id: String,
+  path: String,
+) -> Result<Value, String> {
+  let gid = normalize_game_id(game_id);
+  api_post_with(&state.inner, "/modelhub/active", json!({"game_id": gid, "model_id": model_id, "path": path})).await
+}
+
+#[tauri::command]
+async fn mh_delete_model(
+  state: tauri::State<'_, AppState>,
+  game_id: Option<String>,
+  model_id: String,
+  path: String,
+) -> Result<Value, String> {
+  let gid = normalize_game_id(game_id);
+  api_post_with(&state.inner, "/modelhub/delete", json!({"game_id": gid, "model_id": model_id, "path": path})).await
+}
+
+#[tauri::command]
+async fn modelhub_validate_model(
+  state: tauri::State<'_, AppState>,
+  game_id: Option<String>,
+  model_dir: String,
+) -> Result<Value, String> {
+  let gid = normalize_game_id(game_id);
+  api_post_with(&state.inner, "/modelhub/validate", json!({"game_id": gid, "model_dir": model_dir})).await
+}
+
+#[tauri::command]
+async fn modelhub_run_offline_evaluation(
+  state: tauri::State<'_, AppState>,
+  model_dir: String,
+  dataset_dir: String,
+) -> Result<Value, String> {
+  api_post_with(&state.inner, "/modelhub/offline-eval", json!({"model_dir": model_dir, "dataset_dir": dataset_dir})).await
+}
+
+#[tauri::command]
+fn install_drivers(app: tauri::AppHandle) -> Value {
+  #[cfg(target_os = "windows")]
+  {
+    let resource_path = app
+      .path_resolver()
+      .resolve_resource("resources/scripts/install_drivers.ps1");
+
+    let script = match resource_path {
+      Some(p) => p,
+      None => return json!({"ok": false, "error": "Could not find install_drivers.ps1"}),
+    };
+
+    let ps = format!(
+      "Start-Process PowerShell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"'",
+      script.display()
+    );
+
+    let out = Command::new("powershell").args(["-NoProfile", "-Command", &ps]).output();
+
+    match out {
+      Ok(o) => json!({ "ok": o.status.success(), "code": o.status.code() }),
+      Err(e) => json!({ "ok": false, "error": e.to_string() }),
     }
-    true
+  }
+  #[cfg(not(target_os = "windows"))]
+  {
+    json!({"ok": false, "error": "Drivers are Windows-only"})
+  }
 }
 
-#[tauri::command]
-fn start_recording(app: AppHandle, window: Window, state: tauri::State<AppState>) -> String {
-    run_python_script(app, "1-collect_data.py", window, state)
-}
-
-#[tauri::command]
-fn start_training(app: AppHandle, window: Window, state: tauri::State<AppState>) -> String {
-    run_python_script(app, "2-train_model.py", window, state)
-}
-
-#[tauri::command]
-fn start_bot(app: AppHandle, window: Window, state: tauri::State<AppState>) -> String {
-    run_python_script(app, "3-test_model.py", window, state)
-}
-
-#[tauri::command]
-fn stop_process(state: tauri::State<AppState>) -> String {
-    let mut handle = state.current_process.lock().unwrap();
-    if let Some(mut child) = handle.take() {
-        match child.kill() {
-            Ok(_) => return "Process stopped".to_string(),
-            Err(e) => return format!("Error killing process: {}", e),
-        }
-    }
-    "No process running".to_string()
-}
-
-// --- DRIVER INSTALLER (Windows Only) ---
-#[tauri::command]
-fn install_drivers(app: tauri::AppHandle) -> serde_json::Value {
-    #[cfg(target_os = "windows")]
-    {
-        let resource_path = app
-            .path_resolver()
-            .resolve_resource("resources/scripts/install_drivers.ps1");
-
-        let script = match resource_path {
-            Some(p) => p,
-            None => return json!({"ok": false, "error": "Could not find install_drivers.ps1"}),
-        };
-
-        let ps = format!(
-            "Start-Process PowerShell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"'",
-            script.display()
-        );
-
-        let out = Command::new("powershell")
-            .args(["-NoProfile", "-Command", &ps])
-            .output();
-
-        match out {
-            Ok(o) => json!({ "ok": o.status.success(), "code": o.status.code() }),
-            Err(e) => json!({"ok": false, "error": e.to_string()}),
-        }
-    }
-    #[cfg(not(target_os = "windows"))]
-    { json!({"ok": false, "error": "Drivers are Windows-only"}) }
-}
-
+// ---------------------------
+// MAIN
+// ---------------------------
 fn main() {
-    tauri::Builder::default()
-        .manage(AppState {
-            current_process: Arc::new(Mutex::new(None)),
-        })
-        .invoke_handler(tauri::generate_handler![
-            get_ai_config,
-            save_configuration,
-            start_recording,
-            start_training,
-            start_bot,
-            stop_process,
-            install_drivers
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+  tauri::Builder::default()
+    .manage(AppState {
+      inner: Arc::new(AppStateInner {
+        current_process: Mutex::new(None),
+        sidecar: Mutex::new(None),
+        http: Client::new(),
+      }),
+    })
+    .setup(|app| {
+      let app_handle = app.handle();
+
+      // ✅ FIX: Manager trait is imported so app.state/get_window work.
+      let state = app.state::<AppState>();
+
+      match start_sidecar_server(&app_handle) {
+        Ok(api) => {
+          *state.inner.sidecar.lock().unwrap() = Some(api);
+        }
+        Err(e) => {
+          // ✅ FIX: provide explicit event payload type to help inference
+          if let Some(w) = app.get_window("main") {
+            let _ = w.emit::<String>("terminal_update", format!("[Fatal] Sidecar failed: {}", e));
+          }
+        }
+      }
+
+      Ok(())
+    })
+    .invoke_handler(tauri::generate_handler![
+      get_ai_config,
+      save_configuration,
+      start_recording,
+      start_training,
+      start_bot,
+      stop_process,
+      modelhub_is_available,
+      modelhub_list_games,
+      mh_get_catalog_data,
+      mh_set_active,
+      mh_delete_model,
+      modelhub_validate_model,
+      modelhub_run_offline_evaluation,
+      install_drivers
+    ])
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }
