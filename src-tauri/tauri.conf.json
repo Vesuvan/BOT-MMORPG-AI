@@ -1,14 +1,14 @@
 {
   "build": {
-    "beforeDevCommand": "npm --prefix tauri-ui run dev",
-    "beforeBuildCommand": "npm --prefix tauri-ui run build",
-    "devPath": "http://localhost:5173",
-    "distDir": "../tauri-ui/dist",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devPath": "../tauri-ui",
+    "distDir": "../tauri-ui",
     "withGlobalTauri": true
   },
   "package": {
     "productName": "BOT-MMORPG-AI",
-    "version": "0.1.7"
+    "version": "0.1.5"
   },
   "tauri": {
     "allowlist": {
@@ -16,29 +16,22 @@
       "shell": {
         "all": false,
         "execute": true,
-        "open": true,  
         "sidecar": false
       },
       "fs": {
         "all": true,
         "scope": [
           "$APP/*",
-          ".env",
-          "catalog/**",
-          "trained_models/**",
-          "datasets/**",
-          "modelhub_registry.json",
-          "active_model.json",
-          "modelhub_settings.json"
+          ".env"
         ]
-      },
-      "path": { "all": true },
-      "window": { "all": true }
+      }
     },
     "bundle": {
       "active": true,
       "category": "Game",
-      "targets": ["nsis"],
+      "targets": [
+        "nsis"
+      ],
       "identifier": "com.bot.mmorpg.ai",
       "icon": [
         "icons/32x32.png",
@@ -49,14 +42,7 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**",
-        "../.env",
-        "../catalog/**",
-        "../modelhub_registry.json",
-        "../active_model.json",
-        "../modelhub_settings.json",
-        "../scripts/modelhub_cli.py",
-        "../modelhub/**"
+        "../versions/**"
       ],
       "windows": {
         "nsis": {
