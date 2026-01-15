@@ -36,6 +36,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+
 # ---- Ensure PROJECT_ROOT importability (critical for PyInstaller/cwd variability) ----
 def _resolve_project_root() -> Path:
     """
@@ -128,6 +129,39 @@ def _normalize_game_id(game_id: Optional[str]) -> str:
     return gid if gid else DEFAULT_GAME_ID
 
 
+# -------------------------------------------------------------------
+# ✅ Option B: treat versions/0.01/model as "builtin" for listing/UI
+# -------------------------------------------------------------------
+def _safe_relpath(p: Path) -> str:
+    try:
+        return str(p.resolve().relative_to(PROJECT_ROOT.resolve()))
+    except Exception:
+        return str(p)
+
+
+def _inject_versions_builtin_models(gid: str) -> list[dict]:
+    """
+    Expose versions/0.01/model as a builtin model entry if present.
+    This is purely for listing/selection in UI (no validation implied).
+    """
+    out: list[dict] = []
+
+    model_dir = (PROJECT_ROOT / "versions" / "0.01" / "model").resolve()
+    if model_dir.exists() and model_dir.is_dir():
+        out.append(
+            {
+                "id": "versions_0_01_model",
+                "name": "Native (versions/0.01/model)",
+                "path": _safe_relpath(model_dir),
+                "game_id": gid,
+                "source": "versions",
+                "kind": "tf_checkpoint",
+            }
+        )
+
+    return out
+
+
 # ---- FastAPI server ----
 def create_app(token: str):
     from fastapi import FastAPI, Header, HTTPException, Request
@@ -136,7 +170,7 @@ def create_app(token: str):
     app = FastAPI(
         title="ModelHub Tauri API",
         version="0.1.8",
-        docs_url=None,      # disable docs for production-hardening
+        docs_url=None,  # disable docs for production-hardening
         redoc_url=None,
         openapi_url=None,
     )
@@ -174,7 +208,9 @@ def create_app(token: str):
         return {"ok": True, "active": session_manager.active_session}
 
     @app.post("/session/begin_recording")
-    async def begin_recording(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def begin_recording(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if not session_manager:
             return {"ok": False, "error": "SessionManager not available"}
@@ -184,7 +220,9 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/session/begin_training")
-    async def begin_training(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def begin_training(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if not session_manager:
             return {"ok": False, "error": "SessionManager not available"}
@@ -196,7 +234,10 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/session/finalize")
-    async def finalize(payload: Dict[str, Any] | None = None, x_auth_token: Optional[str] = Header(default=None)):
+    async def finalize(
+        payload: Dict[str, Any] | None = None,
+        x_auth_token: Optional[str] = Header(default=None),
+    ):
         _auth(x_auth_token)
         if not session_manager or not getattr(session_manager, "active_session", None):
             return {"ok": True, "finalized": None}
@@ -226,7 +267,9 @@ def create_app(token: str):
         return {"ok": True, "games": mh_list_games()}
 
     @app.get("/modelhub/game")
-    async def modelhub_game(game_id: str = "", x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_game(
+        game_id: str = "", x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if mh_load_game is None:
             return {"ok": False, "error": "ModelHub not available"}
@@ -234,7 +277,9 @@ def create_app(token: str):
         return {"ok": True, "game": mh_load_game(gid)}
 
     @app.get("/modelhub/catalog")
-    async def modelhub_catalog(game_id: str = "", x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_catalog(
+        game_id: str = "", x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         gid = _normalize_game_id(game_id)
 
@@ -242,6 +287,9 @@ def create_app(token: str):
             return {"ok": True, "builtin_models": [], "datasets": [], "models": [], "active": None}
 
         builtin = mh_list_builtin_models(PROJECT_ROOT, gid) if mh_list_builtin_models else []
+        builtin = list(builtin) if builtin else []
+        builtin.extend(_inject_versions_builtin_models(gid))
+
         datasets = mh_get_datasets(gid) if mh_get_datasets else []
         models = mh_get_models(gid) if mh_get_models else []
         active = mh_get_active_model() if mh_get_active_model else None
@@ -265,7 +313,9 @@ def create_app(token: str):
         }
 
     @app.post("/modelhub/active")
-    async def modelhub_set_active(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_set_active(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if not MODELHUB_AVAILABLE or mh_set_active_model is None:
             return {"ok": False, "error": "ModelHub not available"}
@@ -278,7 +328,9 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/modelhub/delete")
-    async def modelhub_delete(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_delete(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if not MODELHUB_AVAILABLE:
             return {"ok": False, "error": "ModelHub not available"}
@@ -311,7 +363,9 @@ def create_app(token: str):
             return {"ok": False, "error": str(e)}
 
     @app.post("/modelhub/validate")
-    async def modelhub_validate(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_validate(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         if mh_load_game is None or mh_validate_compatibility is None or mh_load_json is None:
             return {"ok": False, "message": "ModelHub not installed"}
@@ -331,7 +385,9 @@ def create_app(token: str):
         return {"ok": True, "result": {"ok": ok, "message": msg}}
 
     @app.post("/modelhub/offline-eval")
-    async def modelhub_offline_eval(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
+    async def modelhub_offline_eval(
+        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
+    ):
         _auth(x_auth_token)
         model_dir = (payload.get("model_dir") or "").strip()
         dataset_dir = (payload.get("dataset_dir") or "").strip()
@@ -343,6 +399,7 @@ def create_app(token: str):
             return {"ok": False, "message": f"Missing evaluation script at {script}"}
 
         import subprocess
+
         cmd = [sys.executable, str(script), "--model-dir", model_dir, "--dataset-dir", dataset_dir]
         subprocess.Popen(cmd, cwd=str(PROJECT_ROOT))
         return {"ok": True, "cmd": cmd}
@@ -360,7 +417,6 @@ def run_server(port: int, token: str) -> Tuple[str, str]:
     Runs uvicorn server. If port==0, OS picks a free port.
     Returns (base_url, token). Prints READY line to stdout.
     """
-    import uvicorn
     from uvicorn.config import Config
     from uvicorn.server import Server
 

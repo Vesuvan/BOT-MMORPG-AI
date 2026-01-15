@@ -161,6 +161,16 @@ fn python_interpreter() -> &'static str {
     }
 }
 
+// Repo root helper:
+// - In dev, current_dir is usually .../src-tauri, so parent() is repo root.
+// - If that fails, fallback to "..".
+fn dev_repo_root() -> PathBuf {
+    std::env::current_dir()
+        .ok()
+        .and_then(|p| p.parent().map(|x| x.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from(".."))
+}
+
 // ---------------------------
 // SIDE-CAR (modelhub/tauri.py) STARTUP
 // ---------------------------
@@ -176,31 +186,32 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
     };
 
     let mut cmd = if cfg!(debug_assertions) {
-        let script_a = PathBuf::from("../modelhub/tauri.py");
-        let script_b = PathBuf::from("../backend/main_backend.py");
+        // ✅ robust path: anchor to repo root, NOT CWD-dependent
+        let root = dev_repo_root();
+        let script_a = root.join("modelhub").join("tauri.py");
+        let script_b = root.join("backend").join("main_backend.py");
         let script = if script_a.exists() { script_a } else { script_b };
 
         let mut c = Command::new(python_interpreter());
         c.arg(script);
         c
     } else {
+        // Production sidecar binary name (you can change to your packaged sidecar exe)
         Command::new("main-backend")
     };
 
     let project_root = if cfg!(debug_assertions) {
-        std::env::current_dir()
-            .ok()
-            .and_then(|p| p.parent().map(|x| x.to_path_buf()))
-            .unwrap_or_else(|| PathBuf::from(".."))
+        dev_repo_root()
     } else {
-        app
-            .path_resolver()
-            .app_config_dir()
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        app.path_resolver().app_config_dir().unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        })
     };
 
+    // NOTE:
+    // In your python sidecar you showed, it expects "--port" and "--token" and "--project-root".
+    // It does NOT require "--serve". Passing unknown flags will break startup.
     cmd.args([
-        "--serve",
         "--port",
         "0",
         "--token",
@@ -220,11 +231,18 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
     }
 
     let mut child = cmd.spawn().map_err(|e| format!("Failed to start sidecar: {e}"))?;
-    let stdout = child.stdout.take().ok_or("Sidecar stdout unavailable".to_string())?;
-    let stderr = child.stderr.take().ok_or("Sidecar stderr unavailable".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or("Sidecar stdout unavailable".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or("Sidecar stderr unavailable".to_string())?;
 
     let (tx, rx) = std::sync::mpsc::channel::<Result<SidecarApi, String>>();
 
+    // stdout thread: look for READY line
     let tx_out = tx.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
@@ -234,13 +252,20 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
                 return;
             }
         }
-        let _ = tx_out.send(Err("Sidecar exited without READY line (stdout)".to_string()));
+        let _ = tx_out.send(Err(
+            "Sidecar exited without READY line (stdout)".to_string(),
+        ));
     });
 
+    // stderr thread: forward lines to UI and detect FAILED
+    let app_handle = app.clone();
     let tx_err = tx.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().flatten() {
+            if let Some(w) = app_handle.get_window("main") {
+                let _ = w.emit::<String>("terminal_update", format!("[Sidecar stderr] {}", line));
+            }
             if line.starts_with("FAILED ") {
                 let _ = tx_err.send(Err(format!("Sidecar failed: {}", line)));
                 return;
@@ -248,9 +273,12 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         }
     });
 
-    let timeout = Duration::from_secs(15);
+    let timeout = Duration::from_secs(25);
     match rx.recv_timeout(timeout) {
         Ok(Ok(api)) => {
+            // Keep child alive by storing it nowhere? In this design the child will live
+            // as long as the process keeps running. If you need to stop it explicitly,
+            // store it in state similar to current_process.
             let _ = child;
             Ok(api)
         }
@@ -392,13 +420,28 @@ fn run_python_script(
     window: Window,
     inner: Arc<AppStateInner>,
 ) -> Result<String, String> {
+    // ✅ exists-checked path selection:
+    // 1) use Tauri resource if it exists
+    // 2) else dev repo_root/versions/0.01/<script>
+    // 3) else show best-effort path for debugging
     let resource_path = app
         .path_resolver()
         .resolve_resource(format!("{}/{}", SCRIPTS_DIR_REL, script_name));
 
-    let script_path =
-        resource_path.unwrap_or_else(|| PathBuf::from(format!("../{}/{}", SCRIPTS_DIR_REL, script_name)));
-    let scripts_dir = scripts_dir_path(&app);
+    let dev_candidate = dev_repo_root().join(SCRIPTS_DIR_REL).join(script_name);
+
+    let script_path = match resource_path {
+        Some(p) if p.exists() => p,
+        _ if dev_candidate.exists() => dev_candidate,
+        Some(p) => p, // keep for debug display
+        None => PathBuf::from(format!("{}/{}", SCRIPTS_DIR_REL, script_name)),
+    };
+
+    // Run with script’s parent as cwd (more reliable than target/debug/... guessing)
+    let scripts_dir = script_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| scripts_dir_path(&app));
 
     let _ = window.emit("terminal_update", format!("[System] Script: {}", script_path.display()));
     let _ = window.emit("terminal_update", format!("[System] CWD: {}", scripts_dir.display()));
@@ -417,7 +460,11 @@ fn run_python_script(
 
     let provider = {
         let p = get_env_var(&app, "AI_PROVIDER");
-        if p.is_empty() { "gemini".to_string() } else { p }
+        if p.is_empty() {
+            "gemini".to_string()
+        } else {
+            p
+        }
     };
     let gemini_key = get_env_var(&app, "GEMINI_API_KEY");
     let openai_key = get_env_var(&app, "OPENAI_API_KEY");
@@ -500,23 +547,20 @@ async fn ai_chat(
         return Err("Message is empty.".to_string());
     }
 
-    // NOTE: CSP must allow connect-src to these hosts (you already have both).
     if provider == "openai" {
         let key = get_env_var(&app, "OPENAI_API_KEY");
         if key.trim().is_empty() {
             return Err("OPENAI_API_KEY is empty. Open Settings and save your key.".to_string());
         }
 
-        // Minimal and stable: Chat Completions endpoint.
-        // If you prefer a different model, change "gpt-4o-mini" here.
         let body = json!({
-      "model": "gpt-4o-mini",
-      "messages": [
-        { "role": "system", "content": "You are a helpful assistant. Reply concisely." },
-        { "role": "user", "content": user_msg }
-      ],
-      "temperature": 0.7
-    });
+            "model": "gpt-4o-mini",
+            "messages": [
+                { "role": "system", "content": "You are a helpful assistant. Reply concisely." },
+                { "role": "user", "content": user_msg }
+            ],
+            "temperature": 0.7
+        });
 
         let res = state
             .inner
@@ -552,18 +596,17 @@ async fn ai_chat(
         return Err("GEMINI_API_KEY is empty. Open Settings and save your key.".to_string());
     }
 
-    // If you want another Gemini model, change "gemini-1.5-flash" here.
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
         key.trim()
     );
 
     let body = json!({
-    "contents": [{
-      "role": "user",
-      "parts": [{ "text": user_msg }]
-    }]
-  });
+        "contents": [{
+            "role": "user",
+            "parts": [{ "text": user_msg }]
+        }]
+    });
 
     let res = state
         .inner
@@ -643,7 +686,13 @@ async fn start_recording(
     let name = dataset_name.unwrap_or_else(|| "Untitled".to_string());
     let inner = state.inner.clone();
 
-    if let Err(e) = api_post_with(&inner, "/session/begin_recording", json!({"game_id": gid, "dataset_name": name})).await {
+    if let Err(e) = api_post_with(
+        &inner,
+        "/session/begin_recording",
+        json!({"game_id": gid, "dataset_name": name}),
+    )
+    .await
+    {
         let _ = window.emit("terminal_update", format!("[Warning] begin_recording failed: {}", e));
     }
 
@@ -671,7 +720,7 @@ async fn start_training(
         "/session/begin_training",
         json!({"game_id": gid, "model_name": mname, "dataset_id": did, "arch": a}),
     )
-        .await
+    .await
     {
         let _ = window.emit("terminal_update", format!("[Warning] begin_training failed: {}", e));
     }
@@ -712,7 +761,11 @@ async fn mh_get_catalog_data(
     game_id: Option<String>,
 ) -> Result<Value, String> {
     let gid = normalize_game_id(game_id);
-    api_get_with(&state.inner, &format!("/modelhub/catalog?game_id={}", urlencoding::encode(&gid))).await
+    api_get_with(
+        &state.inner,
+        &format!("/modelhub/catalog?game_id={}", urlencoding::encode(&gid)),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -723,7 +776,12 @@ async fn mh_set_active(
     path: String,
 ) -> Result<Value, String> {
     let gid = normalize_game_id(game_id);
-    api_post_with(&state.inner, "/modelhub/active", json!({"game_id": gid, "model_id": model_id, "path": path})).await
+    api_post_with(
+        &state.inner,
+        "/modelhub/active",
+        json!({"game_id": gid, "model_id": model_id, "path": path}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -734,7 +792,12 @@ async fn mh_delete_model(
     path: String,
 ) -> Result<Value, String> {
     let gid = normalize_game_id(game_id);
-    api_post_with(&state.inner, "/modelhub/delete", json!({"game_id": gid, "model_id": model_id, "path": path})).await
+    api_post_with(
+        &state.inner,
+        "/modelhub/delete",
+        json!({"game_id": gid, "model_id": model_id, "path": path}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -744,7 +807,12 @@ async fn modelhub_validate_model(
     model_dir: String,
 ) -> Result<Value, String> {
     let gid = normalize_game_id(game_id);
-    api_post_with(&state.inner, "/modelhub/validate", json!({"game_id": gid, "model_dir": model_dir})).await
+    api_post_with(
+        &state.inner,
+        "/modelhub/validate",
+        json!({"game_id": gid, "model_dir": model_dir}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -753,7 +821,12 @@ async fn modelhub_run_offline_evaluation(
     model_dir: String,
     dataset_dir: String,
 ) -> Result<Value, String> {
-    api_post_with(&state.inner, "/modelhub/offline-eval", json!({"model_dir": model_dir, "dataset_dir": dataset_dir})).await
+    api_post_with(
+        &state.inner,
+        "/modelhub/offline-eval",
+        json!({"model_dir": model_dir, "dataset_dir": dataset_dir}),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -801,12 +874,14 @@ fn main() {
         })
         .setup(|app| {
             let app_handle = app.handle();
-
             let state = app.state::<AppState>();
 
             match start_sidecar_server(&app_handle) {
                 Ok(api) => {
                     *state.inner.sidecar.lock().unwrap() = Some(api);
+                    if let Some(w) = app.get_window("main") {
+                        let _ = w.emit::<String>("terminal_update", "[System] Sidecar READY".to_string());
+                    }
                 }
                 Err(e) => {
                     if let Some(w) = app.get_window("main") {
@@ -818,25 +893,25 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-      // Settings + AI
-      get_ai_config,
-      save_configuration,
-      ai_chat,
+            // Settings + AI
+            get_ai_config,
+            save_configuration,
+            ai_chat,
 
-      // Existing
-      start_recording,
-      start_training,
-      start_bot,
-      stop_process,
-      modelhub_is_available,
-      modelhub_list_games,
-      mh_get_catalog_data,
-      mh_set_active,
-      mh_delete_model,
-      modelhub_validate_model,
-      modelhub_run_offline_evaluation,
-      install_drivers
-    ])
+            // Existing
+            start_recording,
+            start_training,
+            start_bot,
+            stop_process,
+            modelhub_is_available,
+            modelhub_list_games,
+            mh_get_catalog_data,
+            mh_set_active,
+            mh_delete_model,
+            modelhub_validate_model,
+            modelhub_run_offline_evaluation,
+            install_drivers
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
