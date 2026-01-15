@@ -1,14 +1,14 @@
 # backend/entry_main.py
 """
-PyInstaller entrypoint for the sidecar.
+PyInstaller entrypoint for the ModelHub/Tauri sidecar.
 
-This is intentionally tiny and stable for packaging.
-It forwards CLI args to modelhub.tauri.main(argv=...).
+This file must stay tiny + stable for packaging. It simply forwards CLI args to
+modelhub.tauri.main(argv=...).
 
-Rust should launch:
+Rust should launch (DEV python or PROD exe):
   main-backend.exe --port 0 --token <token> --resource-root <...> --data-root <...>
 
-Your modelhub/tauri.py prints:
+modelhub/tauri.py prints (flush=True):
   READY url=http://127.0.0.1:<port> token=<token>
 """
 
@@ -19,12 +19,15 @@ from typing import List
 
 
 def main() -> int:
-    # Import your sidecar entry and call it with forwarded argv
+    # Import the real sidecar entrypoint
     from modelhub.tauri import main as sidecar_main
 
     # Forward args exactly (skip program name)
     argv: List[str] = sys.argv[1:]
-    return int(sidecar_main(argv) or 0)
+
+    # sidecar_main already returns an int exit code (0/1). Keep it safe anyway.
+    rc = sidecar_main(argv)
+    return int(rc) if rc is not None else 0
 
 
 if __name__ == "__main__":

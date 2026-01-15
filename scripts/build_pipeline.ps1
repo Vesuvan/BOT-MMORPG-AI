@@ -470,6 +470,11 @@ if (-not $SkipPython) {
 
   Log-Ok "Sidecar bundled: $tauriSidecarDir"
 
+
+  Log-Info "Killing any running main-backend.exe..."
+  cmd /c "taskkill /IM main-backend.exe /F >nul 2>&1"
+  Start-Sleep -Milliseconds 500
+
   # --- smoke test the bundled exe prints READY (must not hang) ---
   Log-Info "Smoke testing bundled sidecar (wait for READY, then stop)..."
 
