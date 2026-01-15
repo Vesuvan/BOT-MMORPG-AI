@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  # Push a tag like v0.1.6 (or v1.2.3) to create a public GitHub Release + attach installer
+  push:
+    tags:
+      - "v*"
+  # Manual run support (type a version like v0.1.6)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  RUST_BACKTRACE: "1"
+  CARGO_TERM_COLOR: "always"
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+
+          # Ensure it starts with "v"
+          if [[ "$VERSION" != v* ]]; then
+            VERSION="v$VERSION"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      # Create (or update) the Release in a modern, reliable way
+      - name: Create/Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: BOT MMORPG AI ${{ steps.get_version.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          body: |
+            ## BOT MMORPG AI ${{ steps.get_version.outputs.version }}
+
+            ### Installation Instructions
+            1. **Download the installer** below (Assets)
+            2. **Run the installer** with administrator privileges
+            3. **Follow the setup wizard** (drivers can be installed automatically)
+            4. **Launch the application** from your desktop or start menu
+
+            ### What's Included
+            - ✅ AI Bot Application with GUI
+            - ✅ Python Backend (bundled)
+            - ✅ Automatic Driver Installation (Interception + vJoy)
+            - ✅ Desktop & Start Menu Shortcuts
+            - ✅ Easy Uninstaller
+
+            ### System Requirements
+            - **OS**: Windows 10/11 (64-bit)
+            - **RAM**: 8GB minimum, 16GB recommended
+            - **GPU**: NVIDIA GPU recommended for training
+            - **Disk**: 5GB free space
+
+            ### Quick Start
+            1. Launch the application
+            2. Click "Collect Data" and play your game for 10-15 minutes
+            3. Click "Train Model" and wait for training to complete
+            4. Click "Start Bot" to let the AI play!
+
+            For detailed instructions, see the User Guide:
+            https://github.com/${{ github.repository }}/blob/main/USAGE.md
+
+            ### Support
+            - 📖 Documentation: https://github.com/${{ github.repository }}
+            - 🐛 Issues: https://github.com/${{ github.repository }}/issues
+
+  build-windows-installer:
+    name: Build Windows Installer + Upload to Release
+    needs: create-release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # IMPORTANT: align with your Windows packaging assumptions (Python 3.10)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y
+
+      # If you need Tauri CLI explicitly, you can keep it,
+      # but your scripts/build_pipeline.ps1 already tries to ensure it.
+      - name: Install Tauri CLI
+        shell: pwsh
+        run: cargo install tauri-cli --version "^1.0" --force
+
+      # Build everything using your existing pipeline script
+      - name: Build installer (PyInstaller + Tauri + NSIS)
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_pipeline.ps1
+
+      - name: Find NSIS installer
+        id: installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $installer) { throw "No installer executable found in src-tauri/target/release/bundle/nsis" }
+
+          "path=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "name=$($installer.Name)"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          Write-Host "Installer: $($installer.FullName)"
+
+      # Upload to the GitHub Release created in the previous job
+      - name: Upload installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ${{ steps.installer.outputs.path }}
+          fail_on_unmatched_files: true
+
+      # Optional: also keep as Actions artifact (handy for debugging, expires)
+      - name: Upload installer artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-${{ needs.create-release.outputs.version }}
+          path: ${{ steps.installer.outputs.path }}
+          retention-days: 90
