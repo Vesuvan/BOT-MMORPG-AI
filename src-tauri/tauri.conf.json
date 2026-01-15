@@ -16,13 +16,13 @@
       "shell": {
         "all": false,
         "execute": true,
+        "open": true,
         "sidecar": false
       },
       "fs": {
         "all": true,
         "scope": [
-          "$APP/*",
-          ".env"
+          "$APP/*"
         ]
       }
     },
