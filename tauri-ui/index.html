@@ -1,10 +1,14 @@
-<!-- tauri-ui/index.html (PROD, Tauri-compatible)
+<!-- launcher/web/main.html (PROD, Tauri-compatible)
   Key changes vs your Eel HTML:
   - Removed /eel.js and ALL eel.* calls
   - Uses ONLY Tauri invoke/events via main.js
   - Adds data-tab attributes for smoke tests + JS routing
   - Keeps your styling/layout, but rewires sidebar nav to be data-tab driven
   - Adds ModelHub wiring elements expected by main.js
+
+  ✅ PRODUCTION FIX (only for Settings):
+  - Removed inline onclick from Settings open/close buttons
+  - Added IDs + addEventListener bindings on DOMContentLoaded
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -404,7 +408,8 @@
         <span>⭐ Star on GitHub</span>
       </a>
 
-      <button type="button" onclick="openSettings()" class="btn-sidebar-settings">
+      <!-- ✅ FIX: remove inline onclick, add id -->
+      <button type="button" id="btn-open-settings" class="btn-sidebar-settings">
         <span>⚙️</span> Configure Neural Link
       </button>
 
@@ -687,7 +692,8 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title"><span>🛠</span> Neural Link Configuration</div>
-        <button class="close-modal" onclick="closeSettings()">×</button>
+        <!-- ✅ FIX: remove inline onclick, add id -->
+        <button class="close-modal" id="btn-close-settings-x">×</button>
       </div>
 
       <div class="modal-body">
@@ -709,7 +715,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+        <!-- ✅ FIX: remove inline onclick, add id -->
+        <button class="btn btn-secondary" id="btn-cancel-settings">Cancel</button>
         <button class="btn" onclick="saveSettings()" id="btn-save-settings">Save Configuration</button>
       </div>
     </div>
@@ -723,6 +730,18 @@
     function closeSettings() {
       document.getElementById('settings-modal-overlay').classList.remove('open');
     }
+
+    // ✅ NEW: production-safe bindings for Settings only (prevents inline handler quirks in installed exe)
+    window.addEventListener('DOMContentLoaded', () => {
+      const openBtn = document.getElementById('btn-open-settings');
+      if (openBtn) openBtn.addEventListener('click', openSettings);
+
+      const closeX = document.getElementById('btn-close-settings-x');
+      if (closeX) closeX.addEventListener('click', closeSettings);
+
+      const cancelBtn = document.getElementById('btn-cancel-settings');
+      if (cancelBtn) cancelBtn.addEventListener('click', closeSettings);
+    });
 
     // Optional: save settings via invoke (safe no-op if missing)
     async function saveSettings() {
