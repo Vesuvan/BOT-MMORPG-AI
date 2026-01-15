@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -22,7 +22,7 @@ const DEFAULT_GAME_ID: &str = "genshin_impact";
 const SCRIPTS_DIR_REL: &str = "versions/0.01";
 
 // ---------------------------
-// APP STATE (Arc inner + SidecarApi stored there)
+// APP STATE
 // ---------------------------
 
 #[derive(Clone, Debug)]
@@ -54,7 +54,7 @@ struct AiConfig {
 // ---------------------------
 
 fn env_file_path(app: &AppHandle) -> PathBuf {
-    // dev convenience: ../.env
+    // Dev convenience: ../.env (repo root)
     if cfg!(debug_assertions) {
         if let Ok(cwd) = std::env::current_dir() {
             let candidate = cwd.join("..").join(".env");
@@ -64,7 +64,7 @@ fn env_file_path(app: &AppHandle) -> PathBuf {
         }
     }
 
-    // production-safe
+    // Production-safe: app config dir
     let cfg_dir = app
         .path_resolver()
         .app_config_dir()
@@ -79,7 +79,9 @@ fn ensure_default_env(app: &AppHandle) {
     if path.exists() {
         return;
     }
-    let default_content = "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\n";
+    // Add PYTHON_PATH as an optional override (production & dev)
+    let default_content =
+        "AI_PROVIDER=\"gemini\"\nGEMINI_API_KEY=\"\"\nOPENAI_API_KEY=\"\"\nPYTHON_PATH=\"\"\n";
     let _ = fs::write(path, default_content);
 }
 
@@ -139,6 +141,10 @@ fn update_env_file(app: &AppHandle, key: &str, value: &str) -> Result<(), String
 // UTILS
 // ---------------------------
 
+fn is_windows() -> bool {
+    cfg!(target_os = "windows")
+}
+
 fn normalize_game_id(game_id: Option<String>) -> String {
     let gid = game_id.unwrap_or_default().trim().to_string();
     if gid.is_empty() {
@@ -148,22 +154,8 @@ fn normalize_game_id(game_id: Option<String>) -> String {
     }
 }
 
-fn scripts_dir_path(app: &AppHandle) -> PathBuf {
-    let resolved = app.path_resolver().resolve_resource(SCRIPTS_DIR_REL);
-    resolved.unwrap_or_else(|| PathBuf::from(format!("../{}", SCRIPTS_DIR_REL)))
-}
-
-fn python_interpreter() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "python"
-    } else {
-        "python3"
-    }
-}
-
 // Repo root helper:
 // - In dev, current_dir is usually .../src-tauri, so parent() is repo root.
-// - If that fails, fallback to "..".
 fn dev_repo_root() -> PathBuf {
     std::env::current_dir()
         .ok()
@@ -171,8 +163,99 @@ fn dev_repo_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(".."))
 }
 
+fn scripts_dir_path(app: &AppHandle) -> PathBuf {
+    let resolved = app.path_resolver().resolve_resource(SCRIPTS_DIR_REL);
+    resolved.unwrap_or_else(|| PathBuf::from(format!("../{}", SCRIPTS_DIR_REL)))
+}
+
+// --- Python selection (production-ready) ---
+
+fn venv_python_from_root(root: &Path) -> PathBuf {
+    if is_windows() {
+        root.join(".venv").join("Scripts").join("python.exe")
+    } else {
+        root.join(".venv").join("bin").join("python3")
+    }
+}
+
+fn bundled_python_resource_rel() -> &'static str {
+    if is_windows() {
+        "resources/python/python.exe"
+    } else {
+        "resources/python/bin/python3"
+    }
+}
+
+/// Finds best python interpreter for this run:
+/// 1) PYTHON_PATH (from .env)
+/// 2) Dev .venv python
+/// 3) Bundled python in resources (prod)
+/// 4) System python fallback ("python"/"python3")
+fn find_python_for_app(app: &AppHandle) -> Result<PathBuf, String> {
+    // 1) Explicit override from .env
+    let explicit = get_env_var(app, "PYTHON_PATH");
+    if !explicit.trim().is_empty() {
+        let p = PathBuf::from(explicit.trim());
+        if p.exists() {
+            return Ok(p);
+        }
+        return Err(format!("PYTHON_PATH was set but not found: {}", p.display()));
+    }
+
+    // 2) Dev: repo root .venv
+    if cfg!(debug_assertions) {
+        let root = dev_repo_root();
+        let vpy = venv_python_from_root(&root);
+        if vpy.exists() {
+            return Ok(vpy);
+        }
+    }
+
+    // 3) Prod: bundled python under resources
+    if let Some(p) = app
+        .path_resolver()
+        .resolve_resource(bundled_python_resource_rel())
+    {
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+
+    // 4) Fallback to system python
+    Ok(PathBuf::from(if is_windows() { "python" } else { "python3" }))
+}
+
+/// Apply venv env vars in dev (helps if fallback python is used, and is harmless otherwise).
+fn apply_dev_venv_env(cmd: &mut Command) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let root = dev_repo_root();
+    let venv_root = root.join(".venv");
+    if !venv_root.exists() {
+        return;
+    }
+
+    let venv_bin = if is_windows() {
+        venv_root.join("Scripts")
+    } else {
+        venv_root.join("bin")
+    };
+
+    // VIRTUAL_ENV is helpful for some tooling
+    cmd.env("VIRTUAL_ENV", &venv_root);
+
+    // Prepend venv bin to PATH
+    let old_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut new_path = std::ffi::OsString::new();
+    new_path.push(venv_bin);
+    new_path.push(std::path::MAIN_SEPARATOR.to_string());
+    new_path.push(old_path);
+    cmd.env("PATH", new_path);
+}
+
 // ---------------------------
-// SIDE-CAR (modelhub/tauri.py) STARTUP
+// SIDE-CAR STARTUP
 // ---------------------------
 
 fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
@@ -185,32 +268,59 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         format!("tkn-{}-{}", pid, now)
     };
 
+    let py = find_python_for_app(app)?;
+
+    // Emit which python is being used for sidecar (debugging gold)
+    if let Some(w) = app.get_window("main") {
+        let _ = w.emit::<String>(
+            "terminal_update",
+            format!("[System] Sidecar Python: {}", py.display()),
+        );
+    }
+
+    // Determine sidecar entrypoint:
     let mut cmd = if cfg!(debug_assertions) {
-        // ✅ robust path: anchor to repo root, NOT CWD-dependent
         let root = dev_repo_root();
         let script_a = root.join("modelhub").join("tauri.py");
         let script_b = root.join("backend").join("main_backend.py");
         let script = if script_a.exists() { script_a } else { script_b };
 
-        let mut c = Command::new(python_interpreter());
+        let mut c = Command::new(&py);
         c.arg(script);
+        apply_dev_venv_env(&mut c);
         c
     } else {
-        // Production sidecar binary name (you can change to your packaged sidecar exe)
-        Command::new("main-backend")
+        // Production:
+        // Recommended: run python sidecar from bundled python script resource.
+        // If you switch to a compiled sidecar binary later, change this block accordingly.
+        // Here we try: resources/backend/main_backend.py (or modelhub/tauri.py) via bundled python.
+        let script_res_a = app.path_resolver().resolve_resource("resources/modelhub/tauri.py");
+        let script_res_b = app
+            .path_resolver()
+            .resolve_resource("resources/backend/main_backend.py");
+
+        let script = script_res_a
+            .filter(|p| p.exists())
+            .or_else(|| script_res_b.filter(|p| p.exists()))
+            .ok_or_else(|| {
+                "Production sidecar script not found in resources. Add resources/modelhub/tauri.py or resources/backend/main_backend.py."
+                    .to_string()
+            })?;
+
+        let mut c = Command::new(&py);
+        c.arg(script);
+        c
     };
 
     let project_root = if cfg!(debug_assertions) {
         dev_repo_root()
     } else {
+        // In production, use app config dir as the "project root" for user data
         app.path_resolver().app_config_dir().unwrap_or_else(|| {
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
         })
     };
 
-    // NOTE:
-    // In your python sidecar you showed, it expects "--port" and "--token" and "--project-root".
-    // It does NOT require "--serve". Passing unknown flags will break startup.
     cmd.args([
         "--port",
         "0",
@@ -264,7 +374,10 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         let reader = BufReader::new(stderr);
         for line in reader.lines().flatten() {
             if let Some(w) = app_handle.get_window("main") {
-                let _ = w.emit::<String>("terminal_update", format!("[Sidecar stderr] {}", line));
+                let _ = w.emit::<String>(
+                    "terminal_update",
+                    format!("[Sidecar stderr] {}", line),
+                );
             }
             if line.starts_with("FAILED ") {
                 let _ = tx_err.send(Err(format!("Sidecar failed: {}", line)));
@@ -276,9 +389,8 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
     let timeout = Duration::from_secs(25);
     match rx.recv_timeout(timeout) {
         Ok(Ok(api)) => {
-            // Keep child alive by storing it nowhere? In this design the child will live
-            // as long as the process keeps running. If you need to stop it explicitly,
-            // store it in state similar to current_process.
+            // NOTE: You may want to store `child` handle to kill sidecar on exit.
+            // This code intentionally leaves it running as long as the app runs.
             let _ = child;
             Ok(api)
         }
@@ -420,7 +532,7 @@ fn run_python_script(
     window: Window,
     inner: Arc<AppStateInner>,
 ) -> Result<String, String> {
-    // ✅ exists-checked path selection:
+    // Resolve script path:
     // 1) use Tauri resource if it exists
     // 2) else dev repo_root/versions/0.01/<script>
     // 3) else show best-effort path for debugging
@@ -433,11 +545,10 @@ fn run_python_script(
     let script_path = match resource_path {
         Some(p) if p.exists() => p,
         _ if dev_candidate.exists() => dev_candidate,
-        Some(p) => p, // keep for debug display
+        Some(p) => p,
         None => PathBuf::from(format!("{}/{}", SCRIPTS_DIR_REL, script_name)),
     };
 
-    // Run with script’s parent as cwd (more reliable than target/debug/... guessing)
     let scripts_dir = script_path
         .parent()
         .map(|p| p.to_path_buf())
@@ -454,9 +565,15 @@ fn run_python_script(
 
     let _ = stop_process_inner(&window, &inner);
 
-    let mut cmd = Command::new(python_interpreter());
+    let py = find_python_for_app(&app)?;
+    let _ = window.emit("terminal_update", format!("[System] Python: {}", py.display()));
+
+    let mut cmd = Command::new(&py);
     cmd.arg(&script_path);
     cmd.current_dir(&scripts_dir);
+
+    // Dev: help python locate site-packages from venv when needed
+    apply_dev_venv_env(&mut cmd);
 
     let provider = {
         let p = get_env_var(&app, "AI_PROVIDER");
@@ -649,7 +766,6 @@ fn get_ai_config(app: AppHandle) -> AiConfig {
     }
 }
 
-// ✅ UPDATED: Robust save_configuration that returns errors and validates input
 #[tauri::command]
 fn save_configuration(app: AppHandle, provider: String, api_key: String) -> Result<bool, String> {
     let provider = provider.trim().to_lowercase();
@@ -662,12 +778,8 @@ fn save_configuration(app: AppHandle, provider: String, api_key: String) -> Resu
     update_env_file(&app, "AI_PROVIDER", &provider)?;
 
     match provider.as_str() {
-        "gemini" => {
-            update_env_file(&app, "GEMINI_API_KEY", &api_key)?;
-        }
-        "openai" => {
-            update_env_file(&app, "OPENAI_API_KEY", &api_key)?;
-        }
+        "gemini" => update_env_file(&app, "GEMINI_API_KEY", &api_key)?,
+        "openai" => update_env_file(&app, "OPENAI_API_KEY", &api_key)?,
         _ => return Err(format!("Unknown provider: {}", provider)),
     }
 
@@ -893,12 +1005,9 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Settings + AI
             get_ai_config,
             save_configuration,
             ai_chat,
-
-            // Existing
             start_recording,
             start_training,
             start_bot,
