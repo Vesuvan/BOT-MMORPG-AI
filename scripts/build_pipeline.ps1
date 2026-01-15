@@ -1,13 +1,13 @@
 <#
 Build pipeline (Windows):
-1) Build Python backend sidecar with PyInstaller
-2) Rename for Tauri sidecar requirements
-3) Copy sidecar + driver installers into src-tauri/binaries and src-tauri/resources
+1) Build Python backend sidecar with PyInstaller (ONEDIR)
+2) Copy sidecar folder into src-tauri/resources/sidecar/main-backend/
+3) Copy driver installers + ps scripts into src-tauri/drivers and src-tauri/resources/scripts
 4) Build Tauri app + NSIS installer
 
 Requirements:
 - Python 3.10+ (for PyInstaller)
-- uv (Python package installer - faster than pip)
+- uv (optional, faster than pip)
 - Rust toolchain + cargo (install via rustup)
 - Tauri CLI (cargo install tauri-cli)
 - NSIS installed (Tauri bundler uses it)
@@ -49,23 +49,21 @@ function Refresh-Path {
   $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
   if (Test-Path $cargoBin) {
     if ($env:Path -notlike "*$cargoBin*") {
-        $env:Path += ";$cargoBin"
+      $env:Path += ";$cargoBin"
     }
   }
 }
 
 function Test-Command-Runnable([string]$name) {
-    # Actually tries to execute the command to ensure it's not a broken shim
-    try {
-        if (Get-Command $name -ErrorAction SilentlyContinue) {
-            # Try running version flag (works for cargo, python, winget, uv, etc)
-            $null = & $name --version 2>&1
-            return ($LASTEXITCODE -eq 0)
-        }
-        return $false
-    } catch {
-        return $false
+  try {
+    if (Get-Command $name -ErrorAction SilentlyContinue) {
+      $null = & $name --version 2>&1
+      return ($LASTEXITCODE -eq 0)
     }
+    return $false
+  } catch {
+    return $false
+  }
 }
 
 function Ensure-Uv {
@@ -77,9 +75,7 @@ function Ensure-Uv {
   }
 
   Log-Warn "uv not found. Installing uv (Python package installer)..."
-
   try {
-    # Install uv via pip
     & python -m pip install --user uv --quiet
     if ($LASTEXITCODE -ne 0) {
       throw "uv installation failed with exit code $LASTEXITCODE"
@@ -120,9 +116,7 @@ function Ensure-Rust {
 
   Log-Info "Attempting to install Rust via winget (Rustup)..."
   try {
-    # Added --disable-interactivity to prevent hanging/weird exit codes
     & winget install -e --id Rustlang.Rustup --accept-package-agreements --accept-source-agreements --disable-interactivity
-
     if ($LASTEXITCODE -ne 0) {
       Log-Warn "winget Rust install failed: winget exited with code $LASTEXITCODE"
       return $false
@@ -131,9 +125,7 @@ function Ensure-Rust {
     Log-Ok "Rustup installed. Refreshing PATH..."
     Refresh-Path
 
-    if (Test-Command-Runnable "cargo") {
-      return $true
-    }
+    if (Test-Command-Runnable "cargo") { return $true }
 
     Log-Warn "Cargo installed but not executable in this session."
     return $false
@@ -147,10 +139,9 @@ function Ensure-TauriCli {
   if (-not (Test-Command-Runnable "cargo")) { return $false }
 
   if ($SkipTauriCliInstall) {
-    return (Test-Command-Runnable "cargo-tauri") # cargo-tauri is the actual executable
+    return (Test-Command-Runnable "cargo-tauri")
   }
 
-  # First check using cargo tauri
   try {
     $v = & cargo tauri --version 2>&1
     if ($LASTEXITCODE -eq 0) {
@@ -169,13 +160,12 @@ function Ensure-TauriCli {
 
     Refresh-Path
 
-    # Verify again
     try {
-        $v2 = & cargo tauri --version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Log-Ok "Tauri CLI installed: $v2"
-            return $true
-        }
+      $v2 = & cargo tauri --version 2>&1
+      if ($LASTEXITCODE -eq 0) {
+        Log-Ok "Tauri CLI installed: $v2"
+        return $true
+      }
     } catch {}
 
     Log-Warn "tauri-cli installed but still not runnable."
@@ -196,27 +186,24 @@ Log-Info "Root directory: $root"
 Log-Info ("Build started at: {0}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 Write-Host ""
 
-# ---- Prereqs ----
-
 # ================================
 # STEP 1: UI Smoke Tests (pre-build)
 # ================================
-$__hasLog = (Get-Command Log-Step -ErrorAction SilentlyContinue) -ne $null
-if ($__hasLog) { Log-Step 1 "UI Smoke Tests (pre-build)" } else { Write-Host "[STEP 1] UI Smoke Tests (pre-build)" }
+Log-Step 1 "UI Smoke Tests (pre-build)"
 
 try {
-  if ($__hasLog) { Log-Info "Running UI/installer smoke tests..." } else { Write-Host "[INFO] Running UI/installer smoke tests..." }
-
-  # Bypass 'uv run' to avoid tensorflow dependency issues on Windows
-  # Tests are standard library only.
+  Log-Info "Running UI/installer smoke tests..."
   & python tests/test_tauri_ui_smoke.py
   if ($LASTEXITCODE -ne 0) { throw "UI smoke tests failed (exit code $LASTEXITCODE)" }
-
-  if ($__hasLog) { Log-Ok "UI smoke tests passed" } else { Write-Host "[OK] UI smoke tests passed" }
+  Log-Ok "UI smoke tests passed"
 } catch {
-  if ($__hasLog) { Log-Fail "$_" } else { Write-Host "[FAIL] $($_.Exception.Message)" }
+  Log-Fail "$_"
   exit 1
 }
+
+# ================================
+# STEP 0: Checking Prerequisites
+# ================================
 Log-Step 0 "Checking Prerequisites"
 
 # Python
@@ -228,16 +215,14 @@ try {
   exit 1
 }
 
-# uv (Python package installer - faster than pip)
+# uv (optional)
 $useUv = Ensure-Uv
 
 # Rust + Tauri only required if building Tauri
 if (-not $SkipTauri) {
   $hasCargo = Ensure-Rust
-
   if (-not $hasCargo) {
     Log-Fail "Rust/Cargo is required to build the installer."
-    Log-Info "Auto-install failed or PATH is not updated."
     Log-Info "MANUAL FIX:"
     Log-Info "  1. Download https://rustup.rs/ and install."
     Log-Info "  2. Restart your terminal."
@@ -245,13 +230,12 @@ if (-not $SkipTauri) {
     exit 1
   }
 
-  # Safe check for version
   try {
-      $rustVersion = & cargo --version 2>&1
-      Log-Ok "Rust found: $rustVersion"
+    $rustVersion = & cargo --version 2>&1
+    Log-Ok "Rust found: $rustVersion"
   } catch {
-      Log-Fail "Cargo command exists but failed to run. Please reinstall Rustup."
-      exit 1
+    Log-Fail "Cargo command exists but failed to run. Please reinstall Rustup."
+    exit 1
   }
 
   $hasTauri = Ensure-TauriCli
@@ -264,10 +248,14 @@ if (-not $SkipTauri) {
   Log-Warn "SkipTauri enabled; Rust/Cargo not required."
 }
 
-# ---- Clean ----
+# ================================
+# Optional Clean
+# ================================
 if ($Clean) {
   Log-Step 1 "Cleaning Build Artifacts"
 
+  # IMPORTANT: do NOT delete src-tauri/resources entirely (it contains icons/config/etc).
+  # Only delete generated subfolders.
   $cleanTargets = @(
     "dist",
     "build",
@@ -275,7 +263,8 @@ if ($Clean) {
     "src-tauri\target",
     "src-tauri\binaries",
     "src-tauri\drivers",
-    "src-tauri\resources"
+    "src-tauri\resources\scripts",
+    "src-tauri\resources\sidecar"
   )
 
   foreach ($rel in $cleanTargets) {
@@ -294,13 +283,14 @@ if ($Clean) {
   Log-Ok "Clean completed"
 }
 
-# ---- Build Python backend ----
+# ================================
+# STEP 2: Build Python backend
+# ================================
 if (-not $SkipPython) {
-  Log-Step 2 "Building Python Backend"
+  Log-Step 2 "Building Python Backend (PyInstaller ONEDIR)"
 
   $venv = Join-Path $root ".venv"
   $venvPython = Join-Path $venv "Scripts\python.exe"
-  $venvPyInstaller = Join-Path $venv "Scripts\pyinstaller.exe"
 
   # Check if venv exists AND is functional
   $venvNeedsCreation = $false
@@ -316,27 +306,17 @@ if (-not $SkipPython) {
   }
 
   if ($venvNeedsCreation) {
-    Log-Info "Creating Python virtual environment with uv..."
+    Log-Info "Creating Python virtual environment..."
     try {
       if ($useUv) {
-        # Use uv to create venv (much faster)
         & uv venv $venv --python python
-        if ($LASTEXITCODE -ne 0) {
-          throw "uv venv creation failed with exit code $LASTEXITCODE"
-        }
+        if ($LASTEXITCODE -ne 0) { throw "uv venv creation failed with exit code $LASTEXITCODE" }
       } else {
-        # Fallback to standard venv
         & python -m venv $venv
-        if ($LASTEXITCODE -ne 0) {
-          throw "venv creation failed with exit code $LASTEXITCODE"
-        }
+        if ($LASTEXITCODE -ne 0) { throw "venv creation failed with exit code $LASTEXITCODE" }
       }
 
-      # Verify python.exe was created
-      if (-not (Test-Path $venvPython)) {
-        throw "venv created but python.exe not found at: $venvPython"
-      }
-
+      if (-not (Test-Path $venvPython)) { throw "venv created but python.exe not found at: $venvPython" }
       Log-Ok "Virtual environment created"
     } catch {
       Log-Fail "Failed to create virtual environment: $_"
@@ -347,7 +327,6 @@ if (-not $SkipPython) {
   Log-Info "Installing Python dependencies..."
   try {
     if ($useUv) {
-      # Use uv for faster installation
       Log-Info "Using uv for package installation (faster than pip)"
       & uv pip install --python $venvPython -e . --quiet
       if ($LASTEXITCODE -ne 0) { throw "uv pip install project failed" }
@@ -357,7 +336,6 @@ if (-not $SkipPython) {
 
       Log-Ok "Dependencies installed with uv"
     } else {
-      # Fallback to pip
       Log-Info "Using pip for package installation"
       $venvPip = Join-Path $venv "Scripts\pip.exe"
 
@@ -375,16 +353,27 @@ if (-not $SkipPython) {
     exit 1
   }
 
-  Log-Info "Building backend sidecar with PyInstaller..."
-  $backend = Join-Path $root "backend\main_backend.py"
+  Log-Info "Building backend sidecar with PyInstaller (onedir)..."
+
+  # IMPORTANT:
+  # Use your actual backend entrypoint (current infra uses backend/main_backend.py).
+  # If you later switch to backend/entry_main.py, change this path.
+  $backend = Join-Path $root "backend\entry_main.py"
   if (-not (Test-Path $backend)) {
     Log-Fail "Backend source not found: $backend"
     exit 1
   }
 
   try {
-    # Use venv's pyinstaller
-    & $venvPyInstaller --noconfirm --clean --onefile --name main-backend $backend
+    # ONEDIR is more reliable than ONEFILE for FastAPI/uvicorn + big deps.
+    & $venvPython -m PyInstaller `
+      --noconfirm `
+      --clean `
+      --onedir `
+      --console `
+      --name main-backend `
+      $backend
+
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
     Log-Ok "Backend built successfully"
   } catch {
@@ -392,29 +381,42 @@ if (-not $SkipPython) {
     exit 1
   }
 
-  $distExe = Join-Path $root "dist\main-backend.exe"
+  $distDir = Join-Path $root "dist\main-backend"
+  $distExe = Join-Path $distDir "main-backend.exe"
   if (-not (Test-Path $distExe)) {
     Log-Fail "PyInstaller output missing: $distExe"
     exit 1
   }
 
   $sizeMb = [math]::Round(((Get-Item $distExe).Length / 1MB), 2)
-  Log-Ok "Backend executable created: $sizeMb MB"
+  Log-Ok "Backend executable created: $sizeMb MB (onedir)"
 
-  Log-Info "Preparing Tauri sidecar binary..."
-  $target = "x86_64-pc-windows-msvc"
-  $tauriSidecarDir = Join-Path $root "src-tauri\binaries"
-  $tauriSidecar = Join-Path $tauriSidecarDir ("main-backend-{0}.exe" -f $target)
+  # Copy the whole ONEDIR output into Tauri resources so it gets bundled by resources/**
+  Log-Info "Bundling sidecar into Tauri resources..."
+  $tauriSidecarDir = Join-Path $root "src-tauri\resources\sidecar\main-backend"
 
+  if (Test-Path $tauriSidecarDir) {
+    Remove-Item -Recurse -Force $tauriSidecarDir -ErrorAction SilentlyContinue
+  }
   New-Item -Force -ItemType Directory $tauriSidecarDir | Out-Null
-  Copy-Item -Force $distExe $tauriSidecar
-  Log-Ok "Sidecar copied: $(Split-Path -Leaf $tauriSidecar)"
+
+  Copy-Item -Recurse -Force (Join-Path $distDir "*") $tauriSidecarDir
+
+  $bundledExe = Join-Path $tauriSidecarDir "main-backend.exe"
+  if (-not (Test-Path $bundledExe)) {
+    Log-Fail "Bundled sidecar exe missing after copy: $bundledExe"
+    exit 1
+  }
+
+  Log-Ok "Sidecar bundled: $tauriSidecarDir"
 } else {
   Log-Warn "Skipping Python backend build"
 }
 
-# ---- Copy driver installers ----
-Log-Step 3 "Copying Driver Installers"
+# ================================
+# STEP 3: Copy driver installers + scripts
+# ================================
+Log-Step 3 "Copying Driver Installers + Scripts"
 
 $drvInterDir = Join-Path $root "src-tauri\drivers\interception"
 $drvVjoyDir  = Join-Path $root "src-tauri\drivers\vjoy"
@@ -464,7 +466,9 @@ if (Test-Path $modelsScriptSrc) {
   Log-Warn "Download models script not found: $modelsScriptSrc"
 }
 
-# ---- Build Tauri ----
+# ================================
+# STEP 4: Build Tauri
+# ================================
 if (-not $SkipTauri) {
   Log-Step 4 "Building Tauri Application"
 
@@ -502,7 +506,9 @@ if (-not $SkipTauri) {
   Log-Warn "Skipping Tauri build"
 }
 
-# ---- Verify ----
+# ================================
+# STEP 5: Verify (optional)
+# ================================
 if ($Verify) {
   Log-Step 5 "Running Verification"
 
@@ -513,6 +519,7 @@ if ($Verify) {
       Log-Fail "Verification failed"
       exit 1
     }
+    Log-Ok "Verification completed"
   } else {
     Log-Warn "Verification script not found: $verifyScript"
   }
