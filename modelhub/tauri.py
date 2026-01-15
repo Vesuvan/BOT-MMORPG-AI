@@ -1,4 +1,3 @@
-# modelhub/tauri.py
 #!/usr/bin/env python3
 """
 ModelHub <-> Tauri bridge (local-only HTTP JSON API)
@@ -8,19 +7,9 @@ Production goals:
 - Token auth on every request (X-Auth-Token header)
 - Works in dev (python -m modelhub.tauri) and in prod (PyInstaller sidecar)
 - No UI/Eel dependencies
-- Reuses your existing ModelHub + SessionManager logic
+- Reuses existing ModelHub + SessionManager logic
 
-Run (dev):
-  python -m modelhub.tauri --port 0
-
-Run (fixed port):
-  python -m modelhub.tauri --port 8787
-
-Security:
-  - Server generates a token by default and prints it in a READY line.
-  - Rust should read stdout, extract URL + token, and then call the API with header X-Auth-Token.
-
-READY line format (single line):
+READY line format:
   READY url=http://127.0.0.1:<port> token=<token>
 
 Requirements:
@@ -34,37 +23,57 @@ import os
 import secrets
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 
-# ---- Ensure PROJECT_ROOT importability (critical for PyInstaller/cwd variability) ----
-def _resolve_project_root() -> Path:
-    """
-    Try to locate repo root robustly:
-    - Prefer explicit MODELHUB_PROJECT_ROOT env if set
-    - Else use two parents up from this file: modelhub/tauri.py -> modelhub -> repo root
-    """
-    env_root = os.environ.get("MODELHUB_PROJECT_ROOT", "").strip()
-    if env_root:
-        p = Path(env_root).expanduser().resolve()
-        return p
+# ----------------------------
+# Roots (dev/prod)
+# ----------------------------
 
+DEFAULT_GAME_ID = "genshin_impact"
+DEFAULT_VERSION = "0.01"
+
+def _resolve_repo_root_from_file() -> Path:
     # modelhub/tauri.py -> modelhub -> repo root
     return Path(__file__).resolve().parent.parent
 
+def _resolve_resource_root() -> Path:
+    """
+    Shipped assets root (read-only in production).
+    Prefer explicit --resource-root or env.
+    """
+    env = os.environ.get("MODELHUB_RESOURCE_ROOT", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    return _resolve_repo_root_from_file()
 
-PROJECT_ROOT: Path = _resolve_project_root()
+def _resolve_data_root() -> Path:
+    """
+    Writable root for new datasets/models.
+    Prefer explicit --data-root or env.
+    """
+    env = os.environ.get("MODELHUB_DATA_ROOT", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    # fallback to repo root (dev)
+    return _resolve_repo_root_from_file()
 
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+RESOURCE_ROOT: Path = _resolve_resource_root()
+DATA_ROOT: Path = _resolve_data_root()
+
+# Ensure imports from repo root (dev) OR sidecar bundle path (prod).
+# In prod PyInstaller, modelhub package is usually bundled, but dev needs repo root.
+repo_root = _resolve_repo_root_from_file()
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
 
-# ---- ModelHub imports (match launcher.py behavior) ----
+# ----------------------------
+# ModelHub imports
+# ----------------------------
+
 MODELHUB_AVAILABLE = False
 session_manager = None
-
-# Defaults (same as launcher.py v0.1.8)
-DEFAULT_GAME_ID = "genshin_impact"
 
 mh_list_games = None
 mh_load_game = None
@@ -114,11 +123,15 @@ try:
     mh_get_active_model = get_active_model
     mh_list_builtin_models = list_builtin_models
 
+    # Create default registry/catalog if needed (dev). In prod, it may live under DATA_ROOT.
+    # If your ensure_default_catalog always writes relative to repo, you can still call it safely;
+    # fallback filesystem scanning below guarantees UI won’t be empty.
     ensure_default_catalog()
-    session_manager = SessionManager(PROJECT_ROOT)
+
+    # IMPORTANT: SessionManager should operate against DATA_ROOT so new recordings/training appear.
+    session_manager = SessionManager(DATA_ROOT)
     MODELHUB_AVAILABLE = True
 except Exception as e:
-    # Keep API alive even if modelhub fails; endpoints return ok:false
     MODELHUB_AVAILABLE = False
     session_manager = None
     _MODELHUB_INIT_ERROR = str(e)
@@ -129,40 +142,68 @@ def _normalize_game_id(game_id: Optional[str]) -> str:
     return gid if gid else DEFAULT_GAME_ID
 
 
-# -------------------------------------------------------------------
-# ✅ Option B: treat versions/0.01/model as "builtin" for listing/UI
-# -------------------------------------------------------------------
-def _safe_relpath(p: Path) -> str:
-    try:
-        return str(p.resolve().relative_to(PROJECT_ROOT.resolve()))
-    except Exception:
-        return str(p)
+# ----------------------------
+# Fallback scanners (guarantee UI is never empty)
+# ----------------------------
 
-
-def _inject_versions_builtin_models(gid: str) -> list[dict]:
+def _scan_versions_builtin_models(resource_root: Path, gid: str) -> List[Dict[str, Any]]:
     """
-    Expose versions/0.01/model as a builtin model entry if present.
-    This is purely for listing/selection in UI (no validation implied).
+    Treat versions/<version>/model/ as builtin models (Option B).
+    This makes builtins appear even if registry/builtin_models.py doesn’t scan versions/.
     """
-    out: list[dict] = []
+    out: List[Dict[str, Any]] = []
+    base = resource_root / "versions" / DEFAULT_VERSION / "model"
 
-    model_dir = (PROJECT_ROOT / "versions" / "0.01" / "model").resolve()
-    if model_dir.exists() and model_dir.is_dir():
-        out.append(
-            {
-                "id": "versions_0_01_model",
-                "name": "Native (versions/0.01/model)",
-                "path": _safe_relpath(model_dir),
-                "game_id": gid,
-                "source": "versions",
-                "kind": "tf_checkpoint",
-            }
-        )
+    if not base.exists() or not base.is_dir():
+        return out
 
+    # If folder exists, advertise it as a builtin model entry.
+    # ModelHub UI expects {name/path/...}. Keep it simple and stable.
+    out.append({
+        "id": f"versions_{DEFAULT_VERSION}_model",
+        "name": f"Bundled Model ({DEFAULT_VERSION})",
+        "path": str(base.as_posix()),
+        "source": "versions",
+        "game_id": gid,
+    })
     return out
 
 
-# ---- FastAPI server ----
+def _scan_datasets_fs(data_root: Path, gid: str) -> List[Dict[str, Any]]:
+    datasets_dir = data_root / "datasets" / gid
+    if not datasets_dir.exists():
+        return []
+    out: List[Dict[str, Any]] = []
+    for p in sorted(datasets_dir.iterdir()):
+        if p.is_dir():
+            out.append({
+                "id": p.name,
+                "name": p.name,
+                "path": str(p.as_posix()),
+            })
+    return out
+
+
+def _scan_trained_models_fs(data_root: Path, gid: str) -> List[Dict[str, Any]]:
+    models_dir = data_root / "trained_models" / gid
+    if not models_dir.exists():
+        return []
+    out: List[Dict[str, Any]] = []
+    for p in sorted(models_dir.iterdir()):
+        if p.is_dir():
+            out.append({
+                "id": p.name,
+                "name": p.name,
+                "path": str(p.as_posix()),
+                "source": "trained_models",
+            })
+    return out
+
+
+# ----------------------------
+# FastAPI server
+# ----------------------------
+
 def create_app(token: str):
     from fastapi import FastAPI, Header, HTTPException, Request
     from fastapi.responses import JSONResponse
@@ -170,7 +211,7 @@ def create_app(token: str):
     app = FastAPI(
         title="ModelHub Tauri API",
         version="0.1.8",
-        docs_url=None,  # disable docs for production-hardening
+        docs_url=None,
         redoc_url=None,
         openapi_url=None,
     )
@@ -181,11 +222,7 @@ def create_app(token: str):
 
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(request: Request, exc: Exception):
-        # Avoid leaking stack traces to callers; keep a compact error
-        return JSONResponse(
-            status_code=500,
-            content={"ok": False, "error": str(exc)},
-        )
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
 
     @app.get("/health")
     async def health(x_auth_token: Optional[str] = Header(default=None)):
@@ -193,24 +230,16 @@ def create_app(token: str):
         return {
             "ok": True,
             "modelhub": MODELHUB_AVAILABLE,
-            "project_root": str(PROJECT_ROOT),
+            "resource_root": str(RESOURCE_ROOT),
+            "data_root": str(DATA_ROOT),
             "version": "0.1.8",
             **({"warning": _MODELHUB_INIT_ERROR} if not MODELHUB_AVAILABLE else {}),
         }
 
     # -------- Session endpoints --------
 
-    @app.get("/session/active")
-    async def session_active(x_auth_token: Optional[str] = Header(default=None)):
-        _auth(x_auth_token)
-        if not session_manager or not getattr(session_manager, "active_session", None):
-            return {"ok": True, "active": None}
-        return {"ok": True, "active": session_manager.active_session}
-
     @app.post("/session/begin_recording")
-    async def begin_recording(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def begin_recording(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if not session_manager:
             return {"ok": False, "error": "SessionManager not available"}
@@ -220,9 +249,7 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/session/begin_training")
-    async def begin_training(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def begin_training(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if not session_manager:
             return {"ok": False, "error": "SessionManager not available"}
@@ -234,10 +261,7 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/session/finalize")
-    async def finalize(
-        payload: Dict[str, Any] | None = None,
-        x_auth_token: Optional[str] = Header(default=None),
-    ):
+    async def finalize(payload: Dict[str, Any] | None = None, x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if not session_manager or not getattr(session_manager, "active_session", None):
             return {"ok": True, "finalized": None}
@@ -249,7 +273,6 @@ def create_app(token: str):
         if stype == "training":
             session_manager.finalize_training()
             return {"ok": True, "finalized": "training"}
-        # Unknown type; clear defensively if your SessionManager supports it
         return {"ok": True, "finalized": "unknown"}
 
     # -------- ModelHub endpoints --------
@@ -262,49 +285,72 @@ def create_app(token: str):
     @app.get("/modelhub/games")
     async def modelhub_games(x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
+        # If registry-based list fails, still provide default game so UI isn’t empty.
         if mh_list_games is None:
-            return {"ok": True, "games": []}
-        return {"ok": True, "games": mh_list_games()}
-
-    @app.get("/modelhub/game")
-    async def modelhub_game(
-        game_id: str = "", x_auth_token: Optional[str] = Header(default=None)
-    ):
-        _auth(x_auth_token)
-        if mh_load_game is None:
-            return {"ok": False, "error": "ModelHub not available"}
-        gid = _normalize_game_id(game_id)
-        return {"ok": True, "game": mh_load_game(gid)}
+            return {"ok": True, "games": [DEFAULT_GAME_ID]}
+        games = mh_list_games() or []
+        if not games:
+            games = [DEFAULT_GAME_ID]
+        return {"ok": True, "games": games}
 
     @app.get("/modelhub/catalog")
-    async def modelhub_catalog(
-        game_id: str = "", x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def modelhub_catalog(game_id: str = "", x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         gid = _normalize_game_id(game_id)
 
-        if not MODELHUB_AVAILABLE:
-            return {"ok": True, "builtin_models": [], "datasets": [], "models": [], "active": None}
+        # Builtins:
+        builtin = []
+        if mh_list_builtin_models:
+            try:
+                # IMPORTANT: builtins should be scanned from RESOURCE_ROOT (shipped assets)
+                builtin = mh_list_builtin_models(RESOURCE_ROOT, gid) or []
+            except Exception:
+                builtin = []
 
-        builtin = mh_list_builtin_models(PROJECT_ROOT, gid) if mh_list_builtin_models else []
-        builtin = list(builtin) if builtin else []
-        builtin.extend(_inject_versions_builtin_models(gid))
+        # Option B injection: versions/0.01/model as builtin
+        builtin += _scan_versions_builtin_models(RESOURCE_ROOT, gid)
 
-        datasets = mh_get_datasets(gid) if mh_get_datasets else []
-        models = mh_get_models(gid) if mh_get_models else []
-        active = mh_get_active_model() if mh_get_active_model else None
+        # Datasets/models registry (may be empty in fresh install)
+        datasets = []
+        models = []
+        active = None
 
-        # Include local trained_models discovery if settings + discover function exist
+        if MODELHUB_AVAILABLE:
+            try:
+                datasets = mh_get_datasets(gid) if mh_get_datasets else []
+            except Exception:
+                datasets = []
+            try:
+                models = mh_get_models(gid) if mh_get_models else []
+            except Exception:
+                models = []
+            try:
+                active = mh_get_active_model() if mh_get_active_model else None
+            except Exception:
+                active = None
+
+        # Local trained models: prefer your discover function, fallback to filesystem scan
         local_models = []
         if mh_discover_local_models and mh_load_settings:
             try:
                 s = mh_load_settings()
-                local_models = mh_discover_local_models(PROJECT_ROOT / s.local_models_dir, gid)
+                # Ensure local_models_dir resolves under DATA_ROOT
+                # If settings points to "trained_models", this becomes DATA_ROOT/trained_models/<gid>
+                local_models = mh_discover_local_models((DATA_ROOT / s.local_models_dir), gid) or []
             except Exception:
                 local_models = []
 
+        if not local_models:
+            local_models = _scan_trained_models_fs(DATA_ROOT, gid)
+
+        # If registry datasets empty, fallback to filesystem (so recording appears immediately)
+        if not datasets:
+            datasets = _scan_datasets_fs(DATA_ROOT, gid)
+
         return {
             "ok": True,
+            "resource_root": str(RESOURCE_ROOT),
+            "data_root": str(DATA_ROOT),
             "builtin_models": builtin,
             "datasets": datasets,
             "models": models,
@@ -313,9 +359,7 @@ def create_app(token: str):
         }
 
     @app.post("/modelhub/active")
-    async def modelhub_set_active(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def modelhub_set_active(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if not MODELHUB_AVAILABLE or mh_set_active_model is None:
             return {"ok": False, "error": "ModelHub not available"}
@@ -328,9 +372,7 @@ def create_app(token: str):
         return {"ok": True}
 
     @app.post("/modelhub/delete")
-    async def modelhub_delete(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def modelhub_delete(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if not MODELHUB_AVAILABLE:
             return {"ok": False, "error": "ModelHub not available"}
@@ -341,10 +383,15 @@ def create_app(token: str):
         if not model_id or not path:
             return {"ok": False, "error": "model_id and path are required"}
 
-        # Safety: only allow deletes under trained_models/<gid>/
+        # Safety: only allow deletes under DATA_ROOT/trained_models/<gid>/
         try:
-            full_path = (PROJECT_ROOT / path).resolve()
-            safe_root = (PROJECT_ROOT / "trained_models" / gid).resolve()
+            full_path = Path(path).expanduser()
+            if not full_path.is_absolute():
+                full_path = (DATA_ROOT / full_path).resolve()
+            else:
+                full_path = full_path.resolve()
+
+            safe_root = (DATA_ROOT / "trained_models" / gid).resolve()
             if safe_root not in full_path.parents and full_path != safe_root:
                 return {"ok": False, "error": f"Refusing to delete outside trained_models/{gid}"}
 
@@ -363,9 +410,7 @@ def create_app(token: str):
             return {"ok": False, "error": str(e)}
 
     @app.post("/modelhub/validate")
-    async def modelhub_validate(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
+    async def modelhub_validate(payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
         if mh_load_game is None or mh_validate_compatibility is None or mh_load_json is None:
             return {"ok": False, "message": "ModelHub not installed"}
@@ -384,46 +429,22 @@ def create_app(token: str):
         ok, msg = mh_validate_compatibility(blueprint, profile)
         return {"ok": True, "result": {"ok": ok, "message": msg}}
 
-    @app.post("/modelhub/offline-eval")
-    async def modelhub_offline_eval(
-        payload: Dict[str, Any], x_auth_token: Optional[str] = Header(default=None)
-    ):
-        _auth(x_auth_token)
-        model_dir = (payload.get("model_dir") or "").strip()
-        dataset_dir = (payload.get("dataset_dir") or "").strip()
-        if not model_dir or not dataset_dir:
-            return {"ok": False, "message": "model_dir and dataset_dir are required"}
-
-        script = PROJECT_ROOT / "scripts" / "evaluate_local_model.py"
-        if not script.exists():
-            return {"ok": False, "message": f"Missing evaluation script at {script}"}
-
-        import subprocess
-
-        cmd = [sys.executable, str(script), "--model-dir", model_dir, "--dataset-dir", dataset_dir]
-        subprocess.Popen(cmd, cwd=str(PROJECT_ROOT))
-        return {"ok": True, "cmd": cmd}
-
     return app
 
 
 def _pick_host() -> str:
-    # Hard bind to localhost for safety
     return "127.0.0.1"
 
 
 def run_server(port: int, token: str) -> Tuple[str, str]:
-    """
-    Runs uvicorn server. If port==0, OS picks a free port.
-    Returns (base_url, token). Prints READY line to stdout.
-    """
+    import uvicorn
     from uvicorn.config import Config
     from uvicorn.server import Server
+    import socket
 
     host = _pick_host()
     app = create_app(token)
 
-    # Create server programmatically to read the chosen port when port==0
     config = Config(
         app=app,
         host=host,
@@ -433,10 +454,6 @@ def run_server(port: int, token: str) -> Tuple[str, str]:
         lifespan="off",
     )
     server = Server(config=config)
-
-    # We need to run in a way that reveals the bound port.
-    # Uvicorn doesn't expose bound port until sockets are created; we can pre-bind ourselves.
-    import socket
 
     if port == 0:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -452,7 +469,6 @@ def run_server(port: int, token: str) -> Tuple[str, str]:
     print(f"READY url={base_url} token={token}", flush=True)
 
     if sockets is not None:
-        # Run with pre-bound socket(s)
         server.run(sockets=sockets)
     else:
         server.run()
@@ -464,20 +480,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="ModelHub local HTTP API for Tauri")
     parser.add_argument("--port", type=int, default=0, help="Port to bind. Use 0 to auto-pick.")
     parser.add_argument("--token", type=str, default="", help="Auth token. If empty, generates one.")
-    parser.add_argument("--project-root", type=str, default="", help="Override project root path.")
+    parser.add_argument("--resource-root", type=str, default="", help="Read-only shipped assets root (versions/, etc).")
+    parser.add_argument("--data-root", type=str, default="", help="Writable data root (datasets/, trained_models/).")
     args = parser.parse_args(argv)
 
-    # Allow explicit project root override for odd packaging/cwd cases
-    if args.project_root.strip():
-        os.environ["MODELHUB_PROJECT_ROOT"] = args.project_root.strip()
+    if args.resource_root.strip():
+        os.environ["MODELHUB_RESOURCE_ROOT"] = args.resource_root.strip()
+    if args.data_root.strip():
+        os.environ["MODELHUB_DATA_ROOT"] = args.data_root.strip()
+
+    # Recompute globals after env set
+    global RESOURCE_ROOT, DATA_ROOT
+    RESOURCE_ROOT = _resolve_resource_root()
+    DATA_ROOT = _resolve_data_root()
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
     token = args.token.strip() or secrets.token_urlsafe(32)
-
-    # Ensure the same root logic if project-root was provided
-    global PROJECT_ROOT
-    PROJECT_ROOT = _resolve_project_root()
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
 
     try:
         run_server(args.port, token)
@@ -485,7 +503,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     except KeyboardInterrupt:
         return 0
     except Exception as e:
-        # Emit a single-line failure marker for Rust logs
         print(f"FAILED error={e}", flush=True)
         return 1
 
