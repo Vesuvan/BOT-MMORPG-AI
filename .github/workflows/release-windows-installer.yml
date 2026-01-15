@@ -61,12 +61,14 @@ jobs:
             ## BOT MMORPG AI ${{ steps.get_version.outputs.version }}
 
             ### Installation Instructions
-            1. **Download the installer** below (Assets)
+
+            1. **Download the installer** for your platform below
             2. **Run the installer** with administrator privileges
             3. **Follow the setup wizard** - it will automatically install required drivers
             4. **Launch the application** from your desktop or start menu
 
             ### What's Included
+
             - ✅ AI Bot Application with GUI
             - ✅ Python Backend (bundled)
             - ✅ Automatic Driver Installation (Interception + vJoy)
@@ -74,13 +76,26 @@ jobs:
             - ✅ Easy Uninstaller
 
             ### System Requirements
+
             - **OS**: Windows 10/11 (64-bit)
             - **RAM**: 8GB minimum, 16GB recommended
             - **GPU**: NVIDIA GPU recommended for training
             - **Disk**: 5GB free space
 
-            For detailed instructions, see:
+            ### Quick Start
+
+            1. Launch the application
+            2. Click "Collect Data" and play your game for 10-15 minutes
+            3. Click "Train Model" and wait for training to complete
+            4. Click "Start Bot" to let the AI play!
+
+            For detailed instructions, see the User Guide:
             https://github.com/${{ github.repository }}/blob/main/USAGE.md
+
+            ### Support
+
+            - 🐛 Report Issues: https://github.com/${{ github.repository }}/issues
+            - 📖 Documentation: https://github.com/${{ github.repository }}
 
   build-windows-installer:
     name: Build Windows Installer + Upload to Release
