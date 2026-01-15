@@ -77,8 +77,17 @@ launcher =[
     "python-dotenv>=1.0.0"
 ]
 
+backend = [
+  "fastapi>=0.110,<1.0",
+  "uvicorn[standard]>=0.27,<1.0"
+]
+
+packaging = [
+  "pyinstaller>=6.0"
+]
+
 all = [
-    "bot-mmorpg-ai[dev,docs,jupyter,launcher]",
+    "bot-mmorpg-ai[dev,docs,jupyter,launcher,backend,packaging]",
 ]
 
 [project.urls]
