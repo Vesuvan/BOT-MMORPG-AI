@@ -22,16 +22,17 @@
       "fs": {
         "all": true,
         "scope": [
-          "$APP/*"
+          "$APP/*",
+          "$APPDATA/*",
+          "$CONFIG/*",
+          "$LOCALDATA/*"
         ]
       }
     },
     "bundle": {
       "active": true,
       "category": "Game",
-      "targets": [
-        "nsis"
-      ],
+      "targets": ["nsis"],
       "identifier": "com.bot.mmorpg.ai",
       "icon": [
         "icons/32x32.png",
@@ -42,7 +43,9 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**"
+
+        "../versions/**",
+        "../modelhub/**"
       ],
       "windows": {
         "nsis": {
