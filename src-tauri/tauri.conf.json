@@ -16,17 +16,22 @@
       "shell": {
         "all": false,
         "execute": true,
+        "open": true,
         "sidecar": false
       },
       "fs": {
         "all": true,
-        "scope": ["$APP/*", ".env"]
+        "scope": [
+          "$APP/*"
+        ]
       }
     },
     "bundle": {
       "active": true,
       "category": "Game",
-      "targets": ["nsis"],
+      "targets": [
+        "nsis"
+      ],
       "identifier": "com.bot.mmorpg.ai",
       "icon": [
         "icons/32x32.png",
@@ -37,8 +42,7 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**",
-        "../.env"
+        "../versions/**"
       ],
       "windows": {
         "nsis": {

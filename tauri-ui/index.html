@@ -1,867 +1,823 @@
+<!-- launcher/web/main.html (PROD, Tauri-compatible)
+  Key changes vs your Eel HTML:
+  - Removed /eel.js and ALL eel.* calls
+  - Uses ONLY Tauri invoke/events via main.js
+  - Adds data-tab attributes for smoke tests + JS routing
+  - Keeps your styling/layout, but rewires sidebar nav to be data-tab driven
+  - Adds ModelHub wiring elements expected by main.js
+
+  ✅ PRODUCTION FIX (only for Settings):
+  - Removed inline onclick from Settings open/close buttons
+  - Added IDs + addEventListener bindings on DOMContentLoaded
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOT-MMORPG-AI</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BOT-MMORPG-AI Launcher</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Fonts (allowed by CSP in tauri.conf.json) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-    <script>
-        // Check if running in Tauri
-        const invoke = window.__TAURI__ ? window.__TAURI__.invoke : null;
-        const listen = window.__TAURI__ ? window.__TAURI__.event.listen : null;
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --bg-panel: #1E1E2E;
+      --bg-card: #252535;
+      --primary: #BB86FC;
+      --secondary: #03DAC6;
+      --accent: #CF6679;
+      --success: #00E676;
+      --text-main: #FFFFFF;
+      --text-dim: #B0B0C0;
+      --border: #333344;
+      --ai-color: #FFD700;
 
-        // Mock 'eel' object so existing logic works unchanged
-        window.eel = {
-            get_ai_config: () => () => invoke ? invoke('get_ai_config') : Promise.resolve({}),
-            save_configuration: (provider, key) => () => invoke ? invoke('save_configuration', { provider: provider, apiKey: key }) : Promise.resolve(true),
-            start_recording: () => () => invoke ? invoke('start_recording') : Promise.resolve("Mock Recording Started"),
-            start_training: () => () => invoke ? invoke('start_training') : Promise.resolve("Mock Training Started"),
-            start_bot: () => () => invoke ? invoke('start_bot') : Promise.resolve("Mock Bot Started"),
-            stop_process: () => () => invoke ? invoke('stop_process') : Promise.resolve("Mock Process Stopped"),
-            get_api_key: () => async () => {
-                if (!invoke) return "";
-                const cfg = await invoke('get_ai_config');
-                return cfg.gemini_key; 
-            }
-        };
+      --shadow: 0 20px 50px rgba(0,0,0,0.45);
+      --shadow-soft: 0 12px 30px rgba(0,0,0,0.25);
 
-        // Listen for terminal logs from Rust
-        if (listen) {
-            listen('terminal_update', (event) => {
-                if (window.update_terminal) {
-                    window.update_terminal(event.payload);
-                }
-            });
-        }
-    </script>
+      --glass: rgba(255,255,255,0.05);
+      --glass-strong: rgba(255,255,255,0.08);
+    }
 
-    <style>
-        :root {
-            /* Cyberpunk / Gamer Palette */
-            --bg-dark: #121212;
-            --bg-panel: #1E1E2E;
-            --bg-card: #252535;
-            --primary: #BB86FC;   /* Neon Purple */
-            --secondary: #03DAC6; /* Teal/Cyan */
-            --accent: #CF6679;    /* Error/Stop Red */
-            --success: #00E676;   /* Matrix Green */
-            --text-main: #FFFFFF;
-            --text-dim: #B0B0C0;
-            --border: #333344;
-            --ai-color: #FFD700;  /* Gold for AI */
-        }
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    html, body { height: 100%; }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-        }
+    /* --- SIDEBAR --- */
+    .sidebar {
+      width: 260px;
+      background-color: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      z-index: 10;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
 
-        /* --- SIDEBAR --- */
-        .sidebar {
-            width: 260px;
-            background-color: var(--bg-panel);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            z-index: 10;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.3);
-        }
+    .sidebar::before{
+      content:"";
+      position:absolute;
+      inset:-120px -120px auto auto;
+      width: 240px; height: 240px;
+      background: radial-gradient(circle at 30% 30%, rgba(187,134,252,0.25), rgba(3,218,198,0.08), transparent 65%);
+      filter: blur(10px);
+      pointer-events:none;
+      transform: rotate(18deg);
+    }
 
-        .brand {
-            display: flex; align-items: center; gap: 12px; margin-bottom: 40px; padding-left: 10px;
-        }
-        .brand-icon {
-            width: 36px; height: 36px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
-            box-shadow: 0 0 15px rgba(187, 134, 252, 0.4);
-        }
-        .brand-text {
-            font-weight: 700; font-size: 18px; letter-spacing: 0.5px;
-            background: linear-gradient(90deg, #fff, #ccc);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; padding-left: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 15px rgba(187, 134, 252, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    .brand-icon::after{
+      content:"";
+      position:absolute;
+      inset:-60%;
+      background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,0.25), transparent 65%);
+      transform: translateX(-40%) rotate(10deg);
+      animation: shimmer 5.5s ease-in-out infinite;
+      opacity: .7;
+    }
+    @keyframes shimmer {
+      0%, 35% { transform: translateX(-65%) rotate(10deg); opacity:.2; }
+      55% { opacity: .7; }
+      100% { transform: translateX(65%) rotate(10deg); opacity:.2; }
+    }
 
-        .nav-menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-        
-        /* Updated nav-btn to handle active states */
-        .nav-btn {
-            display: flex; align-items: center; gap: 14px; padding: 12px 16px;
-            border-radius: 10px; color: var(--text-dim); text-decoration: none;
-            transition: all 0.2s ease; cursor: pointer; font-weight: 500;
-            background: transparent; border: none; width: 100%; text-align: left;
-            font-family: inherit; font-size: 14px;
-        }
-        .nav-btn:hover { background-color: rgba(255, 255, 255, 0.05); color: #fff; transform: translateX(4px); }
-        .nav-btn.active {
-            background-color: rgba(187, 134, 252, 0.15); color: var(--primary);
-            border-left: 3px solid var(--primary);
-        }
-        .nav-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .brand-text {
+      font-weight: 700; font-size: 18px; letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #fff, #ccc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
 
-        .sidebar-footer {
-            margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border);
-            font-size: 12px; color: var(--text-dim);
-        }
-        
-        /* Sidebar Buttons */
-        .btn-github {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; background-color: #24292e; color: white; padding: 10px;
-            border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;
-            margin-bottom: 10px; border: 1px solid var(--border); transition: all 0.2s;
-        }
-        .btn-github:hover { background-color: #2f363d; border-color: #fff; transform: translateY(-2px); }
+    .nav-menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .nav-btn {
+      display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+      border-radius: 10px; color: var(--text-dim); text-decoration: none;
+      transition: all 0.2s ease; cursor: pointer; font-weight: 500;
+      position: relative;
+    }
+    .nav-btn:hover { background-color: rgba(255, 255, 255, 0.05); color: #fff; transform: translateX(4px); }
+    .nav-btn.active {
+      background-color: rgba(187, 134, 252, 0.15); color: var(--primary);
+      border-left: 3px solid var(--primary);
+    }
+    .nav-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .nav-btn.active::after{
+      content:"";
+      position:absolute;
+      right:10px; top:50%;
+      transform: translateY(-50%);
+      width:8px; height:8px; border-radius:50%;
+      background: var(--secondary);
+      box-shadow: 0 0 12px rgba(3,218,198,.55);
+      opacity:.9;
+    }
 
-        .btn-sidebar-settings {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; background: rgba(255, 255, 255, 0.03); color: var(--text-dim);
-            padding: 10px; border-radius: 8px; border: 1px solid var(--border);
-            cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;
-            margin-bottom: 15px;
-        }
-        .btn-sidebar-settings:hover {
-            background: rgba(187, 134, 252, 0.1); border-color: var(--primary);
-            color: var(--text-main); box-shadow: 0 0 10px rgba(187, 134, 252, 0.2);
-        }
+    .sidebar-footer {
+      margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--text-dim);
+      position: relative;
+      z-index: 2;
+    }
 
-        .status-dot {
-            display: inline-block; width: 8px; height: 8px; background-color: var(--success);
-            border-radius: 50%; margin-right: 6px; box-shadow: 0 0 8px var(--success);
-        }
+    .btn-github {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; background-color: #24292e; color: white; padding: 10px;
+      border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;
+      margin-bottom: 10px; border: 1px solid var(--border); transition: all 0.2s;
+    }
+    .btn-github:hover { background-color: #2f363d; border-color: #fff; transform: translateY(-2px); }
 
-        /* --- MAIN CONTENT --- */
-        .main-area {
-            flex: 1; padding: 30px 40px; overflow-y: auto; position: relative;
-            display: flex; flex-direction: column;
-        }
-        .header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;
-            flex-shrink: 0;
-        }
-        .page-title { font-size: 28px; font-weight: 700; }
-        .profile-chip {
-            background: var(--bg-card); padding: 6px 14px; border-radius: 20px;
-            border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; font-size: 14px;
-        }
+    .btn-sidebar-settings {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; background: rgba(255, 255, 255, 0.03); color: var(--text-dim);
+      padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+      cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s;
+      margin-bottom: 15px;
+    }
+    .btn-sidebar-settings:hover {
+      background: rgba(187, 134, 252, 0.1); border-color: var(--primary);
+      color: var(--text-main); box-shadow: 0 0 10px rgba(187, 134, 252, 0.2);
+    }
 
-        /* Tab Logic */
-        .tab-content { 
-            display: none; 
-            flex: 1; 
-            animation: fadeIn 0.3s ease; 
-            height: 100%; /* Ensure tab takes full height for layout */
-            overflow-y: auto;
-        }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px; background-color: var(--success);
+      border-radius: 50%; margin-right: 6px; box-shadow: 0 0 8px var(--success);
+    }
 
-        /* Dashboard */
-        .hero-status {
-            background: linear-gradient(135deg, rgba(3, 218, 198, 0.1), rgba(187, 134, 252, 0.05));
-            border: 1px solid rgba(3, 218, 198, 0.3); border-radius: 16px; padding: 30px;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;
-            position: relative; overflow: hidden;
-        }
-        .hero-status::after {
-            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
-            background: var(--secondary); box-shadow: 0 0 15px var(--secondary);
-        }
-        .hero-text h2 { margin-bottom: 5px; font-size: 24px; }
-        .hero-text p { color: var(--text-dim); }
+    /* --- MAIN CONTENT --- */
+    .main-area {
+      flex: 1; padding: 30px 40px; overflow-y: auto; position: relative;
+      display: flex; flex-direction: column;
+    }
 
-        .grid-container {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px; margin-bottom: 30px;
-        }
-        .card {
-            background-color: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 24px; transition: transform 0.2s, border-color 0.2s; cursor: pointer;
-        }
-        .card:hover {
-            transform: translateY(-5px); border-color: var(--primary);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-        .card-icon {
-            width: 48px; height: 48px; background: rgba(255,255,255,0.05);
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            margin-bottom: 16px; font-size: 24px;
-        }
-        .card h3 { font-size: 18px; margin-bottom: 8px; }
-        .card p { color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+    .header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;
+      flex-shrink: 0;
+    }
+    .page-title { font-size: 28px; font-weight: 700; }
+    .profile-chip {
+      background: var(--bg-card); padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; font-size: 14px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+    }
 
-        .stats-bar {
-            display: flex; gap: 20px; background: var(--bg-card); padding: 15px 25px;
-            border-radius: 12px; border-top: 1px solid var(--border);
-        }
-        .stat-item { flex: 1; text-align: center; border-right: 1px solid var(--border); }
-        .stat-item:last-child { border-right: none; }
-        .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
-        .stat-val { font-size: 20px; font-weight: 700; color: var(--secondary); margin-top: 4px; }
+    /* Tab Logic */
+    .tab-content { display: none; flex: 1; animation: fadeIn 0.25s ease; height: 100%; overflow-y: auto; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Train / Teach Layout Fixes */
-        /* Flex container for full-height tabs */
-        #tab-train, #tab-teach {
-            display: none; /* Default hidden */
-            flex-direction: column;
-            height: 100%;
-        }
-        #tab-train.active, #tab-teach.active {
-            display: flex;
-        }
+    /* Dashboard */
+    .hero-status {
+      background: linear-gradient(135deg, rgba(3, 218, 198, 0.1), rgba(187, 134, 252, 0.05));
+      border: 1px solid rgba(3, 218, 198, 0.3); border-radius: 16px; padding: 30px;
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;
+      position: relative; overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+    .hero-status::after {
+      content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+      background: var(--secondary); box-shadow: 0 0 15px var(--secondary);
+    }
+    .hero-text h2 { margin-bottom: 5px; font-size: 24px; }
+    .hero-text p { color: var(--text-dim); }
 
-        /* Terminal - Auto expand to fill space */
-        .terminal-window {
-            background: #0f0f14; border: 1px solid var(--border); border-radius: 8px;
-            padding: 15px; font-family: 'JetBrains Mono', monospace; 
-            flex: 1; /* Take remaining height */
-            overflow-y: auto; color: #00ff00; font-size: 13px; margin-bottom: 20px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5); white-space: pre-wrap;
-            min-height: 300px;
-        }
-        .log-entry { margin-bottom: 5px; opacity: 0.8; word-wrap: break-word; }
-        .log-time { color: #666; margin-right: 10px; }
+    .grid-container {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; margin-bottom: 30px;
+    }
+    .card {
+      background-color: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px; transition: transform 0.2s, border-color 0.2s, box-shadow .2s; cursor: pointer;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      transform: translateY(-5px); border-color: var(--primary);
+      box-shadow: 0 18px 36px rgba(0,0,0,0.28);
+    }
+    .card-icon {
+      width: 48px; height: 48px; background: rgba(255,255,255,0.05);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; font-size: 24px;
+    }
+    .card h3 { font-size: 18px; margin-bottom: 8px; }
+    .card p { color: var(--text-dim); font-size: 13px; line-height: 1.5; }
 
-        /* Game View - Auto expand */
-        .game-placeholder {
-            flex: 1; /* Take remaining height */
-            background: #111; border: 2px dashed var(--border);
-            border-radius: 12px; display: flex; align-items: center; justify-content: center;
-            color: var(--text-dim); flex-direction: column; gap: 15px; margin-bottom: 20px;
-            min-height: 300px;
-        }
+    .stats-bar {
+      display: flex; gap: 20px; background: var(--bg-card); padding: 15px 25px;
+      border-radius: 12px; border-top: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+    }
+    .stat-item { flex: 1; text-align: center; border-right: 1px solid var(--border); }
+    .stat-item:last-child { border-right: none; }
+    .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-val { font-size: 20px; font-weight: 700; color: var(--secondary); margin-top: 4px; }
 
-        /* Chat */
-        .chat-container {
-            display: flex; flex-direction: column; height: 100%; /* Fill parent */
-            background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden;
-        }
-        .chat-messages {
-            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;
-        }
-        .chat-bubble {
-            max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; user-select: text;
-        }
-        .bubble-ai {
-            align-self: flex-start; background: rgba(187, 134, 252, 0.1); border: 1px solid var(--primary);
-            color: #fff; border-bottom-left-radius: 2px;
-        }
-        .bubble-user {
-            align-self: flex-end; background: var(--secondary); color: #000; font-weight: 500; border-bottom-right-radius: 2px;
-        }
-        .chat-input-area {
-            padding: 20px; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; gap: 10px;
-        }
-        .chat-input {
-            flex: 1; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px;
-            padding: 12px; color: white; font-family: 'Inter', sans-serif;
-        }
-        .chat-input:focus { outline: none; border-color: var(--secondary); }
-        .ai-analysis-box {
-            background: rgba(255, 215, 0, 0.1); border: 1px solid var(--ai-color);
-            color: var(--text-main); padding: 15px; border-radius: 8px; margin-top: 15px; display: none; animation: fadeIn 0.5s;
-            max-height: 200px; overflow-y: auto;
-        }
+    /* Teach / Train Layout Fixes */
+    #tab-train, #tab-teach { display: none; flex-direction: column; height: 100%; }
+    #tab-train.active, #tab-teach.active { display: flex; }
 
-        /* Buttons */
-        .btn {
-            background: var(--primary); color: #000; border: none; padding: 12px 24px;
-            border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s;
-            display: inline-flex; align-items: center; gap: 8px;
-        }
-        .btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(187,134,252,0.5); }
-        .btn-danger { background: var(--accent); color: white; }
-        .btn-success { background: var(--success); color: black; }
-        .btn-ai { background: linear-gradient(135deg, #FFD700, #FFA500); color: black; }
+    /* Terminal */
+    .terminal-window {
+      background: #0f0f14; border: 1px solid var(--border); border-radius: 10px;
+      padding: 15px; font-family: 'JetBrains Mono', monospace;
+      flex: 1;
+      overflow-y: auto; color: #00ff00; font-size: 13px; margin-bottom: 18px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+      white-space: pre-wrap;
+      min-height: 300px;
+    }
+    .log-entry { margin-bottom: 5px; opacity: 0.85; word-wrap: break-word; }
+    .log-time { color: #666; margin-right: 10px; }
 
-        .spinner {
-            border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid var(--secondary);
-            width: 20px; height: 20px; animation: spin 1s linear infinite; display: none;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .game-placeholder {
+      flex: 1;
+      background: #111; border: 2px dashed var(--border);
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      color: var(--text-dim); flex-direction: column; gap: 15px; margin-bottom: 20px;
+      min-height: 300px;
+    }
 
-        /* --- SETTINGS MODAL --- */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            z-index: 200;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        }
-        .modal-overlay.open { opacity: 1; pointer-events: all; }
+    /* Chat */
+    .chat-container {
+      display: flex; flex-direction: column; height: 100%;
+      background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;
+    }
+    .chat-bubble {
+      max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; user-select: text;
+      animation: bubbleIn .22s ease;
+    }
+    @keyframes bubbleIn { from { transform: translateY(6px); opacity: .0; } to { transform: translateY(0); opacity: 1; } }
+    .bubble-ai {
+      align-self: flex-start; background: rgba(187, 134, 252, 0.1); border: 1px solid var(--primary);
+      color: #fff; border-bottom-left-radius: 2px;
+    }
+    .bubble-user {
+      align-self: flex-end; background: var(--secondary); color: #000; font-weight: 600; border-bottom-right-radius: 2px;
+    }
+    .chat-input-area {
+      padding: 20px; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; gap: 10px;
+    }
+    .chat-input {
+      flex: 1; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; color: white; font-family: 'Inter', sans-serif;
+    }
+    .chat-input:focus { outline: none; border-color: var(--secondary); box-shadow: 0 0 16px rgba(3,218,198,0.15); }
 
-        .settings-modal {
-            background: var(--bg-panel);
-            width: 500px;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            padding: 30px;
-            transform: translateY(20px);
-            transition: transform 0.3s;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
-        }
-        .modal-overlay.open .settings-modal { transform: translateY(0); }
+    /* Buttons */
+    .btn {
+      background: var(--primary); color: #000; border: none; padding: 12px 24px;
+      border-radius: 10px; font-weight: 800; cursor: pointer; transition: transform .15s, filter .15s, box-shadow .15s, background .15s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.20);
+    }
+    .btn:hover { filter: brightness(1.08); box-shadow: 0 0 18px rgba(187,134,252,0.45); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); filter: brightness(0.98); }
+    .btn-danger { background: var(--accent); color: white; }
+    .btn-success { background: var(--success); color: black; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.03);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 30px rgba(0,0,0,0.16);
+    }
+    .btn-secondary:hover{
+      border-color: rgba(187,134,252,0.55);
+      box-shadow: 0 0 18px rgba(187,134,252,0.22);
+    }
+    .btn-small { padding: 10px 14px; font-size: 12px; font-weight: 800; border-radius: 10px; }
+    .btn-wide { width: 100%; }
 
-        .modal-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px;
-        }
-        .modal-title { font-size: 20px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
-        .close-modal { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 24px; }
-        .close-modal:hover { color: var(--accent); }
+    /* Inputs */
+    .form-label { display: block; margin-bottom: 8px; color: var(--text-dim); font-size: 12px; font-weight: 800; letter-spacing:.3px; }
+    .form-input, .form-select {
+      width: 100%; background: var(--bg-dark); border: 1px solid var(--border);
+      color: white; padding: 12px; border-radius: 10px; font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, box-shadow .2s;
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(187, 134, 252, 0.2);
+    }
 
-        .form-group { margin-bottom: 20px; }
-        .form-label { display: block; margin-bottom: 8px; color: var(--text-dim); font-size: 13px; font-weight: 600; }
-        .form-input, .form-select {
-            width: 100%; background: var(--bg-dark); border: 1px solid var(--border);
-            color: white; padding: 12px; border-radius: 8px; font-family: 'Inter', sans-serif;
-            transition: border-color 0.2s;
-        }
-        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 10px rgba(187, 134, 252, 0.2); }
+    /* Modals */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(7px);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.28s ease;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
 
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
+    .modal {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      width: 560px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 28px;
+      transform: translateY(16px) scale(0.98);
+      transition: transform 0.28s ease;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .modal-overlay.open .modal { transform: translateY(0) scale(1); }
 
-    </style>
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;
+      position: relative; z-index: 2;
+    }
+    .modal-title { font-size: 18px; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .close-modal { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 24px; }
+    .close-modal:hover { color: var(--accent); }
+
+    .modal-body { position: relative; z-index: 2; }
+    .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 22px; position: relative; z-index: 2; }
+  </style>
 </head>
+
 <body>
-
-    <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-icon">🤖</div>
-            <div class="brand-text">BOT-MMORPG-AI</div>
-        </div>
-
-        <nav class="nav-menu">
-            <button class="nav-btn active" id="btn-dashboard" onclick="showTab('dashboard')" data-tab="dashboard">
-                <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-                Dashboard
-            </button>
-            <button class="nav-btn" id="btn-teach" onclick="showTab('teach')" data-tab="teach">
-                <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                Teach (Record)
-            </button>
-            <button class="nav-btn" id="btn-train" onclick="showTab('train')" data-tab="train">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                Train Brain
-            </button>
-            <button class="nav-btn" id="btn-run" onclick="showTab('run')" data-tab="run">
-                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                Run Bot
-            </button>
-            <button class="nav-btn" id="btn-strategist" onclick="showTab('strategist')" data-tab="strategist">
-                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-                AI Strategist ✨
-            </button>
-        </nav>
-
-        <div class="sidebar-footer">
-            <a href="https://github.com/ruslanmv/BOT-MMORPG-AI" target="_blank" class="btn-github">
-                <span>⭐ Star on GitHub</span>
-            </a>
-            
-            <button onclick="openSettings()" class="btn-sidebar-settings">
-                <span>⚙️</span> Configure Neural Link
-            </button>
-
-            <div style="margin-top: 10px;">
-                <span class="status-dot"></span> System Online <br>
-                <span style="opacity: 0.6;">v0.1.5 | Stable</span>
-            </div>
-        </div>
-    </aside>
-
-    <main class="main-area">
-
-        <header class="header">
-            <h1 class="page-title" id="page-title">Dashboard</h1>
-            <div class="profile-chip">
-                <span>👤</span> <span>RuslanMV</span>
-            </div>
-        </header>
-
-        <div id="tab-dashboard" class="tab-content active">
-            <div class="hero-status">
-                <div class="hero-text">
-                    <h2 style="color: var(--secondary)">System Ready</h2>
-                    <p>Hooked into: <strong>Genshin Impact</strong> (PID: 4920)</p>
-                </div>
-                <button class="btn" onclick="showTab('run')">Quick Start</button>
-            </div>
-
-            <h3 style="margin-bottom: 15px; color: var(--text-dim);">Quick Actions</h3>
-            <div class="grid-container">
-                <div class="card" onclick="showTab('teach')">
-                    <div class="card-icon" style="color: #FF5252;">🎥</div>
-                    <h3>Create New Route</h3>
-                    <p>Record your movement and actions to teach the AI a new farming path.</p>
-                </div>
-                <div class="card" onclick="showTab('train')">
-                    <div class="card-icon" style="color: #FFB74D;">🧠</div>
-                    <h3>Retrain Model</h3>
-                    <p>Update the neural network with the latest recorded gameplay data.</p>
-                </div>
-                <div class="card" onclick="showTab('run')">
-                    <div class="card-icon" style="color: #69F0AE;">⚡</div>
-                    <h3>Run Automation</h3>
-                    <p>Execute the current model. Sit back and watch it play.</p>
-                </div>
-                 <div class="card" onclick="showTab('strategist')">
-                    <div class="card-icon" style="color: #FFD700;">✨</div>
-                    <h3>Ask AI Strategist</h3>
-                    <p>Get instant advice on routes, builds, and bot configuration.</p>
-                </div>
-            </div>
-
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <div class="stat-label">Samples</div><div class="stat-val">12,400</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Accuracy</div><div class="stat-val">94.2%</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Runtime</div><div class="stat-val">00:00:00</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-teach" class="tab-content">
-            <div class="game-placeholder">
-                <div style="font-size: 40px; margin-bottom: 10px;">🎮</div>
-                <p>Game Window Detected: 1920x1080</p>
-                <p style="color: #666; font-size: 12px;">(Overlay inactive)</p>
-            </div>
-            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px;">
-                <button class="btn btn-danger" onclick="toggleRecord(this)">
-                    <span>●</span> Start Recording
-                </button>
-                <span style="color: var(--text-dim);" id="record-status">Press to start capturing data...</span>
-            </div>
-        </div>
-
-        <div id="tab-train" class="tab-content">
-            <div class="terminal-window" id="terminal">
-                <div class="log-entry"><span class="log-time">[System]</span> Neural Training Console Initialized.</div>
-            </div>
-            
-            <div style="margin-top: 10px; width: 100%; background: #333; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 10px;">
-                <div style="height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); width: 0%; transition: width 0.5s ease;" id="progress-bar"></div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn" style="background: var(--primary); color: white;" onclick="startTraining()">
-                        <span>⚙️</span> Start Training
-                    </button>
-                    <button class="btn btn-ai" onclick="analyzeLogs()">
-                        <span>✨</span> Analyze Logs
-                    </button>
-                </div>
-                <span id="train-pct">0%</span>
-            </div>
-            
-            <div id="log-analysis-result" class="ai-analysis-box">
-                <strong>AI Analysis:</strong> <span id="analysis-text"></span>
-            </div>
-        </div>
-
-        <div id="tab-run" class="tab-content">
-            <div class="hero-status" style="background: rgba(0,0,0,0.3); border: 1px dashed var(--border);">
-                <div class="hero-text">
-                    <h2>Bot Control</h2>
-                    <p>Current Model: <strong>v0.1.2_genshin_farm</strong></p>
-                </div>
-                <div class="stat-val" style="color: var(--text-dim); font-size: 14px;">IDLE</div>
-            </div>
-            <div style="display: flex; gap: 20px;">
-                <button class="btn btn-success" style="flex: 1; height: 60px; font-size: 18px;" onclick="toggleBot(this)">
-                    ▶ START BOT
-                </button>
-            </div>
-            <div style="margin-top: 30px; padding: 20px; background: var(--bg-card); border-radius: 10px;">
-                <h4 style="margin-bottom: 15px;">Safety Settings</h4>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" checked> Stop if HP < 20%
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" checked> Auto-eat food
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-strategist" class="tab-content">
-            <div class="chat-container">
-                <div class="chat-messages" id="chat-history">
-                    <div class="chat-bubble bubble-ai">
-                        Hello! I am your AI Gaming Strategist. Ask me about farming routes, optimal builds, or bot configuration! ✨
-                    </div>
-                </div>
-                <div class="chat-input-area">
-                    <input type="text" id="chat-input" class="chat-input" placeholder="Ask about farming routes..." onkeypress="handleChatEnter(event)">
-                    <button class="btn" onclick="sendChatMessage()">Send</button>
-                    <div class="spinner" id="chat-spinner"></div>
-                </div>
-            </div>
-        </div>
-
-    </main>
-
-    <div class="modal-overlay" id="settings-modal-overlay">
-        <div class="settings-modal">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <span>🛠</span> Neural Link Configuration
-                </div>
-                <button class="close-modal" onclick="closeSettings()">×</button>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">LLM Intelligence Provider</label>
-                <select class="form-select" id="settings-provider">
-                    <option value="gemini">Google Gemini (Free/Fast)</option>
-                    <option value="openai">OpenAI GPT-4 (Smartest)</option>
-                    <option value="local" disabled>Local LLaMA (Coming Soon)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">API Key</label>
-                <div style="position: relative;">
-                    <input type="password" class="form-input" id="settings-api-key" placeholder="Paste your API Key here...">
-                    <span onclick="togglePasswordVis()" style="position: absolute; right: 10px; top: 12px; cursor: pointer; opacity: 0.6;">👁</span>
-                </div>
-                <p style="font-size: 11px; color: var(--text-dim); margin-top: 5px;">
-                    Your key is stored locally in <code>.env</code>. Never share it.
-                </p>
-            </div>
-
-            <div class="modal-footer">
-                <button class="btn" style="background: var(--bg-card); color: white; border: 1px solid var(--border);" onclick="closeSettings()">Cancel</button>
-                <button class="btn" onclick="saveSettings()" id="btn-save-settings">Save Configuration</button>
-            </div>
-        </div>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">🤖</div>
+      <div class="brand-text">BOT-MMORPG-AI</div>
     </div>
 
-    <script>
-        // Global Config State
-        let aiConfig = {
-            provider: "gemini",
-            gemini_key: "",
-            openai_key: ""
-        };
+    <!-- IMPORTANT: data-tab attributes required by UI smoke tests + main.js routing -->
+    <nav class="nav-menu">
+      <a data-tab="dashboard" class="nav-btn active" id="btn-dashboard" href="#">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
+      </a>
+      <a data-tab="teach" class="nav-btn" id="btn-teach" href="#">
+        <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        Teach (Record)
+      </a>
+      <a data-tab="train" class="nav-btn" id="btn-train" href="#">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        Train Brain
+      </a>
+      <a data-tab="run" class="nav-btn" id="btn-run" href="#">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        Run Bot
+      </a>
+      <a data-tab="models" class="nav-btn" id="btn-models" href="#">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM6 8v8h12V8z"/></svg>
+        ModelHub
+      </a>
+      <a data-tab="strategist" class="nav-btn" id="btn-strategist" href="#">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+        AI Strategist ✨
+      </a>
+    </nav>
 
-        // --- INIT ---
-        window.addEventListener('DOMContentLoaded', async () => {
-            if (typeof eel !== 'undefined') {
-                // Load saved config on startup
-                const savedConfig = await eel.get_ai_config()();
-                if (savedConfig) {
-                    aiConfig = savedConfig;
-                    logSystem(`System Initialized. Active Provider: ${aiConfig.provider.toUpperCase()}`);
-                    
-                    // Update UI inputs to match loaded data
-                    document.getElementById('settings-provider').value = aiConfig.provider;
-                    updateModalInput(); 
-                }
-            }
+    <div class="sidebar-footer">
+      <a href="https://github.com/ruslanmv/BOT-MMORPG-AI" target="_blank" class="btn-github" rel="noreferrer">
+        <span>⭐ Star on GitHub</span>
+      </a>
+
+      <!-- ✅ FIX: remove inline onclick, add id -->
+      <button type="button" id="btn-open-settings" class="btn-sidebar-settings">
+        <span>⚙️</span> Configure Neural Link
+      </button>
+
+      <div style="margin-top: 10px;">
+        <span class="status-dot"></span> <span id="backend-status-text">System Online</span><br>
+        <span style="opacity: 0.6;">v0.1.8 | Stable</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="header">
+      <h1 class="page-title" id="page-title">Dashboard</h1>
+      <div class="profile-chip">
+        <span>🧩</span>
+        <span id="backend-status-badge">Running</span>
+        <span style="opacity:.55;">•</span>
+        <span id="backend-status">Rust Backend Active</span>
+      </div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="hero-status">
+        <div class="hero-text">
+          <h2 style="color: var(--secondary)">System Ready</h2>
+          <p>Active Game: <strong id="active-game-pill">genshin_impact</strong></p>
+        </div>
+        <button class="btn" type="button" onclick="window.showTab && window.showTab('run')">Quick Start</button>
+      </div>
+
+      <h3 style="margin-bottom: 15px; color: var(--text-dim);">Quick Actions</h3>
+      <div class="grid-container">
+        <div class="card" onclick="window.showTab && window.showTab('teach')">
+          <div class="card-icon" style="color: #FF5252;">🎥</div>
+          <h3>Create New Route</h3>
+          <p>Record movement and actions to create a dataset session.</p>
+        </div>
+        <div class="card" onclick="window.showTab && window.showTab('train')">
+          <div class="card-icon" style="color: #FFB74D;">🧠</div>
+          <h3>Train New Model</h3>
+          <p>Start training scripts. Logs stream into the terminal.</p>
+        </div>
+        <div class="card" onclick="window.showTab && window.showTab('models')">
+          <div class="card-icon" style="color: #69F0AE;">📚</div>
+          <h3>ModelHub</h3>
+          <p>Choose game, inspect models/datasets, set active model.</p>
+        </div>
+        <div class="card" onclick="window.showTab && window.showTab('strategist')">
+          <div class="card-icon" style="color: #FFD700;">✨</div>
+          <h3>Ask AI Strategist</h3>
+          <p>Optional cloud chat (Gemini/OpenAI) using your API key.</p>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-label">Datasets</div><div class="stat-val" id="stat-datasets">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Models</div><div class="stat-val" id="stat-models">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Active Model</div>
+          <div class="stat-val" style="font-size:14px;color:var(--text-dim)" id="stat-active">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEACH -->
+    <div id="tab-teach" class="tab-content">
+      <div class="game-placeholder">
+        <div style="font-size: 40px; margin-bottom: 10px;">🎮</div>
+        <p>Switch to game window and start recording</p>
+        <p style="color: #666; font-size: 12px;">(Overlay inactive)</p>
+      </div>
+
+      <div class="card" style="cursor: default;">
+        <h3 style="margin-bottom: 10px;">Recording Session</h3>
+
+        <label class="form-label">Game ID</label>
+        <input class="form-input" id="teach-game-id" value="genshin_impact" />
+
+        <div style="height:10px;"></div>
+
+        <label class="form-label">Dataset name</label>
+        <input class="form-input" id="teach-dataset-name" placeholder="e.g. bridge_route_01" />
+
+        <div style="height:12px;"></div>
+
+        <button class="btn btn-danger btn-wide" id="btnRecord" onclick="window.toggleRecord && window.toggleRecord(this)">
+          <span>●</span> Start Recording
+        </button>
+
+        <div style="margin-top:10px; color:var(--text-dim);" id="record-status">
+          Press to start capturing data…
+        </div>
+      </div>
+    </div>
+
+    <!-- TRAIN -->
+    <div id="tab-train" class="tab-content">
+      <div class="terminal-window" id="terminal">
+        <div class="log-entry"><span class="log-time">[System]</span> Neural Training Console Initialized.</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn" id="btnStartTraining" type="button">
+            <span>🧠</span> Start Training
+          </button>
+          <button class="btn btn-secondary" id="btnAnalyzeLogs" type="button">
+            <span>✨</span> Analyze Logs
+          </button>
+          <button class="btn btn-secondary" type="button" onclick="window.showTab && window.showTab('models')">
+            <span>📚</span> Open ModelHub
+          </button>
+        </div>
+        <span id="train-pct">0%</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <label class="form-label">Game ID</label>
+          <input class="form-input" id="train-game-id" value="genshin_impact"/>
+        </div>
+        <div>
+          <label class="form-label">Model name</label>
+          <input class="form-input" id="train-model-name" placeholder="e.g. genshin_farm_v1"/>
+        </div>
+        <div>
+          <label class="form-label">Dataset id</label>
+          <input class="form-input" id="train-dataset-id" placeholder="Pick from ModelHub or paste id"/>
+        </div>
+        <div>
+          <label class="form-label">Arch label</label>
+          <select class="form-select" id="train-arch">
+            <option value="custom" selected>custom</option>
+            <option value="inception_v3">inception_v3</option>
+            <option value="alexnet2">alexnet2</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="log-analysis-result" style="display:none; margin-top:12px; background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255,215,0,0.65); padding: 15px; border-radius: 12px; color: var(--text-main);">
+        <strong>AI Analysis:</strong> <span id="analysis-text"></span>
+      </div>
+    </div>
+
+    <!-- RUN -->
+    <div id="tab-run" class="tab-content">
+      <div class="hero-status" style="background: rgba(0,0,0,0.3); border: 1px dashed var(--border);">
+        <div class="hero-text">
+          <h2>Bot Control</h2>
+          <p>Current Active Model: <strong id="run-active-model">—</strong></p>
+        </div>
+        <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="bot-state">IDLE</div>
+      </div>
+
+      <div class="card" style="cursor: default;">
+        <h3 style="margin-bottom: 10px;">Start / Stop</h3>
+        <button class="btn btn-success btn-wide" style="height: 60px; font-size: 18px;" id="btnStartBot" onclick="window.toggleBot && window.toggleBot(this)">
+          ▶ START BOT
+        </button>
+        <div style="margin-top:10px; color: var(--text-dim); font-size: 12px;">
+          Tip: set an active model in <b>ModelHub</b> before running.
+        </div>
+      </div>
+
+      <div style="height:14px;"></div>
+
+      <div class="card" style="cursor: default;">
+        <h3 style="margin-bottom: 10px;">Drivers</h3>
+        <button class="btn btn-secondary btn-wide" id="btnInstallDrivers" type="button">Install Drivers (Windows)</button>
+        <div style="margin-top:10px; color: var(--text-dim);" id="drivers-status">—</div>
+      </div>
+    </div>
+
+    <!-- MODELHUB -->
+    <div id="tab-models" class="tab-content">
+      <div class="hero-status" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border);">
+        <div class="hero-text">
+          <h2>ModelHub</h2>
+          <p>Built-in + registry + local trained models. Set active, validate, evaluate.</p>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+          <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="modelhub-status">—</div>
+          <div style="font-size: 12px; color: var(--text-dim);">Active: <span id="active-model">None</span></div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 320px 1fr; gap:16px;">
+        <!-- LEFT -->
+        <div class="card" style="cursor: default;">
+          <h3 style="margin-bottom: 10px;">Game</h3>
+          <select class="form-select" id="game-select"></select>
+
+          <div style="height:12px;"></div>
+
+          <h3 style="margin-bottom: 10px;">Datasets</h3>
+          <select class="form-select" id="dataset-select"></select>
+
+          <div style="height:12px;"></div>
+
+          <h3 style="margin-bottom: 10px;">Models</h3>
+          <label class="form-label">Built-in</label>
+          <select class="form-select" id="builtin-model-select"></select>
+
+          <div style="height:10px;"></div>
+
+          <label class="form-label">Registry</label>
+          <select class="form-select" id="registry-model-select"></select>
+
+          <div style="height:10px;"></div>
+
+          <label class="form-label">Local (trained_models)</label>
+          <select class="form-select" id="local-model-select"></select>
+
+          <div style="height:14px;"></div>
+
+          <button class="btn btn-secondary btn-wide" id="btnSetActiveModel" type="button">Set Active Model</button>
+
+          <div style="height:10px;"></div>
+
+          <button class="btn btn-danger btn-wide" id="btnDeleteModel" type="button">Delete Local Model</button>
+
+          <div style="height:18px;"></div>
+
+          <h3 style="margin-bottom: 10px;">Validate / Offline Eval</h3>
+          <button class="btn btn-secondary btn-wide" id="btnValidateModel" type="button">Validate Model</button>
+
+          <div style="height:10px;"></div>
+
+          <label class="form-label">Dataset directory (for offline eval)</label>
+          <input class="form-input" id="offline-dataset-dir" placeholder="e.g. datasets/genshin_impact/<dataset_id>/" />
+
+          <div style="height:10px;"></div>
+
+          <button class="btn btn-secondary btn-wide" id="btnOfflineEval" type="button">Offline Evaluate</button>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="card" style="cursor: default;">
+          <h3 style="margin-bottom: 10px;">Validation result</h3>
+          <div id="model-validate-result" style="color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 12px; white-space: pre-wrap;">—</div>
+
+          <div style="height:18px;"></div>
+
+          <h3 style="margin-bottom: 10px;">Notes</h3>
+          <div style="color: var(--text-dim); font-size: 13px; line-height: 1.5;">
+            <ul style="margin-left: 18px;">
+              <li>Built-in models are shipped with the app (good for testing).</li>
+              <li>Deletion is restricted to <code>trained_models/&lt;game_id&gt;/</code> for safety.</li>
+              <li>Training/recording scripts are treated as black boxes; the sidecar manages sessions.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRATEGIST -->
+    <div id="tab-strategist" class="tab-content">
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-history">
+          <div class="chat-bubble bubble-ai">
+            Hello! I am your AI Strategist UI placeholder. Hook me to a Rust command if you want real chat responses.
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" class="chat-input" placeholder="Ask about farming routes..." onkeypress="handleChatEnter(event)">
+          <button class="btn" id="btnSendChat" type="button">Send</button>
+          <div class="spinner" id="chat-spinner" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settings-modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title"><span>🛠</span> Neural Link Configuration</div>
+        <!-- ✅ FIX: remove inline onclick, add id -->
+        <button class="close-modal" id="btn-close-settings-x">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="margin-bottom: 18px;">
+          <label class="form-label">LLM Provider</label>
+          <select class="form-select" id="settings-provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label class="form-label">API Key</label>
+          <input type="password" class="form-input" id="settings-api-key" placeholder="Paste your API Key here...">
+          <p style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+            Stored locally in <code>.env</code> (dev: repo root, prod: app config dir).
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <!-- ✅ FIX: remove inline onclick, add id -->
+        <button class="btn btn-secondary" id="btn-cancel-settings">Cancel</button>
+        <button class="btn" onclick="saveSettings()" id="btn-save-settings">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Minimal modal controls
+    function openSettings() {
+      document.getElementById('settings-modal-overlay').classList.add('open');
+    }
+    function closeSettings() {
+      document.getElementById('settings-modal-overlay').classList.remove('open');
+    }
+
+    // ✅ NEW: production-safe bindings for Settings only (prevents inline handler quirks in installed exe)
+    window.addEventListener('DOMContentLoaded', () => {
+      const openBtn = document.getElementById('btn-open-settings');
+      if (openBtn) openBtn.addEventListener('click', openSettings);
+
+      const closeX = document.getElementById('btn-close-settings-x');
+      if (closeX) closeX.addEventListener('click', closeSettings);
+
+      const cancelBtn = document.getElementById('btn-cancel-settings');
+      if (cancelBtn) cancelBtn.addEventListener('click', closeSettings);
+    });
+
+    // Optional: save settings via invoke (safe no-op if missing)
+    async function saveSettings() {
+      if (!window.__TAURI__?.invoke) return alert("Tauri backend not found.");
+
+      const provider = document.getElementById('settings-provider').value;
+      const api_key = document.getElementById('settings-api-key').value.trim();
+      if (!api_key) return alert("Please enter an API Key.");
+
+      const btn = document.getElementById('btn-save-settings');
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        await window.__TAURI__.invoke('save_configuration', { provider, api_key });
+        btn.textContent = "Saved!";
+        setTimeout(() => {
+          btn.textContent = "Save Configuration";
+          btn.disabled = false;
+          closeSettings();
+        }, 800);
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = "Save Configuration";
+        alert("Save failed: " + e);
+      }
+    }
+
+    // Legacy handlers referenced by HTML (main.js will usually provide these too)
+    function handleChatEnter(e) {
+      if (e.key === 'Enter') document.getElementById('btnSendChat')?.click();
+    }
+
+    // Navigation fallback (main.js should override with richer routing)
+    window.showTab = window.showTab || function(tabId) {
+      const titles = {
+        dashboard: "Dashboard",
+        teach: "Teach Mode",
+        train: "Neural Training",
+        run: "Run Bot",
+        models: "ModelHub",
+        strategist: "AI Strategist"
+      };
+      const pageTitle = document.getElementById('page-title');
+      if (pageTitle) pageTitle.textContent = titles[tabId] || "Dashboard";
+
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = '';
+      });
+
+      const activeTab = document.getElementById('tab-' + tabId);
+      if (activeTab) {
+        activeTab.classList.add('active');
+        if (tabId === 'teach' || tabId === 'train') activeTab.style.display = 'flex';
+        else activeTab.style.display = 'block';
+      }
+
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      const btn = document.getElementById('btn-' + tabId);
+      if (btn) btn.classList.add('active');
+    };
+
+    // Bind sidebar click routing based on data-tab (smoke-test expected)
+    window.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-tab]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const tab = el.getAttribute('data-tab');
+          if (tab) window.showTab(tab);
         });
+      });
+    });
+  </script>
 
-        // --- CORE AI LOGIC (Gemini + OpenAI) ---
-        async function callAI(prompt, systemInstruction = "") {
-            const term = document.getElementById('terminal');
-            
-            // 1. Validation
-            let activeKey = aiConfig.provider === 'openai' ? aiConfig.openai_key : aiConfig.gemini_key;
-            
-            if (!activeKey) {
-                logSystem(`❌ Error: No API Key found for ${aiConfig.provider.toUpperCase()}. Check Settings.`);
-                return "⚠️ Error: API Key missing. Please configure settings.";
-            }
-
-            logSystem(`🚀 Sending request to ${aiConfig.provider.toUpperCase()}...`);
-
-            try {
-                let responseText = "";
-
-                if (aiConfig.provider === 'gemini') {
-                    // --- GEMINI CALL (Using Stable 2.0 Flash) ---
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeKey}`;
-                    const payload = {
-                        contents: [{ parts: [{ text: prompt }] }],
-                        systemInstruction: { parts: [{ text: systemInstruction }] }
-                    };
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errText = await response.text();
-                        // Special handling for 429 Quota errors
-                        if (response.status === 429) {
-                            throw new Error("Quota Exceeded (429). The Free Tier limit has been reached. Please wait a minute or check billing.");
-                        }
-                        throw new Error(`Gemini API Error (${response.status}): ${errText}`);
-                    }
-
-                    const data = await response.json();
-                    responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
-
-                } else if (aiConfig.provider === 'openai') {
-                    // --- OPENAI CALL ---
-                    const url = "https://api.openai.com/v1/chat/completions";
-                    const payload = {
-                        model: "gpt-4o", 
-                        messages: [
-                            { role: "system", content: systemInstruction },
-                            { role: "user", content: prompt }
-                        ]
-                    };
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${activeKey}`
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errText = await response.text();
-                        throw new Error(`OpenAI API Error (${response.status}): ${errText}`);
-                    }
-
-                    const data = await response.json();
-                    responseText = data.choices?.[0]?.message?.content || "No response.";
-                }
-
-                logSystem(`✅ Response received from ${aiConfig.provider}.`);
-                return responseText;
-
-            } catch (e) {
-                console.error(e);
-                logSystem(`❌ CONNECTION ERROR: ${e.message}`);
-                return `Error: ${e.message}`;
-            }
-        }
-
-        // --- SETTINGS MODAL LOGIC ---
-        function openSettings() {
-            document.getElementById('settings-modal-overlay').classList.add('open');
-            updateModalInput();
-        }
-
-        function closeSettings() {
-            document.getElementById('settings-modal-overlay').classList.remove('open');
-        }
-
-        // Switch input value based on dropdown selection
-        function updateModalInput() {
-            const provider = document.getElementById('settings-provider').value;
-            const input = document.getElementById('settings-api-key');
-            
-            if (provider === 'gemini') {
-                input.value = aiConfig.gemini_key;
-                input.placeholder = "Paste Gemini API Key (starts with AIza...)";
-            } else {
-                input.value = aiConfig.openai_key;
-                input.placeholder = "Paste OpenAI API Key (starts with sk-...)";
-            }
-        }
-
-        // Listener for dropdown change
-        document.getElementById('settings-provider').addEventListener('change', updateModalInput);
-
-        async function saveSettings() {
-            const provider = document.getElementById('settings-provider').value;
-            const keyInput = document.getElementById('settings-api-key').value.trim();
-            const btn = document.getElementById('btn-save-settings');
-
-            if(!keyInput) {
-                alert("Please enter an API Key.");
-                return;
-            }
-
-            btn.innerText = "Saving...";
-            
-            // Save to Python Backend
-            if (typeof eel !== 'undefined') {
-                const success = await eel.save_configuration(provider, keyInput)();
-                
-                if(success) {
-                    // Update Local State Immediately
-                    aiConfig.provider = provider;
-                    if(provider === 'gemini') aiConfig.gemini_key = keyInput;
-                    if(provider === 'openai') aiConfig.openai_key = keyInput;
-
-                    btn.innerText = "Saved!";
-                    btn.style.background = "var(--success)";
-                    logSystem(`Settings updated. Switched to ${provider}.`);
-                    
-                    setTimeout(() => {
-                        closeSettings();
-                        btn.innerText = "Save Configuration";
-                        btn.style.background = "var(--primary)";
-                    }, 1000);
-                } else {
-                    btn.innerText = "Error Saving";
-                    btn.style.background = "var(--accent)";
-                    logSystem("Failed to save settings to .env file.");
-                }
-            }
-        }
-
-        // --- UTILS & LOGGING ---
-        function logSystem(msg) {
-            const term = document.getElementById('terminal');
-            const time = new Date().toLocaleTimeString();
-            term.innerHTML += `<div class="log-entry"><span class="log-time">[${time}]</span> ${msg}</div>`;
-            term.scrollTop = term.scrollHeight;
-        }
-
-        eel.expose(update_terminal);
-        function update_terminal(line) {
-            logSystem(line); // Reuse logSystem for python output
-            // Parse progress
-            if (line.includes('Epoch')) {
-                const match = line.match(/Epoch (\d+)\/(\d+)/);
-                if (match) {
-                     const percent = (parseInt(match[1]) / parseInt(match[2])) * 100;
-                     document.getElementById('progress-bar').style.width = percent + '%';
-                     document.getElementById('train-pct').innerText = Math.round(percent) + '%';
-                }
-            }
-        }
-
-        // --- CHAT UI ---
-        function handleChatEnter(e) { if (e.key === 'Enter') sendChatMessage(); }
-
-        async function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            const history = document.getElementById('chat-history');
-            const spinner = document.getElementById('chat-spinner');
-            const msg = input.value.trim();
-            if (!msg) return;
-
-            history.innerHTML += `<div class="chat-bubble bubble-user">${msg}</div>`;
-            input.value = "";
-            history.scrollTop = history.scrollHeight;
-            spinner.style.display = "block";
-
-            // Call the Generic AI Handler
-            const response = await callAI(msg, "You are a hardcore MMORPG gaming assistant.");
-            
-            spinner.style.display = "none";
-            const formatted = response.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-            history.innerHTML += `<div class="chat-bubble bubble-ai">${formatted}</div>`;
-            history.scrollTop = history.scrollHeight;
-        }
-
-        // --- TAB LOGIC ---
-        function showTab(tabId) {
-            const titles = {
-                'dashboard': 'Dashboard', 'teach': 'Teach Mode', 'train': 'Neural Training',
-                'run': 'Run Bot', 'strategist': 'AI Strategist'
-            };
-            document.getElementById('page-title').innerText = titles[tabId];
-            
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('active');
-                // Reset display property manually handled in CSS for flex containers
-                el.style.display = ''; 
-            });
-            
-            // Show active tab
-            const activeTab = document.getElementById('tab-' + tabId);
-            activeTab.classList.add('active');
-            
-            // For teach/train tabs, ensure they use flex layout (handled by CSS class)
-            if(tabId === 'teach' || tabId === 'train') {
-                activeTab.style.display = 'flex';
-            } else {
-                activeTab.style.display = 'block';
-            }
-
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-            const activeBtn = document.getElementById('btn-' + tabId) || 
-                              document.querySelector(`button[data-tab="${tabId}"]`);
-            if (activeBtn) activeBtn.classList.add('active');
-        }
-
-        function togglePasswordVis() {
-            const input = document.getElementById('settings-api-key');
-            input.type = input.type === "password" ? "text" : "password";
-        }
-        
-        // --- PROCESS CONTROLS ---
-        async function startTraining() {
-            logSystem("Requesting training start...");
-            await eel.start_training()();
-        }
-        
-        async function analyzeLogs() {
-            const term = document.getElementById('terminal');
-            const logs = term.innerText;
-            if(logs.length < 20) return alert("Not enough logs.");
-            
-            document.getElementById('log-analysis-result').style.display = "block";
-            document.getElementById('analysis-text').innerText = "Analyzing...";
-            
-            const ans = await callAI(`Analyze these logs concisely: ${logs}`);
-            document.getElementById('analysis-text').innerHTML = ans.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-        }
-
-        // Simple placeholders for Record/Bot (same as before)
-        let isRecording = false;
-        async function toggleRecord(btn) {
-            isRecording = !isRecording;
-            const status = document.getElementById('record-status');
-            if (isRecording) {
-                await eel.start_recording()();
-                btn.innerHTML = "<span>■</span> Stop"; btn.style.background = "#333";
-                status.innerText = "🔴 Recording..."; status.style.color = "#FF5252";
-            } else {
-                await eel.stop_process()();
-                btn.innerHTML = "<span>●</span> Rec"; btn.style.background = "var(--accent)";
-                status.innerText = "Saved."; status.style.color = "var(--success)";
-            }
-        }
-        
-        let isBotRunning = false;
-        async function toggleBot(btn) {
-            isBotRunning = !isBotRunning;
-            if(isBotRunning) {
-                if (typeof eel !== 'undefined') await eel.start_bot()();
-                btn.innerText = "■ STOP BOT";
-                btn.style.background = "var(--accent)";
-                btn.style.color = "white";
-            } else {
-                if (typeof eel !== 'undefined') await eel.stop_process()();
-                btn.innerText = "▶ START BOT";
-                btn.style.background = "var(--success)";
-                btn.style.color = "black";
-            }
-        }
-    </script>
+  <!-- IMPORTANT: load your Tauri JS last -->
+  <script src="./main.js"></script>
 </body>
 </html>
