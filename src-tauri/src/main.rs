@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager, Window}; // ✅ FIX: Manager trait in scope (state/get_window)
 use reqwest::Client;
+use tauri::{AppHandle, Manager, Window};
 
 // ---------------------------
 // CONSTANTS / DEFAULTS
@@ -386,12 +386,18 @@ fn stop_process_inner(window: &Window, inner: &Arc<AppStateInner>) -> String {
   "No process running".to_string()
 }
 
-fn run_python_script(app: AppHandle, script_name: &str, window: Window, inner: Arc<AppStateInner>) -> Result<String, String> {
+fn run_python_script(
+  app: AppHandle,
+  script_name: &str,
+  window: Window,
+  inner: Arc<AppStateInner>,
+) -> Result<String, String> {
   let resource_path = app
     .path_resolver()
     .resolve_resource(format!("{}/{}", SCRIPTS_DIR_REL, script_name));
 
-  let script_path = resource_path.unwrap_or_else(|| PathBuf::from(format!("../{}/{}", SCRIPTS_DIR_REL, script_name)));
+  let script_path =
+    resource_path.unwrap_or_else(|| PathBuf::from(format!("../{}/{}", SCRIPTS_DIR_REL, script_name)));
   let scripts_dir = scripts_dir_path(&app);
 
   let _ = window.emit("terminal_update", format!("[System] Script: {}", script_path.display()));
@@ -466,6 +472,128 @@ fn run_python_script(app: AppHandle, script_name: &str, window: Window, inner: A
 }
 
 // ---------------------------
+// AI CHAT (PRODUCTION) - GEMINI + OPENAI
+// ---------------------------
+
+fn get_provider(app: &AppHandle) -> String {
+  let p = get_env_var(app, "AI_PROVIDER");
+  let p = p.trim().to_lowercase();
+  if p.is_empty() { "gemini".to_string() } else { p }
+}
+
+fn normalize_provider(p: &str) -> String {
+  match p.trim().to_lowercase().as_str() {
+    "openai" => "openai".to_string(),
+    _ => "gemini".to_string(),
+  }
+}
+
+#[tauri::command]
+async fn ai_chat(
+  app: AppHandle,
+  state: tauri::State<'_, AppState>,
+  message: String,
+) -> Result<String, String> {
+  let provider = normalize_provider(&get_provider(&app));
+  let user_msg = message.trim().to_string();
+  if user_msg.is_empty() {
+    return Err("Message is empty.".to_string());
+  }
+
+  // NOTE: CSP must allow connect-src to these hosts (you already have both).
+  if provider == "openai" {
+    let key = get_env_var(&app, "OPENAI_API_KEY");
+    if key.trim().is_empty() {
+      return Err("OPENAI_API_KEY is empty. Open Settings and save your key.".to_string());
+    }
+
+    // Minimal and stable: Chat Completions endpoint.
+    // If you prefer a different model, change "gpt-4o-mini" here.
+    let body = json!({
+      "model": "gpt-4o-mini",
+      "messages": [
+        { "role": "system", "content": "You are a helpful assistant. Reply concisely." },
+        { "role": "user", "content": user_msg }
+      ],
+      "temperature": 0.7
+    });
+
+    let res = state
+      .inner
+      .http
+      .post("https://api.openai.com/v1/chat/completions")
+      .bearer_auth(key.trim())
+      .json(&body)
+      .send()
+      .await
+      .map_err(|e| e.to_string())?;
+
+    let status = res.status();
+    let v: Value = res.json().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+      return Err(v.to_string());
+    }
+
+    let text = v["choices"][0]["message"]["content"]
+      .as_str()
+      .unwrap_or("")
+      .to_string();
+
+    if text.trim().is_empty() {
+      return Err("OpenAI returned an empty response.".to_string());
+    }
+    return Ok(text);
+  }
+
+  // Default: Gemini
+  let key = get_env_var(&app, "GEMINI_API_KEY");
+  if key.trim().is_empty() {
+    return Err("GEMINI_API_KEY is empty. Open Settings and save your key.".to_string());
+  }
+
+  // If you want another Gemini model, change "gemini-1.5-flash" here.
+  let url = format!(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
+    key.trim()
+  );
+
+  let body = json!({
+    "contents": [{
+      "role": "user",
+      "parts": [{ "text": user_msg }]
+    }]
+  });
+
+  let res = state
+    .inner
+    .http
+    .post(url)
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| e.to_string())?;
+
+  let status = res.status();
+  let v: Value = res.json().await.map_err(|e| e.to_string())?;
+
+  if !status.is_success() {
+    return Err(v.to_string());
+  }
+
+  let text = v["candidates"][0]["content"]["parts"][0]["text"]
+    .as_str()
+    .unwrap_or("")
+    .to_string();
+
+  if text.trim().is_empty() {
+    return Err("Gemini returned an empty response.".to_string());
+  }
+
+  Ok(text)
+}
+
+// ---------------------------
 // TAURI COMMANDS
 // ---------------------------
 
@@ -480,10 +608,12 @@ fn get_ai_config(app: AppHandle) -> AiConfig {
 
 #[tauri::command]
 fn save_configuration(app: AppHandle, provider: String, api_key: String) -> bool {
+  let provider = normalize_provider(&provider);
   let _ = update_env_file(&app, "AI_PROVIDER", &provider);
+
   if provider == "gemini" {
     let _ = update_env_file(&app, "GEMINI_API_KEY", api_key.trim());
-  } else if provider == "openai" {
+  } else {
     let _ = update_env_file(&app, "OPENAI_API_KEY", api_key.trim());
   }
   true
@@ -528,7 +658,9 @@ async fn start_training(
     &inner,
     "/session/begin_training",
     json!({"game_id": gid, "model_name": mname, "dataset_id": did, "arch": a}),
-  ).await {
+  )
+  .await
+  {
     let _ = window.emit("terminal_update", format!("[Warning] begin_training failed: {}", e));
   }
 
@@ -563,7 +695,10 @@ async fn modelhub_list_games(state: tauri::State<'_, AppState>) -> Result<Value,
 }
 
 #[tauri::command]
-async fn mh_get_catalog_data(state: tauri::State<'_, AppState>, game_id: Option<String>) -> Result<Value, String> {
+async fn mh_get_catalog_data(
+  state: tauri::State<'_, AppState>,
+  game_id: Option<String>,
+) -> Result<Value, String> {
   let gid = normalize_game_id(game_id);
   api_get_with(&state.inner, &format!("/modelhub/catalog?game_id={}", urlencoding::encode(&gid))).await
 }
@@ -655,7 +790,6 @@ fn main() {
     .setup(|app| {
       let app_handle = app.handle();
 
-      // ✅ FIX: Manager trait is imported so app.state/get_window work.
       let state = app.state::<AppState>();
 
       match start_sidecar_server(&app_handle) {
@@ -663,7 +797,6 @@ fn main() {
           *state.inner.sidecar.lock().unwrap() = Some(api);
         }
         Err(e) => {
-          // ✅ FIX: provide explicit event payload type to help inference
           if let Some(w) = app.get_window("main") {
             let _ = w.emit::<String>("terminal_update", format!("[Fatal] Sidecar failed: {}", e));
           }
@@ -673,8 +806,12 @@ fn main() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
+      // Settings + AI
       get_ai_config,
       save_configuration,
+      ai_chat,
+
+      // Existing
       start_recording,
       start_training,
       start_bot,

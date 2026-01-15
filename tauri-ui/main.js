@@ -557,15 +557,21 @@ window.installDrivers = async function () {
 };
 
 // AI STRATEGIST: Placeholder (hook to Rust ask_ai if you add it)
+// AI STRATEGIST: Real LLM call via Rust command ai_chat
 window.sendChatMessage = async function () {
+  if (!invoke) return alert("Tauri backend not found.");
+
   const input = document.getElementById("chat-input");
   const history = document.getElementById("chat-history");
   const spinner = document.getElementById("chat-spinner");
+  const sendBtn = document.getElementById("btnSendChat");
 
   if (!input || !history) return;
+
   const msg = input.value.trim();
   if (!msg) return;
 
+  // User bubble
   const userBubble = document.createElement("div");
   userBubble.className = "chat-bubble bubble-user";
   userBubble.textContent = msg;
@@ -573,19 +579,31 @@ window.sendChatMessage = async function () {
 
   input.value = "";
   history.scrollTop = history.scrollHeight;
-  if (spinner) spinner.style.display = "block";
 
-  // If you add a Rust command "ask_ai", you can replace this.
-  setTimeout(() => {
-    if (spinner) spinner.style.display = "none";
+  // UI busy state
+  if (spinner) spinner.style.display = "block";
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    // ✅ Real backend call (Gemini/OpenAI depending on saved provider)
+    const reply = await invoke("ai_chat", { message: msg });
+
     const aiBubble = document.createElement("div");
     aiBubble.className = "chat-bubble bubble-ai";
-    aiBubble.innerHTML =
-      "I am ready to help! <br><i>(Hook me to a Rust command like <code>ask_ai</code> if you want real provider calls.)</i>";
+    aiBubble.textContent = reply; // safe text (no HTML injection)
     history.appendChild(aiBubble);
+  } catch (e) {
+    const aiBubble = document.createElement("div");
+    aiBubble.className = "chat-bubble bubble-ai";
+    aiBubble.textContent = `⚠️ AI error: ${e}`;
+    history.appendChild(aiBubble);
+  } finally {
+    if (spinner) spinner.style.display = "none";
+    if (sendBtn) sendBtn.disabled = false;
     history.scrollTop = history.scrollHeight;
-  }, 900);
+  }
 };
+
 
 window.handleChatEnter = function (e) {
   if (e.key === "Enter") window.sendChatMessage();
@@ -671,7 +689,16 @@ function wireEvents() {
   bind("btnAnalyzeLogs", () => window.analyzeLogs());
   bind("btnStartBot", window.toggleBot);
   bind("btnInstallDrivers", () => window.installDrivers());
-  bind("btnSendChat", () => window.sendChatMessage);
+  bind("btnSendChat", () => window.sendChatMessage());
+
+  const chatInput = getEl("chat-input");
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") window.sendChatMessage();
+    });
+  }
+
+
 
   // Quick Start Button
   bind("nav-teach", () => window.showTab("teach"));
