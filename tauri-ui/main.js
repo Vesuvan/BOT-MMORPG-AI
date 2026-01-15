@@ -1,9 +1,9 @@
 // tauri-ui/main.js
 // ------------------------------------------------------------
-// BOT-MMORPG-AI (Tauri UI) - UPDATED for Launcher v0.1.8 upgrade
-// - Adds ModelHub commands wiring via Rust->Python sidecar API
-// - Adds game/model/dataset selection plumbing
-// - Listens to Rust events: terminal_update, process_finished
+// BOT-MMORPG-AI (Tauri UI) - UPDATED v0.1.9
+// - Fixed Settings: Loads/Saves API Keys correctly via Rust
+// - Adds ModelHub commands wiring
+// - Adds AI Chat wiring
 // ------------------------------------------------------------
 
 // State & Tauri Globals
@@ -40,7 +40,7 @@ window.showTab = function (tabId) {
     train: "Neural Network Training",
     run: "Run Bot",
     strategist: "AI Strategist",
-    modelhub: "ModelHub",
+    models: "ModelHub",
   };
 
   const pageTitle = document.getElementById("page-title");
@@ -77,11 +77,12 @@ function logToTerminal(msg, type = "info") {
   terminal.appendChild(entry);
   terminal.scrollTop = terminal.scrollHeight;
 
+  // Keep log size manageable
   const entries = terminal.querySelectorAll(".log-entry");
   if (entries.length > 200) entries[0].remove();
 }
 
-// Backward-compat global hook (if any inline HTML calls it)
+// Backward-compat global hook
 window.update_terminal = function (line) {
   logToTerminal(line, "info");
 
@@ -116,10 +117,81 @@ function updateBackendStatus(status, message) {
   if (dot) dot.style.backgroundColor = status === "Running" ? "var(--success)" : "var(--accent)";
 }
 
-// ------------------------------------------------------------
-// MODELHUB UI HELPERS (minimal wiring; safe even if UI elements
-// are not present yet — it will just no-op)
-// ------------------------------------------------------------
+// ============================================================
+// ✅ NEW: SETTINGS MANAGEMENT (Fixes API Key Error)
+// ============================================================
+
+// 1. Load Settings from Rust -> UI Modal
+window.loadSettingsIntoModal = async function() {
+  if (!invoke) return;
+  try {
+    const config = await invoke("get_ai_config");
+    
+    // Select Provider
+    const providerSel = document.getElementById("settings-provider");
+    if (providerSel) {
+        providerSel.value = (config.provider || "gemini").trim().toLowerCase();
+    }
+
+    // Populate Key based on provider
+    const keyInput = document.getElementById("settings-api-key");
+    if (keyInput) {
+      const p = (config.provider || "").trim().toLowerCase();
+      if (p === "openai") {
+        keyInput.value = config.openai_key || "";
+      } else {
+        keyInput.value = config.gemini_key || "";
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load settings:", e);
+    logToTerminal("Error loading settings: " + e, "warning");
+  }
+}
+
+// 2. Save Settings from UI Modal -> Rust
+async function saveSettingsFromModal() {
+  if (!invoke) return alert("Tauri backend not found.");
+
+  const provider = document.getElementById("settings-provider")?.value || "gemini";
+  const api_key = (document.getElementById("settings-api-key")?.value || "").trim();
+  
+  if (!api_key) return alert("Please enter an API Key.");
+
+  const btn = document.getElementById("btn-save-settings");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+  }
+
+  try {
+    // Call the Rust command
+    await invoke("save_configuration", { provider, api_key });
+
+    if (btn) btn.textContent = "Saved!";
+    logToTerminal(`Configuration saved. Provider: ${provider}`, "success");
+
+    // Close modal after delay
+    setTimeout(() => {
+      if (btn) { 
+        btn.textContent = "Save Configuration"; 
+        btn.disabled = false; 
+      }
+      document.getElementById("settings-modal-overlay")?.classList.remove("open");
+    }, 800);
+  } catch (e) {
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Save Configuration";
+    }
+    alert("Save failed: " + e);
+    logToTerminal("Save failed: " + e, "error");
+  }
+}
+
+// ============================================================
+// MODELHUB UI HELPERS
+// ============================================================
 
 function getEl(id) {
   return document.getElementById(id);
@@ -141,12 +213,6 @@ function setSelectOptions(selectEl, items, getLabel, getValue, placeholder = "Se
   }
 }
 
-function safeString(v) {
-  return v === null || v === undefined ? "" : String(v);
-}
-
-// Try to infer common fields from your ModelHub catalog formats.
-// (keeps UI resilient if schema changes slightly)
 function labelForGame(g) {
   if (typeof g === "string") return g;
   return g.name || g.title || g.id || JSON.stringify(g);
@@ -207,7 +273,6 @@ async function loadGamesIntoUI() {
     const games = (res && res.games) ? res.games : (Array.isArray(res) ? res : []);
     const sel = getEl("game-select");
     setSelectOptions(sel, games, labelForGame, valueForGame, "Choose game...");
-    // default
     if (sel && !sel.value) {
       sel.value = selectedGameId;
     }
@@ -223,7 +288,6 @@ async function loadCatalog(gameId) {
 
   try {
     const res = await invoke("mh_get_catalog_data", { game_id: gid });
-    // Rust returns serde_json::Value; we expect {ok:true, ...} or directly fields.
     const payload = res && res.ok === true ? res : res;
     currentCatalog = {
       builtin_models: payload.builtin_models || [],
@@ -235,12 +299,9 @@ async function loadCatalog(gameId) {
 
     logToTerminal(`Catalog loaded for game: ${gid}`, "success");
 
-    // Wire selects if present
     const dsSel = getEl("dataset-select");
     setSelectOptions(dsSel, currentCatalog.datasets, labelForDataset, valueForDataset, "Choose dataset...");
-    if (dsSel) {
-      dsSel.value = selectedDatasetId || "";
-    }
+    if (dsSel) dsSel.value = selectedDatasetId || "";
 
     const builtinSel = getEl("builtin-model-select");
     setSelectOptions(builtinSel, currentCatalog.builtin_models, labelForBuiltin, valueForBuiltin, "Choose builtin model...");
@@ -254,7 +315,6 @@ async function loadCatalog(gameId) {
     setSelectOptions(localSel, currentCatalog.local_models, labelForLocalModel, valueForLocalModel, "Choose local model...");
     if (localSel) localSel.value = selectedLocalModelPath || "";
 
-    // Active display
     const activeBox = getEl("active-model");
     if (activeBox) {
       activeBox.textContent = currentCatalog.active ? JSON.stringify(currentCatalog.active) : "None";
@@ -266,11 +326,7 @@ async function loadCatalog(gameId) {
 
 async function setActiveModelFromUI() {
   if (!invoke) return;
-
-  // Prefer local model path > builtin model path > registry model record (id/path)
   const gid = selectedGameId || DEFAULT_GAME_ID;
-
-  // Determine selection
   let model_id = "";
   let path = "";
 
@@ -281,14 +337,10 @@ async function setActiveModelFromUI() {
     model_id = "builtin";
     path = selectedBuiltinModelPath;
   } else if (selectedModelRegistryId) {
-    // registry model selection may return id OR path; try to find matching object for a path
     model_id = selectedModelRegistryId;
     const found = (currentCatalog.models || []).find((m) => valueForModel(m) === selectedModelRegistryId);
     path = found ? (found.path || "") : "";
-    if (!path) {
-      // if not found, assume id is path (some schemas do that)
-      path = selectedModelRegistryId;
-    }
+    if (!path) path = selectedModelRegistryId;
   }
 
   if (!path) {
@@ -308,10 +360,8 @@ async function setActiveModelFromUI() {
 
 async function deleteSelectedModel() {
   if (!invoke) return;
-
   const gid = selectedGameId || DEFAULT_GAME_ID;
 
-  // Only delete local model paths (safe)
   if (!selectedLocalModelPath) {
     alert("Deletion is only allowed for local trained models. Select a local model first.");
     return;
@@ -337,13 +387,8 @@ async function deleteSelectedModel() {
 
 async function validateSelectedModel() {
   if (!invoke) return;
-
   const gid = selectedGameId || DEFAULT_GAME_ID;
-
-  const modelDir =
-    selectedLocalModelPath ||
-    selectedBuiltinModelPath ||
-    "";
+  const modelDir = selectedLocalModelPath || selectedBuiltinModelPath || "";
 
   if (!modelDir) {
     alert("Select a model folder (local/builtin) to validate.");
@@ -352,7 +397,6 @@ async function validateSelectedModel() {
 
   try {
     const res = await invoke("modelhub_validate_model", { game_id: gid, model_dir: modelDir });
-    // Expected: {ok:true, result:{ok,message}}
     const result = res && res.result ? res.result : res;
     const msg = result && result.message ? result.message : JSON.stringify(result);
     logToTerminal(`Validate: ${msg}`, (result && result.ok) ? "success" : "warning");
@@ -366,7 +410,6 @@ async function validateSelectedModel() {
 
 async function runOfflineEvaluation() {
   if (!invoke) return;
-
   const modelDir = selectedLocalModelPath || selectedBuiltinModelPath || "";
   const datasetDir = getEl("offline-dataset-dir")?.value?.trim() || "";
 
@@ -388,10 +431,9 @@ async function runOfflineEvaluation() {
 // BUTTON HANDLERS (Rust Commands)
 // ------------------------------------------------------------
 
-// TEACH: Toggle Recording (now supports game_id + dataset_name)
+// TEACH: Toggle Recording
 window.toggleRecord = async function (btn) {
   if (!invoke) return alert("Tauri backend not found.");
-
   isRecording = !isRecording;
   const status = document.getElementById("record-status");
 
@@ -399,13 +441,11 @@ window.toggleRecord = async function (btn) {
     try {
       logToTerminal("Requesting recording start...", "info");
       btn.disabled = true;
-
       const game_id = (getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID).trim();
       const dataset_name = (getEl("teach-dataset-name")?.value || "Untitled").trim();
 
       const res = await invoke("start_recording", { game_id, dataset_name });
       logToTerminal(res, "success");
-
       btn.innerHTML = "<span>■</span> Stop Recording";
       btn.style.background = "#333";
       if (status) {
@@ -423,7 +463,6 @@ window.toggleRecord = async function (btn) {
       btn.disabled = true;
       const res = await invoke("stop_process");
       logToTerminal(res, "success");
-
       btn.innerHTML = "<span>●</span> Start Recording";
       btn.style.background = "var(--accent)";
       if (status) {
@@ -438,10 +477,9 @@ window.toggleRecord = async function (btn) {
   }
 };
 
-// TRAIN: Start Training (now supports game_id/model_name/dataset_id/arch)
+// TRAIN: Start Training
 window.startTraining = async function () {
   if (!invoke) return alert("Tauri backend not found.");
-
   const progressBar = document.getElementById("progress-bar");
   const pctDisplay = document.getElementById("train-pct");
   const btn = document.getElementById("btnStartTraining");
@@ -449,7 +487,6 @@ window.startTraining = async function () {
   try {
     logToTerminal("-------------------------------------------", "info");
     logToTerminal("Initializing Neural Network Training...", "info");
-
     if (btn) btn.disabled = true;
     if (progressBar) progressBar.style.width = "0%";
     if (pctDisplay) pctDisplay.textContent = "0%";
@@ -467,33 +504,26 @@ window.startTraining = async function () {
   }
 };
 
-// TRAIN: Analyze Logs (local heuristic)
+// TRAIN: Analyze Logs
 window.analyzeLogs = async function () {
   const terminal = document.getElementById("terminal");
   const resultBox = document.getElementById("log-analysis-result");
   const resultText = document.getElementById("analysis-text");
-
   if (!terminal) return;
   const logs = terminal.innerText;
-
   if (logs.length < 50) {
     alert("Not enough logs to analyze. Please run training first.");
     return;
   }
-
   if (resultText) resultText.textContent = "Analyzing local logs...";
   if (resultBox) resultBox.style.display = "block";
-
   setTimeout(() => {
     let analysis = "Log Analysis: \n";
     const epochCount = (logs.match(/Epoch/g) || []).length;
-
     if (epochCount > 0) analysis += `• Found ${epochCount} training epochs.\n`;
     else analysis += "• No training epochs detected yet.\n";
-
     if (logs.includes("Error") || logs.includes("Exception")) analysis += "• ⚠️ Errors detected in logs.\n";
     else analysis += "• System appears stable.\n";
-
     if (resultText) resultText.textContent = analysis;
   }, 800);
 };
@@ -501,17 +531,13 @@ window.analyzeLogs = async function () {
 // RUN: Toggle Bot
 window.toggleBot = async function (btn) {
   if (!invoke) return alert("Tauri backend not found.");
-
   isBotRunning = !isBotRunning;
-
   if (isBotRunning) {
     try {
       logToTerminal("Initializing autonomous bot...", "info");
       btn.disabled = true;
-
       const res = await invoke("start_bot");
       logToTerminal(res, "success");
-
       btn.innerText = "■ STOP BOT";
       btn.style.background = "var(--accent)";
       btn.style.color = "white";
@@ -526,7 +552,6 @@ window.toggleBot = async function (btn) {
       btn.disabled = true;
       const res = await invoke("stop_process");
       logToTerminal(res, "success");
-
       btn.innerText = "▶ START BOT";
       btn.style.background = "var(--success)";
       btn.style.color = "black";
@@ -538,7 +563,7 @@ window.toggleBot = async function (btn) {
   }
 };
 
-// RUN: Install Drivers (real Rust command if present)
+// RUN: Install Drivers
 window.installDrivers = async function () {
   if (!invoke) return alert("Tauri backend not found.");
   logToTerminal("Installing drivers (admin)...", "info");
@@ -556,41 +581,32 @@ window.installDrivers = async function () {
   }
 };
 
-// AI STRATEGIST: Placeholder (hook to Rust ask_ai if you add it)
-// AI STRATEGIST: Real LLM call via Rust command ai_chat
+// AI STRATEGIST: Chat
 window.sendChatMessage = async function () {
   if (!invoke) return alert("Tauri backend not found.");
-
   const input = document.getElementById("chat-input");
   const history = document.getElementById("chat-history");
   const spinner = document.getElementById("chat-spinner");
   const sendBtn = document.getElementById("btnSendChat");
-
   if (!input || !history) return;
-
   const msg = input.value.trim();
   if (!msg) return;
 
-  // User bubble
   const userBubble = document.createElement("div");
   userBubble.className = "chat-bubble bubble-user";
   userBubble.textContent = msg;
   history.appendChild(userBubble);
-
   input.value = "";
   history.scrollTop = history.scrollHeight;
 
-  // UI busy state
   if (spinner) spinner.style.display = "block";
   if (sendBtn) sendBtn.disabled = true;
 
   try {
-    // ✅ Real backend call (Gemini/OpenAI depending on saved provider)
     const reply = await invoke("ai_chat", { message: msg });
-
     const aiBubble = document.createElement("div");
     aiBubble.className = "chat-bubble bubble-ai";
-    aiBubble.textContent = reply; // safe text (no HTML injection)
+    aiBubble.textContent = reply;
     history.appendChild(aiBubble);
   } catch (e) {
     const aiBubble = document.createElement("div");
@@ -602,11 +618,6 @@ window.sendChatMessage = async function () {
     if (sendBtn) sendBtn.disabled = false;
     history.scrollTop = history.scrollHeight;
   }
-};
-
-
-window.handleChatEnter = function (e) {
-  if (e.key === "Enter") window.sendChatMessage();
 };
 
 // ------------------------------------------------------------
@@ -623,10 +634,8 @@ async function wireBackendEvents() {
   await listen("process_finished", (event) => {
     const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
     logToTerminal(`[System] Process finished: ${msg}`, "info");
-    // re-enable training button if present
     const btn = getEl("btnStartTraining");
     if (btn) btn.disabled = false;
-    // update toggles
     isRecording = false;
     isBotRunning = false;
   });
@@ -645,17 +654,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateBackendStatus("Running", "Rust Backend Active");
     logToTerminal("✓ Tauri Backend Connected", "success");
 
-    // Listen to backend events
     await wireBackendEvents();
 
-    // Load config
-    invoke("get_ai_config")
-      .then((config) => {
-        logToTerminal(`Loaded Config. Provider: ${config.provider}`, "info");
-      })
-      .catch((err) => logToTerminal(`Config Load Warning: ${err}`, "warning"));
+    // Initial Config Log (just for user confidence)
+    invoke("get_ai_config").then((config) => {
+      if(config.provider) {
+        logToTerminal(`Loaded Config: ${config.provider}`, "info");
+      }
+    }).catch((err) => logToTerminal(`Config Load Warning: ${err}`, "warning"));
 
-    // ModelHub init
     await refreshModelhubAvailability();
     if (modelhubAvailable) {
       await loadGamesIntoUI();
@@ -670,15 +677,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function wireEvents() {
-  // Navigation
-  document.querySelectorAll("button[data-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+  // Tabs
+  document.querySelectorAll("button[data-tab], a[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
       const tab = btn.getAttribute("data-tab");
       if (tab) window.showTab(tab);
     });
   });
 
-  // Action Buttons
+  // Buttons
   const bind = (id, func) => {
     const el = getEl(id);
     if (el) el.addEventListener("click", () => func(el));
@@ -690,7 +698,33 @@ function wireEvents() {
   bind("btnStartBot", window.toggleBot);
   bind("btnInstallDrivers", () => window.installDrivers());
   bind("btnSendChat", () => window.sendChatMessage());
+  
+  // Settings Modal Buttons
+  // Note: HTML might have them; ensure they exist before binding
+  const btnOpenSettings = getEl("btn-open-settings");
+  if (btnOpenSettings) {
+    btnOpenSettings.addEventListener("click", () => {
+        window.loadSettingsIntoModal();
+        const overlay = getEl("settings-modal-overlay");
+        if(overlay) overlay.classList.add("open");
+    });
+  }
+  
+  const btnSaveSettings = getEl("btn-save-settings");
+  if (btnSaveSettings) {
+      btnSaveSettings.addEventListener("click", saveSettingsFromModal);
+  }
 
+  // When provider changes in modal, clear the key input (UX safety)
+  const settingsProvider = getEl("settings-provider");
+  if(settingsProvider) {
+      settingsProvider.addEventListener("change", () => {
+          const keyInput = getEl("settings-api-key");
+          if(keyInput) keyInput.value = "";
+      });
+  }
+
+  // Chat Input
   const chatInput = getEl("chat-input");
   if (chatInput) {
     chatInput.addEventListener("keydown", (e) => {
@@ -698,13 +732,7 @@ function wireEvents() {
     });
   }
 
-
-
-  // Quick Start Button
-  bind("nav-teach", () => window.showTab("teach"));
-
-  // ---- ModelHub UI wiring (only if elements exist) ----
-
+  // ModelHub UI wiring
   const gameSel = getEl("game-select");
   if (gameSel) {
     gameSel.addEventListener("change", async () => {
@@ -717,7 +745,6 @@ function wireEvents() {
   if (dsSel) {
     dsSel.addEventListener("change", () => {
       selectedDatasetId = dsSel.value || "";
-      // reflect to train tab if input exists
       const t = getEl("train-dataset-id");
       if (t && !t.value) t.value = selectedDatasetId;
     });
@@ -727,13 +754,10 @@ function wireEvents() {
   if (builtinSel) {
     builtinSel.addEventListener("change", () => {
       selectedBuiltinModelPath = builtinSel.value || "";
-      // Clear other selections to avoid conflicts
       selectedModelRegistryId = "";
       selectedLocalModelPath = "";
-      const regSel = getEl("registry-model-select");
-      const localSel = getEl("local-model-select");
-      if (regSel) regSel.value = "";
-      if (localSel) localSel.value = "";
+      getEl("registry-model-select").value = "";
+      getEl("local-model-select").value = "";
     });
   }
 
@@ -743,10 +767,8 @@ function wireEvents() {
       selectedModelRegistryId = regSel.value || "";
       selectedBuiltinModelPath = "";
       selectedLocalModelPath = "";
-      const builtinSel2 = getEl("builtin-model-select");
-      const localSel = getEl("local-model-select");
-      if (builtinSel2) builtinSel2.value = "";
-      if (localSel) localSel.value = "";
+      getEl("builtin-model-select").value = "";
+      getEl("local-model-select").value = "";
     });
   }
 
@@ -756,10 +778,8 @@ function wireEvents() {
       selectedLocalModelPath = localSel.value || "";
       selectedBuiltinModelPath = "";
       selectedModelRegistryId = "";
-      const builtinSel2 = getEl("builtin-model-select");
-      const regSel2 = getEl("registry-model-select");
-      if (builtinSel2) builtinSel2.value = "";
-      if (regSel2) regSel2.value = "";
+      getEl("builtin-model-select").value = "";
+      getEl("registry-model-select").value = "";
     });
   }
 
