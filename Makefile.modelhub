@@ -1,0 +1,31 @@
+# Optional include:
+#   include Makefile.modelhub
+# Local-only by default. Cloud upload/download require enable_cloud=true in modelhub_settings.json
+
+MODELHUB_PY ?= python
+GAME ?=
+MODEL ?=
+PROFILE ?=
+SOURCE ?=
+MODEL_DIR ?=
+DATASET_DIR ?=
+
+modelhub-list-games:
+	$(MODELHUB_PY) -m modelhub.cli list-games
+
+modelhub-list-local-models:
+	$(MODELHUB_PY) -m modelhub.cli list-local-models --game $(GAME)
+
+modelhub-validate-profile:
+	$(MODELHUB_PY) -m modelhub.cli validate-profile --game $(GAME) --profile $(PROFILE)
+
+# Cloud is disabled by default; opt-in only:
+modelhub-download-model:
+	$(MODELHUB_PY) -m modelhub.cli download-model --game $(GAME) --model $(MODEL)
+
+modelhub-upload-model:
+	$(MODELHUB_PY) -m modelhub.cli upload-model --game $(GAME) --model $(MODEL) --source-dir $(SOURCE)
+
+# Offline evaluation on recorded datasets:
+modelhub-eval-local:
+	$(MODELHUB_PY) scripts/evaluate_local_model.py --model-dir $(MODEL_DIR) --dataset-dir $(DATASET_DIR)
