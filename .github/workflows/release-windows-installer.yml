@@ -21,8 +21,9 @@ env:
   CARGO_TERM_COLOR: "always"
 
 jobs:
+
   create-release:
-    name: Create GitHub Release
+    name: Create Release
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -41,7 +42,6 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
 
-          # Ensure it starts with "v"
           if [[ "$VERSION" != v* ]]; then
             VERSION="v$VERSION"
           fi
@@ -49,22 +49,21 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
-      # Create (or update) the Release in a modern, reliable way
-      - name: Create/Update Release
+      - name: Create/Update Release (no deprecated set-output)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
           name: BOT MMORPG AI ${{ steps.get_version.outputs.version }}
-          generate_release_notes: true
           draft: false
           prerelease: false
+          generate_release_notes: true
           body: |
             ## BOT MMORPG AI ${{ steps.get_version.outputs.version }}
 
             ### Installation Instructions
             1. **Download the installer** below (Assets)
             2. **Run the installer** with administrator privileges
-            3. **Follow the setup wizard** (drivers can be installed automatically)
+            3. **Follow the setup wizard** - it will automatically install required drivers
             4. **Launch the application** from your desktop or start menu
 
             ### What's Included
@@ -80,18 +79,8 @@ jobs:
             - **GPU**: NVIDIA GPU recommended for training
             - **Disk**: 5GB free space
 
-            ### Quick Start
-            1. Launch the application
-            2. Click "Collect Data" and play your game for 10-15 minutes
-            3. Click "Train Model" and wait for training to complete
-            4. Click "Start Bot" to let the AI play!
-
-            For detailed instructions, see the User Guide:
+            For detailed instructions, see:
             https://github.com/${{ github.repository }}/blob/main/USAGE.md
-
-            ### Support
-            - 📖 Documentation: https://github.com/${{ github.repository }}
-            - 🐛 Issues: https://github.com/${{ github.repository }}/issues
 
   build-windows-installer:
     name: Build Windows Installer + Upload to Release
