@@ -289,7 +289,7 @@ if ($Clean) {
 if (-not $SkipPython) {
   Log-Step 2 "Building Python Backend (PyInstaller ONEDIR)"
 
-  $venv = Join-Path $root ".venv"
+  $venv       = Join-Path $root ".venv"
   $venvPython = Join-Path $venv "Scripts\python.exe"
 
   # Check if venv exists AND is functional
@@ -324,40 +324,92 @@ if (-not $SkipPython) {
     }
   }
 
+  # --- ensure pip exists inside venv ---
+  Log-Info "Ensuring pip exists in build venv..."
+  try {
+    & $venvPython -m pip --version *> $null
+    if ($LASTEXITCODE -ne 0) { throw "pip missing" }
+    Log-Ok "pip already present"
+  } catch {
+    Log-Warn "pip not found in venv. Bootstrapping pip with ensurepip..."
+    try {
+      & $venvPython -m ensurepip --upgrade
+      if ($LASTEXITCODE -ne 0) { throw "ensurepip failed (exit code $LASTEXITCODE)" }
+
+      & $venvPython -m pip install --upgrade pip setuptools wheel --quiet
+      if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed (exit code $LASTEXITCODE)" }
+
+      Log-Ok "pip bootstrapped and upgraded"
+    } catch {
+      Log-Fail "Failed to bootstrap pip in venv: $_"
+      exit 1
+    }
+  }
+
+  # --- install project deps into venv (so PyInstaller sees everything) ---
   Log-Info "Installing Python dependencies..."
   try {
     if ($useUv) {
       Log-Info "Using uv for package installation (faster than pip)"
       & uv pip install --python $venvPython -e . --quiet
       if ($LASTEXITCODE -ne 0) { throw "uv pip install project failed" }
-
-      & uv pip install --python $venvPython pyinstaller --quiet
-      if ($LASTEXITCODE -ne 0) { throw "uv pip install pyinstaller failed" }
-
-      Log-Ok "Dependencies installed with uv"
     } else {
       Log-Info "Using pip for package installation"
-      $venvPip = Join-Path $venv "Scripts\pip.exe"
-
-      & $venvPip install --quiet -e .
+      & $venvPython -m pip install -e . --quiet
       if ($LASTEXITCODE -ne 0) { throw "pip install project failed" }
-
-      & $venvPip install --quiet pyinstaller
-      if ($LASTEXITCODE -ne 0) { throw "pip install pyinstaller failed" }
-
-      Log-Ok "Dependencies installed with pip"
     }
+    Log-Ok "Project dependencies installed"
   } catch {
-    Log-Fail "Failed to install Python dependencies: $_"
-    Log-Info "TIP: Try running with -Clean to recreate the virtual environment"
+    Log-Fail "Failed to install project dependencies: $_"
     exit 1
   }
 
+  # --- ensure backend runtime deps exist in build venv ---
+  Log-Info "Ensuring backend runtime deps (fastapi/uvicorn) are installed in build venv..."
+  try {
+    & $venvPython -c "import fastapi, uvicorn; print('backend deps OK')" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "missing" }
+    Log-Ok "Backend runtime deps OK"
+  } catch {
+    try {
+      if ($useUv) {
+        & uv pip install --python $venvPython fastapi uvicorn --quiet
+      } else {
+        & $venvPython -m pip install fastapi uvicorn --quiet
+      }
+      if ($LASTEXITCODE -ne 0) { throw "install failed" }
+
+      & $venvPython -c "import fastapi, uvicorn; print('backend deps OK')" 2>$null
+      if ($LASTEXITCODE -ne 0) { throw "still missing after install" }
+
+      Log-Ok "Backend runtime deps installed"
+    } catch {
+      Log-Fail "Failed to ensure fastapi/uvicorn in build venv: $_"
+      exit 1
+    }
+  }
+
+  # --- ensure PyInstaller exists ---
+  Log-Info "Ensuring PyInstaller is installed in build venv..."
+  try {
+    & $venvPython -m pip show pyinstaller *> $null
+    if ($LASTEXITCODE -ne 0) {
+      if ($useUv) {
+        & uv pip install --python $venvPython pyinstaller --quiet
+      } else {
+        & $venvPython -m pip install pyinstaller --quiet
+      }
+      if ($LASTEXITCODE -ne 0) { throw "install failed" }
+    }
+    Log-Ok "PyInstaller ready"
+  } catch {
+    Log-Fail "Failed to install PyInstaller: $_"
+    exit 1
+  }
+
+  # --- build the sidecar with PyInstaller ONEDIR ---
   Log-Info "Building backend sidecar with PyInstaller (onedir)..."
 
-  # IMPORTANT:
-  # Use your actual backend entrypoint (current infra uses backend/main_backend.py).
-  # If you later switch to backend/entry_main.py, change this path.
   $backend = Join-Path $root "backend\entry_main.py"
   if (-not (Test-Path $backend)) {
     Log-Fail "Backend source not found: $backend"
@@ -365,7 +417,10 @@ if (-not $SkipPython) {
   }
 
   try {
-    # ONEDIR is more reliable than ONEFILE for FastAPI/uvicorn + big deps.
+    # Clean previous dist/main-backend so we never ship stale _internal
+    $distDir = Join-Path $root "dist\main-backend"
+    if (Test-Path $distDir) { Remove-Item -Recurse -Force $distDir -ErrorAction SilentlyContinue }
+
     & $venvPython -m PyInstaller `
       --noconfirm `
       --clean `
@@ -381,17 +436,22 @@ if (-not $SkipPython) {
     exit 1
   }
 
+  # --- validate output exists ---
   $distDir = Join-Path $root "dist\main-backend"
   $distExe = Join-Path $distDir "main-backend.exe"
   if (-not (Test-Path $distExe)) {
     Log-Fail "PyInstaller output missing: $distExe"
     exit 1
   }
+  if (-not (Test-Path (Join-Path $distDir "_internal"))) {
+    Log-Fail "PyInstaller _internal folder missing: dist\main-backend\_internal"
+    exit 1
+  }
 
   $sizeMb = [math]::Round(((Get-Item $distExe).Length / 1MB), 2)
   Log-Ok "Backend executable created: $sizeMb MB (onedir)"
 
-  # Copy the whole ONEDIR output into Tauri resources so it gets bundled by resources/**
+  # --- bundle into Tauri resources ---
   Log-Info "Bundling sidecar into Tauri resources..."
   $tauriSidecarDir = Join-Path $root "src-tauri\resources\sidecar\main-backend"
 
@@ -409,9 +469,70 @@ if (-not $SkipPython) {
   }
 
   Log-Ok "Sidecar bundled: $tauriSidecarDir"
+
+  # --- smoke test the bundled exe prints READY (must not hang) ---
+  Log-Info "Smoke testing bundled sidecar (wait for READY, then stop)..."
+
+  $timeoutSec = 15
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $bundledExe
+  $psi.Arguments = "--port 0"
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError  = $true
+  $psi.CreateNoWindow = $true
+
+  $p = New-Object System.Diagnostics.Process
+  $p.StartInfo = $psi
+
+  $null = $p.Start()
+
+  $readyLine = $null
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+  try {
+    while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
+      # ReadLine blocks only if no newline; use Peek to avoid hang
+      while (-not $p.StandardOutput.EndOfStream -and $p.StandardOutput.Peek() -ge 0) {
+        $line = $p.StandardOutput.ReadLine()
+        if ($line) {
+          if ($line -match "^READY url=http://127\.0\.0\.1:\d+ token=") {
+            $readyLine = $line
+            break
+          }
+        }
+      }
+
+      if ($readyLine) { break }
+      if ($p.HasExited) { break }
+
+      Start-Sleep -Milliseconds 100
+    }
+
+    if (-not $readyLine) {
+      # Collect some stderr for debugging
+      $err = ""
+      try { $err = $p.StandardError.ReadToEnd() } catch {}
+      throw "Sidecar did not print READY within ${timeoutSec}s. stderr: $err"
+    }
+
+    Log-Ok "Sidecar smoke test OK: $readyLine"
+  }
+  finally {
+    # Always stop the process so the pipeline doesn't hang
+    try {
+      if (-not $p.HasExited) { $p.Kill($true) }
+    } catch {}
+    try { $p.WaitForExit(3000) | Out-Null } catch {}
+  }
+
+
+
 } else {
   Log-Warn "Skipping Python backend build"
 }
+
+
 
 # ================================
 # STEP 3: Copy driver installers + scripts
