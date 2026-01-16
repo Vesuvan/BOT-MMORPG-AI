@@ -280,8 +280,7 @@ fn ensure_runtime_layout(app: &AppHandle) -> PathBuf {
     root
 }
 
-// NOTE: work_dir() may already exist elsewhere; we do NOT redefine it here.
-// Prefer to keep a single work_dir() in the module.
+// NOTE: keep ONLY one work_dir() in this module (patched below).
 
 fn managed_python_root(app: &AppHandle) -> PathBuf {
     ensure_runtime_layout(app).join("runtime").join("py")
@@ -296,10 +295,38 @@ fn managed_venv_python(app: &AppHandle) -> PathBuf {
 }
 
 fn bundled_python_dir(app: &AppHandle) -> Option<PathBuf> {
-    app.path_resolver()
-        .resolve_resource("resources/python")
-        .and_then(|p| if p.exists() { Some(p) } else { None })
+    // Try common resource layouts.
+    let candidates = [
+        "python",              // <resource_dir>\python
+        "resources/python",    // sometimes resources are nested
+        "resources\\python",
+        "python\\",
+    ];
+
+    for rel in candidates {
+        if let Some(p) = app.path_resolver().resolve_resource(rel) {
+            if p.exists() {
+                return Some(if p.is_dir() { p } else { p.parent()?.to_path_buf() });
+            }
+        }
+    }
+
+    // Fallback: build from resource_dir() directly.
+    if let Some(rd) = app.path_resolver().resource_dir() {
+        let p1 = rd.join("python");
+        if p1.exists() {
+            return Some(p1);
+        }
+
+        let p2 = rd.join("resources").join("python");
+        if p2.exists() {
+            return Some(p2);
+        }
+    }
+
+    None
 }
+
 
 fn bundled_wheelhouse_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path_resolver()
@@ -332,6 +359,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String> {
+    // If venv python exists, we are ready.
     let vpy = managed_venv_python(app);
     if vpy.exists() {
         return Ok(vpy);
@@ -339,76 +367,261 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
 
     let py_root = managed_python_root(app);
 
-    // Copy bundled python to LocalAppData
+    // LocalAppData target where we install the bundled runtime
     let local_py_dir = py_root.join("python");
-    if !local_py_dir.exists() {
+
+    // Copy bundled python to LocalAppData if python executable is missing
+    let base_py_candidate = if is_windows() {
+        local_py_dir.join("python.exe")
+    } else {
+        local_py_dir.join("bin").join("python3")
+    };
+
+    if !base_py_candidate.exists() {
         if let Some(bundled_dir) = bundled_python_dir(app) {
-            let _ = window.emit("terminal_update", format!("[System] Installing bundled Python runtime -> {}", local_py_dir.display()));
-            copy_dir_all(&bundled_dir, &local_py_dir).map_err(|e| format!("Failed to copy bundled python: {}", e))?;
+            let _ = window.emit(
+                "terminal_update",
+                format!("[System] Bundled Python dir: {}", bundled_dir.display()),
+            );
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] Installing bundled Python runtime -> {}",
+                    local_py_dir.display()
+                ),
+            );
+
+            // Clean destination first to avoid partial/stale installs
+            let _ = fs::remove_dir_all(&local_py_dir);
+
+            copy_dir_all(&bundled_dir, &local_py_dir)
+                .map_err(|e| format!("Failed to copy bundled python: {}", e))?;
         } else {
-            return Err("Bundled Python runtime not found. Put Python under resources/python/.".to_string());
+            return Err(
+                "Bundled Python runtime not found in installed resources (resources/python)."
+                    .to_string(),
+            );
         }
     }
 
-    let base_py = if is_windows() { local_py_dir.join("python.exe") } else { local_py_dir.join("bin").join("python3") };
+    // Re-check after copy
+    let base_py = if is_windows() {
+        local_py_dir.join("python.exe")
+    } else {
+        local_py_dir.join("bin").join("python3")
+    };
+
     if !base_py.exists() {
-        return Err(format!("Bundled Python runtime missing executable: {}", base_py.display()));
+        return Err(format!(
+            "Bundled Python runtime missing executable after copy: {}",
+            base_py.display()
+        ));
     }
 
     // Create venv
     let venv_dir = py_root.join("venv");
-    let _ = window.emit("terminal_update", format!("[System] Creating venv: {}", venv_dir.display()));
-    let status = Command::new(&base_py).arg("-m").arg("venv").arg(&venv_dir).status()
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Creating venv: {}", venv_dir.display()),
+    );
+
+    let out = Command::new(&base_py)
+        .arg("-m")
+        .arg("venv")
+        .arg(&venv_dir)
+        .output()
         .map_err(|e| format!("Failed to run python -m venv: {}", e))?;
-    if !status.success() {
-        return Err(format!("python -m venv failed (exit={})", status));
+
+    if !out.stdout.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!(
+                "[System] venv stdout: {}",
+                String::from_utf8_lossy(&out.stdout)
+            ),
+        );
+    }
+    if !out.stderr.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!(
+                "[System] venv stderr: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ),
+        );
+    }
+    if !out.status.success() {
+        return Err(format!(
+            "python -m venv failed (exit={}). If you used the Windows *embeddable* Python, it often cannot create venv unless you bundle Lib/venv (full stdlib).",
+            out.status
+        ));
     }
 
+    // Confirm venv python exists
     let vpy = managed_venv_python(app);
     if !vpy.exists() {
         return Err(format!("Venv python not found: {}", vpy.display()));
     }
 
-    // Install deps
-    if let Some(req) = bundled_requirements_lock(app) {
+    // Resolve pyproject.toml from bundled resources
+    let pyproject = app
+        .path_resolver()
+        .resolve_resource("pyproject.toml")
+        .ok_or_else(|| {
+            "pyproject.toml not found in bundled resources. Add it to tauri.conf.json bundle.resources."
+                .to_string()
+        })?;
+
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Using pyproject: {}", pyproject.display()),
+    );
+
+    // Upgrade pip tooling first (helps with PEP 517 / pyproject builds)
+    {
         let mut cmd = Command::new(&vpy);
-        cmd.arg("-m").arg("pip").arg("install");
-        if let Some(wh) = bundled_wheelhouse_dir(app) {
-            cmd.arg("--no-index").arg("--find-links").arg(wh);
+        cmd.arg("-m")
+            .arg("pip")
+            .arg("install")
+            .arg("--upgrade")
+            .arg("pip")
+            .arg("setuptools")
+            .arg("wheel");
+
+        let out = cmd
+            .output()
+            .map_err(|e| format!("pip upgrade failed to start: {}", e))?;
+
+        if !out.stdout.is_empty() {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] pip upgrade stdout: {}",
+                    String::from_utf8_lossy(&out.stdout)
+                ),
+            );
         }
-        cmd.arg("-r").arg(req);
-        let _ = window.emit("terminal_update", "[System] Installing Python dependencies...".to_string());
-        let status = cmd.status().map_err(|e| format!("pip install failed: {}", e))?;
-        if !status.success() {
-            return Err(format!("pip install failed (exit={})", status));
+        if !out.stderr.is_empty() {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] pip upgrade stderr: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            );
         }
-    } else {
-        let _ = window.emit("terminal_update", "[System] requirements.lock.txt not found; skipping dependency install".to_string());
+        if !out.status.success() {
+            return Err(format!("pip upgrade failed (exit={})", out.status));
+        }
     }
 
-    // Verify
-    let verify = Command::new(&vpy).arg("-c").arg("import numpy; print('numpy_ok')").status();
+    // Install dependencies from pyproject.toml
+    let pyproject_dir = pyproject
+        .parent()
+        .ok_or_else(|| "Invalid pyproject.toml path (no parent dir)".to_string())?;
+
+    let extras = "launcher,backend"; // choose what you want in production (or "" for base only)
+
+    let mut cmd = Command::new(&vpy);
+    cmd.arg("-m").arg("pip").arg("install");
+
+    // Offline wheelhouse support
+    if let Some(wh) = bundled_wheelhouse_dir(app) {
+        // IMPORTANT: pass &wh so we don't move it (avoids E0382)
+        cmd.arg("--no-index").arg("--find-links").arg(&wh);
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] Using offline wheelhouse: {}", wh.display()),
+        );
+    }
+
+    // Install from pyproject directory
+    let target = if extras.trim().is_empty() {
+        pyproject_dir.to_string_lossy().to_string()
+    } else {
+        format!("{}[{}]", pyproject_dir.to_string_lossy(), extras)
+    };
+
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Installing from pyproject: {}", target),
+    );
+
+    cmd.arg(target);
+
+    let out = cmd
+        .output()
+        .map_err(|e| format!("pip install (pyproject) failed to start: {}", e))?;
+
+    if !out.stdout.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] pip stdout: {}", String::from_utf8_lossy(&out.stdout)),
+        );
+    }
+    if !out.stderr.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] pip stderr: {}", String::from_utf8_lossy(&out.stderr)),
+        );
+    }
+    if !out.status.success() {
+        return Err(format!(
+            "pip install from pyproject failed (exit={})",
+            out.status
+        ));
+    }
+
+    // Verify minimal imports
+    let verify = Command::new(&vpy)
+        .arg("-c")
+        .arg("import numpy; print('numpy_ok')")
+        .output();
+
     match verify {
-        Ok(st) if st.success() => { let _ = window.emit("terminal_update", "[System] Python env ready".to_string()); }
-        _ => return Err("Python env created but verification failed (numpy import).".to_string()),
+        Ok(out) if out.status.success() => {
+            let _ = window.emit("terminal_update", "[System] Python env ready".to_string());
+        }
+        Ok(out) => {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] verify stdout: {}",
+                    String::from_utf8_lossy(&out.stdout)
+                ),
+            );
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] verify stderr: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            );
+            return Err("Python env created but verification failed (numpy import).".to_string());
+        }
+        Err(_) => {
+            return Err("Python env created but verification failed (numpy import).".to_string())
+        }
     }
 
     Ok(vpy)
 }
 
-/// Writable runtime directory (datasets/models/logs)
+
+
+/// Writable runtime directory (datasets/models/logs) — production uses LocalAppData root.
 fn work_dir(app: &AppHandle) -> PathBuf {
-    let p = app
-        .path_resolver()
-        .app_data_dir()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let p = ensure_runtime_layout(app);
     let _ = fs::create_dir_all(&p);
     p
 }
-
-/// Resolve scripts from *bundled resources* in production:
-///   resolve_resource("versions/0.01/<script>.py")
-/// and fallback to repo tree in debug.
+/// Resolve scripts in production in this order:
+///  1) Local override:   %LOCALAPPDATA%\BOT-MMORPG-AI\content\versions\<ver>\...
+///  2) Bundled resource: resolve_resource("versions/<ver>/<script>")
+///  3) Local legacy:     %LOCALAPPDATA%\BOT-MMORPG-AI\_up_\versions\<ver>\...
+///  4) Install legacy:   <exe_dir>\_up_\versions\<ver>\...   (Program Files install)
+///
+/// In debug, fallback to repo tree: <repo>/versions/<ver>/<script>
 fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
     if !cfg!(debug_assertions) {
         let root = ensure_runtime_layout(app);
@@ -431,30 +644,50 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
             }
         }
 
-        // 3) legacy staging support
-        let legacy_up = root
+        // 3) legacy staging support (LocalAppData)
+        let legacy_up_local = root
             .join("_up_")
             .join("versions")
             .join(DEFAULT_VERSION)
             .join(script_name);
-        if legacy_up.exists() {
-            return Ok(legacy_up);
+        if legacy_up_local.exists() {
+            return Ok(legacy_up_local);
         }
 
-        return Err(format!("Script not found: versions/{}/{}", DEFAULT_VERSION, script_name));
+        // 4) legacy staging support (install dir / Program Files)
+        // Example: C:\Program Files\BOT-MMORPG-AI\_up_\versions\0.01\1-collect_data.py
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let legacy_up_install = exe_dir
+                    .join("_up_")
+                    .join("versions")
+                    .join(DEFAULT_VERSION)
+                    .join(script_name);
+                if legacy_up_install.exists() {
+                    return Ok(legacy_up_install);
+                }
+            }
+        }
+
+        return Err(format!(
+            "Script not found. Tried content/, bundled resource {}, LocalAppData _up_, and install-dir _up_.",
+            rel
+        ));
     }
 
-    // DEV
+    // DEV: repo tree
     let candidate = dev_repo_root()
         .join("versions")
         .join(DEFAULT_VERSION)
         .join(script_name);
+
     if candidate.exists() {
         Ok(candidate)
     } else {
         Err(format!("Script not found (dev): {}", candidate.display()))
     }
 }
+
 
 
 // ---------------------------
@@ -791,8 +1024,16 @@ fn run_python_script(
     inner: Arc<AppStateInner>,
 ) -> Result<String, String> {
     let script_path = resolve_script(&app, script_name)?;
-    let py = find_python_for_app(&app)?;
     let data_root = work_dir(&app);
+
+
+    // In production, ALWAYS use managed venv python (bootstrap if missing).
+    // In dev, keep existing behavior (find_python_for_app uses repo .venv / explicit PYTHON_PATH / PATH).
+    let py = if cfg!(debug_assertions) {
+        find_python_for_app(&app)?
+    } else {
+        ensure_python_env(&app, &window)?
+    };
 
     let _ = window.emit("terminal_update", format!("[System] Python: {}", py.display()));
     let _ = window.emit("terminal_update", format!("[System] Script: {}", script_path.display()));
@@ -801,7 +1042,22 @@ fn run_python_script(
     let _ = stop_process_inner(&window, &inner);
 
     let mut cmd = Command::new(&py);
-    cmd.arg(&script_path);
+    // Use -u for unbuffered output so UI gets logs immediately
+    cmd.arg("-u").arg(&script_path);
+    // Ensure local imports work (grabscreen/models/etc live next to the script in versions/<ver>/)
+    if let Some(vdir) = script_path.parent() {
+        let _ = window.emit("terminal_update", format!("[System] VersionDir: {}", vdir.display()));
+        let old = std::env::var("PYTHONPATH").unwrap_or_default();
+        let sep = if is_windows() { ";" } else { ":" };
+        let newp = if old.is_empty() {
+            vdir.display().to_string()
+        } else {
+            format!("{}{}{}", vdir.display(), sep, old)
+        };
+        cmd.env("PYTHONPATH", newp);
+        cmd.env("BOT_VERSION_DIR", vdir);
+    }
+
     cmd.current_dir(&data_root);
 
     if cfg!(debug_assertions) {
