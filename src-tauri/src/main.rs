@@ -295,10 +295,38 @@ fn managed_venv_python(app: &AppHandle) -> PathBuf {
 }
 
 fn bundled_python_dir(app: &AppHandle) -> Option<PathBuf> {
-    app.path_resolver()
-        .resolve_resource("resources/python")
-        .and_then(|p| if p.exists() { Some(p) } else { None })
+    // Try common resource layouts.
+    let candidates = [
+        "python",              // <resource_dir>\python
+        "resources/python",    // sometimes resources are nested
+        "resources\\python",
+        "python\\",
+    ];
+
+    for rel in candidates {
+        if let Some(p) = app.path_resolver().resolve_resource(rel) {
+            if p.exists() {
+                return Some(if p.is_dir() { p } else { p.parent()?.to_path_buf() });
+            }
+        }
+    }
+
+    // Fallback: build from resource_dir() directly.
+    if let Some(rd) = app.path_resolver().resource_dir() {
+        let p1 = rd.join("python");
+        if p1.exists() {
+            return Some(p1);
+        }
+
+        let p2 = rd.join("resources").join("python");
+        if p2.exists() {
+            return Some(p2);
+        }
+    }
+
+    None
 }
+
 
 fn bundled_wheelhouse_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path_resolver()
@@ -331,6 +359,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String> {
+    // If venv python exists, we are ready.
     let vpy = managed_venv_python(app);
     if vpy.exists() {
         return Ok(vpy);
@@ -338,62 +367,247 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
 
     let py_root = managed_python_root(app);
 
-    // Copy bundled python to LocalAppData
+    // LocalAppData target where we install the bundled runtime
     let local_py_dir = py_root.join("python");
-    if !local_py_dir.exists() {
+
+    // Copy bundled python to LocalAppData if python executable is missing
+    let base_py_candidate = if is_windows() {
+        local_py_dir.join("python.exe")
+    } else {
+        local_py_dir.join("bin").join("python3")
+    };
+
+    if !base_py_candidate.exists() {
         if let Some(bundled_dir) = bundled_python_dir(app) {
-            let _ = window.emit("terminal_update", format!("[System] Installing bundled Python runtime -> {}", local_py_dir.display()));
-            copy_dir_all(&bundled_dir, &local_py_dir).map_err(|e| format!("Failed to copy bundled python: {}", e))?;
+            let _ = window.emit(
+                "terminal_update",
+                format!("[System] Bundled Python dir: {}", bundled_dir.display()),
+            );
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] Installing bundled Python runtime -> {}",
+                    local_py_dir.display()
+                ),
+            );
+
+            // Clean destination first to avoid partial/stale installs
+            let _ = fs::remove_dir_all(&local_py_dir);
+
+            copy_dir_all(&bundled_dir, &local_py_dir)
+                .map_err(|e| format!("Failed to copy bundled python: {}", e))?;
         } else {
-            return Err("Bundled Python runtime not found. Put Python under resources/python/.".to_string());
+            return Err(
+                "Bundled Python runtime not found in installed resources (resources/python)."
+                    .to_string(),
+            );
         }
     }
 
-    let base_py = if is_windows() { local_py_dir.join("python.exe") } else { local_py_dir.join("bin").join("python3") };
+    // Re-check after copy
+    let base_py = if is_windows() {
+        local_py_dir.join("python.exe")
+    } else {
+        local_py_dir.join("bin").join("python3")
+    };
+
     if !base_py.exists() {
-        return Err(format!("Bundled Python runtime missing executable: {}", base_py.display()));
+        return Err(format!(
+            "Bundled Python runtime missing executable after copy: {}",
+            base_py.display()
+        ));
     }
 
     // Create venv
     let venv_dir = py_root.join("venv");
-    let _ = window.emit("terminal_update", format!("[System] Creating venv: {}", venv_dir.display()));
-    let status = Command::new(&base_py).arg("-m").arg("venv").arg(&venv_dir).status()
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Creating venv: {}", venv_dir.display()),
+    );
+
+    let out = Command::new(&base_py)
+        .arg("-m")
+        .arg("venv")
+        .arg(&venv_dir)
+        .output()
         .map_err(|e| format!("Failed to run python -m venv: {}", e))?;
-    if !status.success() {
-        return Err(format!("python -m venv failed (exit={})", status));
+
+    if !out.stdout.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!(
+                "[System] venv stdout: {}",
+                String::from_utf8_lossy(&out.stdout)
+            ),
+        );
+    }
+    if !out.stderr.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!(
+                "[System] venv stderr: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ),
+        );
+    }
+    if !out.status.success() {
+        return Err(format!(
+            "python -m venv failed (exit={}). If you used the Windows *embeddable* Python, it often cannot create venv unless you bundle Lib/venv (full stdlib).",
+            out.status
+        ));
     }
 
+    // Confirm venv python exists
     let vpy = managed_venv_python(app);
     if !vpy.exists() {
         return Err(format!("Venv python not found: {}", vpy.display()));
     }
 
-    // Install deps
-    if let Some(req) = bundled_requirements_lock(app) {
+    // Resolve pyproject.toml from bundled resources
+    let pyproject = app
+        .path_resolver()
+        .resolve_resource("pyproject.toml")
+        .ok_or_else(|| {
+            "pyproject.toml not found in bundled resources. Add it to tauri.conf.json bundle.resources."
+                .to_string()
+        })?;
+
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Using pyproject: {}", pyproject.display()),
+    );
+
+    // Upgrade pip tooling first (helps with PEP 517 / pyproject builds)
+    {
         let mut cmd = Command::new(&vpy);
-        cmd.arg("-m").arg("pip").arg("install");
-        if let Some(wh) = bundled_wheelhouse_dir(app) {
-            cmd.arg("--no-index").arg("--find-links").arg(wh);
+        cmd.arg("-m")
+            .arg("pip")
+            .arg("install")
+            .arg("--upgrade")
+            .arg("pip")
+            .arg("setuptools")
+            .arg("wheel");
+
+        let out = cmd
+            .output()
+            .map_err(|e| format!("pip upgrade failed to start: {}", e))?;
+
+        if !out.stdout.is_empty() {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] pip upgrade stdout: {}",
+                    String::from_utf8_lossy(&out.stdout)
+                ),
+            );
         }
-        cmd.arg("-r").arg(req);
-        let _ = window.emit("terminal_update", "[System] Installing Python dependencies...".to_string());
-        let status = cmd.status().map_err(|e| format!("pip install failed: {}", e))?;
-        if !status.success() {
-            return Err(format!("pip install failed (exit={})", status));
+        if !out.stderr.is_empty() {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] pip upgrade stderr: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            );
         }
-    } else {
-        let _ = window.emit("terminal_update", "[System] requirements.lock.txt not found; skipping dependency install".to_string());
+        if !out.status.success() {
+            return Err(format!("pip upgrade failed (exit={})", out.status));
+        }
     }
 
-    // Verify
-    let verify = Command::new(&vpy).arg("-c").arg("import numpy; print('numpy_ok')").status();
+    // Install dependencies from pyproject.toml
+    let pyproject_dir = pyproject
+        .parent()
+        .ok_or_else(|| "Invalid pyproject.toml path (no parent dir)".to_string())?;
+
+    let extras = "launcher,backend"; // choose what you want in production (or "" for base only)
+
+    let mut cmd = Command::new(&vpy);
+    cmd.arg("-m").arg("pip").arg("install");
+
+    // Offline wheelhouse support
+    if let Some(wh) = bundled_wheelhouse_dir(app) {
+        // IMPORTANT: pass &wh so we don't move it (avoids E0382)
+        cmd.arg("--no-index").arg("--find-links").arg(&wh);
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] Using offline wheelhouse: {}", wh.display()),
+        );
+    }
+
+    // Install from pyproject directory
+    let target = if extras.trim().is_empty() {
+        pyproject_dir.to_string_lossy().to_string()
+    } else {
+        format!("{}[{}]", pyproject_dir.to_string_lossy(), extras)
+    };
+
+    let _ = window.emit(
+        "terminal_update",
+        format!("[System] Installing from pyproject: {}", target),
+    );
+
+    cmd.arg(target);
+
+    let out = cmd
+        .output()
+        .map_err(|e| format!("pip install (pyproject) failed to start: {}", e))?;
+
+    if !out.stdout.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] pip stdout: {}", String::from_utf8_lossy(&out.stdout)),
+        );
+    }
+    if !out.stderr.is_empty() {
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] pip stderr: {}", String::from_utf8_lossy(&out.stderr)),
+        );
+    }
+    if !out.status.success() {
+        return Err(format!(
+            "pip install from pyproject failed (exit={})",
+            out.status
+        ));
+    }
+
+    // Verify minimal imports
+    let verify = Command::new(&vpy)
+        .arg("-c")
+        .arg("import numpy; print('numpy_ok')")
+        .output();
+
     match verify {
-        Ok(st) if st.success() => { let _ = window.emit("terminal_update", "[System] Python env ready".to_string()); }
-        _ => return Err("Python env created but verification failed (numpy import).".to_string()),
+        Ok(out) if out.status.success() => {
+            let _ = window.emit("terminal_update", "[System] Python env ready".to_string());
+        }
+        Ok(out) => {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] verify stdout: {}",
+                    String::from_utf8_lossy(&out.stdout)
+                ),
+            );
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] verify stderr: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            );
+            return Err("Python env created but verification failed (numpy import).".to_string());
+        }
+        Err(_) => {
+            return Err("Python env created but verification failed (numpy import).".to_string())
+        }
     }
 
     Ok(vpy)
 }
+
+
 
 /// Writable runtime directory (datasets/models/logs) — production uses LocalAppData root.
 fn work_dir(app: &AppHandle) -> PathBuf {
