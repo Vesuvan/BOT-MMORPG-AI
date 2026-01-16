@@ -22,7 +22,10 @@
       "fs": {
         "all": true,
         "scope": [
-          "$APP/*"
+          "$APP/*",
+          "$APPDATA/*",
+          "$CONFIG/*",
+          "$LOCALDATA/*"
         ]
       }
     },
@@ -42,7 +45,8 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**"
+        "../versions/**",
+        "../modelhub/**"
       ],
       "windows": {
         "nsis": {
