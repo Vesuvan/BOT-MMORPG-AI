@@ -182,6 +182,13 @@ if ([string]::IsNullOrWhiteSpace($scriptPath)) { $scriptPath = $PSCommandPath }
 $scriptDir = Split-Path -Parent $scriptPath
 $root = (Resolve-Path (Join-Path $scriptDir "..")).Path
 
+# ---- Guard: ensure versions folder exists (better error than Tauri glob failure) ----
+$versionsDir = Join-Path $root "versions"
+if (-not (Test-Path $versionsDir)) {
+  throw "Missing required folder: $versionsDir (expected versions/0.01 etc.)"
+}
+
+
 Log-Info "Root directory: $root"
 Log-Info ("Build started at: {0}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 Write-Host ""
@@ -460,7 +467,31 @@ if (-not $SkipPython) {
   }
   New-Item -Force -ItemType Directory $tauriSidecarDir | Out-Null
 
-  Copy-Item -Recurse -Force (Join-Path $distDir "*") $tauriSidecarDir
+# --- Robust sidecar copy (handles locked DLLs / Defender scanning) ---
+$lockNames = @("main-backend", "main-backend.exe", "BOT-MMORPG-AI", "BOT-MMORPG-AI.exe")
+foreach ($n in $lockNames) {
+  try { Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
+}
+
+# Remove destination _internal to avoid update-in-place locks
+try { Remove-Item -Recurse -Force (Join-Path $tauriSidecarDir "_internal") -ErrorAction SilentlyContinue } catch {}
+
+$maxTries = 25
+$delaySec = 1
+$lastErr = $null
+for ($i = 1; $i -le $maxTries; $i++) {
+  try {
+    Copy-Item -Recurse -Force (Join-Path $distDir "*") $tauriSidecarDir -ErrorAction Stop
+    $lastErr = $null
+    break
+  } catch {
+    $lastErr = $_
+    Log-Warn ("Sidecar copy attempt {0}/{1} failed: {2}" -f $i, $maxTries, $_.Exception.Message)
+    Start-Sleep -Seconds $delaySec
+  }
+}
+if ($lastErr -ne $null) { throw $lastErr }
+# --- End robust sidecar copy ---
 
   $bundledExe = Join-Path $tauriSidecarDir "main-backend.exe"
   if (-not (Test-Path $bundledExe)) {

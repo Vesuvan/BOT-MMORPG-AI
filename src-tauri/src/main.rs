@@ -196,6 +196,14 @@ fn bundled_python_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn find_python_for_app(app: &AppHandle) -> Result<PathBuf, String> {
+    // Production: prefer managed venv python (avoid system python missing deps)
+    if !cfg!(debug_assertions) {
+        let vpy = managed_venv_python(app);
+        if vpy.exists() {
+            return Ok(vpy);
+        }
+    }
+
     // 1) .env explicit python path
     let explicit = get_env_var(app, "PYTHON_PATH");
     if !explicit.trim().is_empty() {
@@ -249,6 +257,145 @@ fn apply_stable_python_env(cmd: &mut Command) {
     cmd.env("PYTHONIOENCODING", "utf-8");
 }
 
+
+// ---------------------------
+// PRODUCTION RUNTIME LAYOUT (LocalAppData)
+// ---------------------------
+
+fn local_data_root(app: &AppHandle) -> PathBuf {
+    app.path_resolver()
+        .app_local_data_dir()
+        .or_else(|| app.path_resolver().app_data_dir())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
+
+fn ensure_runtime_layout(app: &AppHandle) -> PathBuf {
+    let root = local_data_root(app).join("BOT-MMORPG-AI");
+    let _ = fs::create_dir_all(root.join("runtime").join("py"));
+    let _ = fs::create_dir_all(root.join("runtime").join("tools"));
+    let _ = fs::create_dir_all(root.join("content"));
+    let _ = fs::create_dir_all(root.join("datasets"));
+    let _ = fs::create_dir_all(root.join("models"));
+    let _ = fs::create_dir_all(root.join("logs"));
+    root
+}
+
+// NOTE: work_dir() may already exist elsewhere; we do NOT redefine it here.
+// Prefer to keep a single work_dir() in the module.
+
+fn managed_python_root(app: &AppHandle) -> PathBuf {
+    ensure_runtime_layout(app).join("runtime").join("py")
+}
+
+fn managed_venv_python(app: &AppHandle) -> PathBuf {
+    if is_windows() {
+        managed_python_root(app).join("venv").join("Scripts").join("python.exe")
+    } else {
+        managed_python_root(app).join("venv").join("bin").join("python3")
+    }
+}
+
+fn bundled_python_dir(app: &AppHandle) -> Option<PathBuf> {
+    app.path_resolver()
+        .resolve_resource("resources/python")
+        .and_then(|p| if p.exists() { Some(p) } else { None })
+}
+
+fn bundled_wheelhouse_dir(app: &AppHandle) -> Option<PathBuf> {
+    app.path_resolver()
+        .resolve_resource("resources/wheelhouse")
+        .and_then(|p| if p.exists() { Some(p) } else { None })
+}
+
+fn bundled_requirements_lock(app: &AppHandle) -> Option<PathBuf> {
+    let rel = format!("versions/{}/requirements.lock.txt", DEFAULT_VERSION);
+    app.path_resolver()
+        .resolve_resource(&rel)
+        .and_then(|p| if p.exists() { Some(p) } else { None })
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&from, &to)?;
+        } else {
+            let _ = fs::create_dir_all(to.parent().unwrap_or(dst));
+            fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String> {
+    let vpy = managed_venv_python(app);
+    if vpy.exists() {
+        return Ok(vpy);
+    }
+
+    let py_root = managed_python_root(app);
+
+    // Copy bundled python to LocalAppData
+    let local_py_dir = py_root.join("python");
+    if !local_py_dir.exists() {
+        if let Some(bundled_dir) = bundled_python_dir(app) {
+            let _ = window.emit("terminal_update", format!("[System] Installing bundled Python runtime -> {}", local_py_dir.display()));
+            copy_dir_all(&bundled_dir, &local_py_dir).map_err(|e| format!("Failed to copy bundled python: {}", e))?;
+        } else {
+            return Err("Bundled Python runtime not found. Put Python under resources/python/.".to_string());
+        }
+    }
+
+    let base_py = if is_windows() { local_py_dir.join("python.exe") } else { local_py_dir.join("bin").join("python3") };
+    if !base_py.exists() {
+        return Err(format!("Bundled Python runtime missing executable: {}", base_py.display()));
+    }
+
+    // Create venv
+    let venv_dir = py_root.join("venv");
+    let _ = window.emit("terminal_update", format!("[System] Creating venv: {}", venv_dir.display()));
+    let status = Command::new(&base_py).arg("-m").arg("venv").arg(&venv_dir).status()
+        .map_err(|e| format!("Failed to run python -m venv: {}", e))?;
+    if !status.success() {
+        return Err(format!("python -m venv failed (exit={})", status));
+    }
+
+    let vpy = managed_venv_python(app);
+    if !vpy.exists() {
+        return Err(format!("Venv python not found: {}", vpy.display()));
+    }
+
+    // Install deps
+    if let Some(req) = bundled_requirements_lock(app) {
+        let mut cmd = Command::new(&vpy);
+        cmd.arg("-m").arg("pip").arg("install");
+        if let Some(wh) = bundled_wheelhouse_dir(app) {
+            cmd.arg("--no-index").arg("--find-links").arg(wh);
+        }
+        cmd.arg("-r").arg(req);
+        let _ = window.emit("terminal_update", "[System] Installing Python dependencies...".to_string());
+        let status = cmd.status().map_err(|e| format!("pip install failed: {}", e))?;
+        if !status.success() {
+            return Err(format!("pip install failed (exit={})", status));
+        }
+    } else {
+        let _ = window.emit("terminal_update", "[System] requirements.lock.txt not found; skipping dependency install".to_string());
+    }
+
+    // Verify
+    let verify = Command::new(&vpy).arg("-c").arg("import numpy; print('numpy_ok')").status();
+    match verify {
+        Ok(st) if st.success() => { let _ = window.emit("terminal_update", "[System] Python env ready".to_string()); }
+        _ => return Err("Python env created but verification failed (numpy import).".to_string()),
+    }
+
+    Ok(vpy)
+}
+
 /// Writable runtime directory (datasets/models/logs)
 fn work_dir(app: &AppHandle) -> PathBuf {
     let p = app
@@ -263,47 +410,41 @@ fn work_dir(app: &AppHandle) -> PathBuf {
 ///   resolve_resource("versions/0.01/<script>.py")
 /// and fallback to repo tree in debug.
 fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
-    // PROD: resolve via Tauri resource resolver
     if !cfg!(debug_assertions) {
-        // 1) First try bundled resources (stable, read-only)
-        let rels = [
-            format!("versions/{}/{}", DEFAULT_VERSION, script_name),
-            format!("resources/versions/{}/{}", DEFAULT_VERSION, script_name),
-            // Some installers/updaters stage resources under _up_
-            format!("_up_/versions/{}/{}", DEFAULT_VERSION, script_name),
-            format!("resources/_up_/versions/{}/{}", DEFAULT_VERSION, script_name),
-        ];
+        let root = ensure_runtime_layout(app);
 
-        for rel in rels.iter() {
-            if let Some(p) = app.path_resolver().resolve_resource(rel) {
-                if p.exists() {
-                    return Ok(p);
-                }
+        // 1) content override (writable)
+        let content_candidate = root
+            .join("content")
+            .join("versions")
+            .join(DEFAULT_VERSION)
+            .join(script_name);
+        if content_candidate.exists() {
+            return Ok(content_candidate);
+        }
+
+        // 2) bundled versions (from ../versions/** => resource path is versions/<ver>/...)
+        let rel = format!("versions/{}/{}", DEFAULT_VERSION, script_name);
+        if let Some(p) = app.path_resolver().resolve_resource(&rel) {
+            if p.exists() {
+                return Ok(p);
             }
         }
 
-        // 2) Then try writable app data (common for staged/updated content)
-        //    Observed on your machine: AppData\Local\BOT-MMORPG-AI\_up_\versions\<ver>\...
-        if let Some(data_dir) = app.path_resolver().app_data_dir() {
-            let candidates = [
-                data_dir.join("_up_").join("versions").join(DEFAULT_VERSION).join(script_name),
-                // Recommended future-proof layout (launcher-style)
-                data_dir.join("content").join("versions").join(DEFAULT_VERSION).join(script_name),
-            ];
-            for p in candidates.iter() {
-                if p.exists() {
-                    return Ok(p.to_path_buf());
-                }
-            }
+        // 3) legacy staging support
+        let legacy_up = root
+            .join("_up_")
+            .join("versions")
+            .join(DEFAULT_VERSION)
+            .join(script_name);
+        if legacy_up.exists() {
+            return Ok(legacy_up);
         }
 
-        return Err(format!(
-            "Script not found. Tried bundled resources and app_data_dir fallbacks for versions/{}/{}",
-            DEFAULT_VERSION, script_name
-        ));
+        return Err(format!("Script not found: versions/{}/{}", DEFAULT_VERSION, script_name));
     }
 
-    // DEV: repo tree
+    // DEV
     let candidate = dev_repo_root()
         .join("versions")
         .join(DEFAULT_VERSION)
@@ -314,6 +455,7 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
         Err(format!("Script not found (dev): {}", candidate.display()))
     }
 }
+
 
 // ---------------------------
 // SIDE-CAR STARTUP
