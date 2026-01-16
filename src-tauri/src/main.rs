@@ -265,22 +265,40 @@ fn work_dir(app: &AppHandle) -> PathBuf {
 fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
     // PROD: resolve via Tauri resource resolver
     if !cfg!(debug_assertions) {
-        let rel = format!("versions/{}/{}", DEFAULT_VERSION, script_name);
-        if let Some(p) = app.path_resolver().resolve_resource(&rel) {
-            if p.exists() {
-                return Ok(p);
+        // 1) First try bundled resources (stable, read-only)
+        let rels = [
+            format!("versions/{}/{}", DEFAULT_VERSION, script_name),
+            format!("resources/versions/{}/{}", DEFAULT_VERSION, script_name),
+            // Some installers/updaters stage resources under _up_
+            format!("_up_/versions/{}/{}", DEFAULT_VERSION, script_name),
+            format!("resources/_up_/versions/{}/{}", DEFAULT_VERSION, script_name),
+        ];
+
+        for rel in rels.iter() {
+            if let Some(p) = app.path_resolver().resolve_resource(rel) {
+                if p.exists() {
+                    return Ok(p);
+                }
             }
         }
-        // Some builds end up nesting in resources/
-        let rel2 = format!("resources/versions/{}/{}", DEFAULT_VERSION, script_name);
-        if let Some(p) = app.path_resolver().resolve_resource(&rel2) {
-            if p.exists() {
-                return Ok(p);
+
+        // 2) Then try writable app data (common for staged/updated content)
+        //    Observed on your machine: AppData\Local\BOT-MMORPG-AI\_up_\versions\<ver>\...
+        if let Some(data_dir) = app.path_resolver().app_data_dir() {
+            let candidates = [
+                data_dir.join("_up_").join("versions").join(DEFAULT_VERSION).join(script_name),
+                // Recommended future-proof layout (launcher-style)
+                data_dir.join("content").join("versions").join(DEFAULT_VERSION).join(script_name),
+            ];
+            for p in candidates.iter() {
+                if p.exists() {
+                    return Ok(p.to_path_buf());
+                }
             }
         }
 
         return Err(format!(
-            "Script not found in bundled resources: versions/{}/{}",
+            "Script not found. Tried bundled resources and app_data_dir fallbacks for versions/{}/{}",
             DEFAULT_VERSION, script_name
         ));
     }
