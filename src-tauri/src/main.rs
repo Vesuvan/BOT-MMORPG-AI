@@ -406,9 +406,13 @@ fn work_dir(app: &AppHandle) -> PathBuf {
     p
 }
 
-/// Resolve scripts from *bundled resources* in production:
-///   resolve_resource("versions/0.01/<script>.py")
-/// and fallback to repo tree in debug.
+/// Resolve scripts in production in this order:
+///  1) Local override:   %LOCALAPPDATA%\BOT-MMORPG-AI\content\versions\<ver>\...
+///  2) Bundled resource: resolve_resource("versions/<ver>/<script>")
+///  3) Local legacy:     %LOCALAPPDATA%\BOT-MMORPG-AI\_up_\versions\<ver>\...
+///  4) Install legacy:   <exe_dir>\_up_\versions\<ver>\...   (Program Files install)
+///
+/// In debug, fallback to repo tree: <repo>/versions/<ver>/<script>
 fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
     if !cfg!(debug_assertions) {
         let root = ensure_runtime_layout(app);
@@ -431,30 +435,50 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
             }
         }
 
-        // 3) legacy staging support
-        let legacy_up = root
+        // 3) legacy staging support (LocalAppData)
+        let legacy_up_local = root
             .join("_up_")
             .join("versions")
             .join(DEFAULT_VERSION)
             .join(script_name);
-        if legacy_up.exists() {
-            return Ok(legacy_up);
+        if legacy_up_local.exists() {
+            return Ok(legacy_up_local);
         }
 
-        return Err(format!("Script not found: versions/{}/{}", DEFAULT_VERSION, script_name));
+        // 4) legacy staging support (install dir / Program Files)
+        // Example: C:\Program Files\BOT-MMORPG-AI\_up_\versions\0.01\1-collect_data.py
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let legacy_up_install = exe_dir
+                    .join("_up_")
+                    .join("versions")
+                    .join(DEFAULT_VERSION)
+                    .join(script_name);
+                if legacy_up_install.exists() {
+                    return Ok(legacy_up_install);
+                }
+            }
+        }
+
+        return Err(format!(
+            "Script not found. Tried content/, bundled resource {}, LocalAppData _up_, and install-dir _up_.",
+            rel
+        ));
     }
 
-    // DEV
+    // DEV: repo tree
     let candidate = dev_repo_root()
         .join("versions")
         .join(DEFAULT_VERSION)
         .join(script_name);
+
     if candidate.exists() {
         Ok(candidate)
     } else {
         Err(format!("Script not found (dev): {}", candidate.display()))
     }
 }
+
 
 
 // ---------------------------
