@@ -32,6 +32,8 @@ struct SidecarApi {
 
 struct AppStateInner {
     current_process: Mutex<Option<Child>>,
+    // keep the sidecar Child handle so we can kill it on app exit
+    sidecar_process: Mutex<Option<Child>>,
     sidecar: Mutex<Option<SidecarApi>>,
     http: Client,
 }
@@ -318,7 +320,8 @@ fn parse_ready_line(line: &str) -> Option<SidecarApi> {
     }
 }
 
-fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
+/// return both SidecarApi and the spawned Child handle
+fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> {
     let token = {
         let pid = std::process::id();
         let now = std::time::SystemTime::now()
@@ -356,9 +359,16 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
         }
 
         if let Some(w) = app.get_window("main") {
-            let _ = w.emit::<String>("terminal_update", format!("[System] Sidecar Python: {}", py.display()));
-            let _ = w.emit::<String>("terminal_update", format!("[System] Sidecar Script: {}", script.display()));
-            let _ = w.emit::<String>("terminal_update", format!("[System] ResourceRoot: {}", resource_root.display()));
+            let _ =
+                w.emit::<String>("terminal_update", format!("[System] Sidecar Python: {}", py.display()));
+            let _ = w.emit::<String>(
+                "terminal_update",
+                format!("[System] Sidecar Script: {}", script.display()),
+            );
+            let _ = w.emit::<String>(
+                "terminal_update",
+                format!("[System] ResourceRoot: {}", resource_root.display()),
+            );
             let _ = w.emit::<String>("terminal_update", format!("[System] DataRoot: {}", data_root.display()));
         }
 
@@ -376,8 +386,12 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
             })?;
 
         if let Some(w) = app.get_window("main") {
-            let _ = w.emit::<String>("terminal_update", format!("[System] Sidecar EXE: {}", sidecar_exe.display()));
-            let _ = w.emit::<String>("terminal_update", format!("[System] ResourceRoot: {}", resource_root.display()));
+            let _ =
+                w.emit::<String>("terminal_update", format!("[System] Sidecar EXE: {}", sidecar_exe.display()));
+            let _ = w.emit::<String>(
+                "terminal_update",
+                format!("[System] ResourceRoot: {}", resource_root.display()),
+            );
             let _ = w.emit::<String>("terminal_update", format!("[System] DataRoot: {}", data_root.display()));
         }
 
@@ -460,9 +474,15 @@ fn start_sidecar_server(app: &AppHandle) -> Result<SidecarApi, String> {
     });
 
     match rx.recv_timeout(Duration::from_secs(25)) {
-        Ok(Ok(api)) => Ok(api),
-        Ok(Err(e)) => Err(e),
-        Err(_) => Err("Timed out waiting for sidecar READY line".to_string()),
+        Ok(Ok(api)) => Ok((api, child)),
+        Ok(Err(e)) => {
+            let _ = child.kill();
+            Err(e)
+        }
+        Err(_) => {
+            let _ = child.kill();
+            Err("Timed out waiting for sidecar READY line".to_string())
+        }
     }
 }
 
@@ -567,6 +587,41 @@ fn stop_process_inner(window: &Window, inner: &Arc<AppStateInner>) -> String {
         return "Process stopped".to_string();
     }
     "No process running".to_string()
+}
+
+/// stop the sidecar backend process (main-backend.exe)
+fn stop_sidecar_inner(window: Option<&Window>, inner: &Arc<AppStateInner>) {
+    let mut guard = inner.sidecar_process.lock().unwrap();
+    if let Some(mut child) = guard.take() {
+        if let Some(w) = window {
+            let _ = w.emit(
+                "terminal_update",
+                format!("[System] Stopping sidecar PID {}", child.id()),
+            );
+        }
+        let _ = child.kill();
+    }
+}
+
+/// ✅ FIX for E0515:
+/// Do not try to produce a borrowed Window from a temporary.
+/// Just stop things without requiring a Window reference.
+fn shutdown_all(app: &AppHandle, window: Option<&Window>) {
+    if let Some(state) = app.try_state::<AppState>() {
+        // Stop user scripts (collect/train/test)
+        {
+            let mut guard = state.inner.current_process.lock().unwrap();
+            if let Some(mut child) = guard.take() {
+                if let Some(w) = window {
+                    let _ = w.emit("terminal_update", format!("[System] Stopping PID {}", child.id()));
+                }
+                let _ = child.kill();
+            }
+        }
+
+        // Stop sidecar
+        stop_sidecar_inner(window, &state.inner);
+    }
 }
 
 fn run_python_script(
@@ -778,10 +833,8 @@ fn get_ai_config(app: AppHandle) -> AiConfig {
     }
 }
 
-/// FIX ✅
 /// - provider is always saved
 /// - api_key is OPTIONAL: if empty, we keep existing saved key
-///   (this allows UI to switch provider without forcing key input)
 #[tauri::command]
 fn save_configuration(app: AppHandle, provider: String, api_key: Option<String>) -> Result<bool, String> {
     let provider = provider.trim().to_lowercase();
@@ -789,7 +842,6 @@ fn save_configuration(app: AppHandle, provider: String, api_key: Option<String>)
 
     update_env_file(&app, "AI_PROVIDER", &provider)?;
 
-    // If UI didn't send a key (or sent empty), do NOT error; just save provider.
     if api_key.is_empty() {
         return Ok(true);
     }
@@ -997,17 +1049,26 @@ fn main() {
         .manage(AppState {
             inner: Arc::new(AppStateInner {
                 current_process: Mutex::new(None),
+                sidecar_process: Mutex::new(None),
                 sidecar: Mutex::new(None),
                 http: Client::new(),
             }),
+        })
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                let app_handle = event.window().app_handle();
+                shutdown_all(&app_handle, Some(event.window()));
+            }
         })
         .setup(|app| {
             let app_handle = app.handle();
             let state = app.state::<AppState>();
 
             match start_sidecar_server(&app_handle) {
-                Ok(api) => {
+                Ok((api, child)) => {
                     *state.inner.sidecar.lock().unwrap() = Some(api);
+                    *state.inner.sidecar_process.lock().unwrap() = Some(child);
+
                     if let Some(w) = app.get_window("main") {
                         let _ = w.emit::<String>("terminal_update", "[System] Sidecar READY".to_string());
                     }
@@ -1042,6 +1103,11 @@ fn main() {
             modelhub_run_offline_evaluation,
             install_drivers
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                shutdown_all(&app_handle, None);
+            }
+        });
 }
