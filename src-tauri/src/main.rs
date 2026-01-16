@@ -280,8 +280,7 @@ fn ensure_runtime_layout(app: &AppHandle) -> PathBuf {
     root
 }
 
-// NOTE: work_dir() may already exist elsewhere; we do NOT redefine it here.
-// Prefer to keep a single work_dir() in the module.
+// NOTE: keep ONLY one work_dir() in this module (patched below).
 
 fn managed_python_root(app: &AppHandle) -> PathBuf {
     ensure_runtime_layout(app).join("runtime").join("py")
@@ -396,16 +395,12 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
     Ok(vpy)
 }
 
-/// Writable runtime directory (datasets/models/logs)
+/// Writable runtime directory (datasets/models/logs) — production uses LocalAppData root.
 fn work_dir(app: &AppHandle) -> PathBuf {
-    let p = app
-        .path_resolver()
-        .app_data_dir()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let p = ensure_runtime_layout(app);
     let _ = fs::create_dir_all(&p);
     p
 }
-
 /// Resolve scripts in production in this order:
 ///  1) Local override:   %LOCALAPPDATA%\BOT-MMORPG-AI\content\versions\<ver>\...
 ///  2) Bundled resource: resolve_resource("versions/<ver>/<script>")
@@ -815,8 +810,16 @@ fn run_python_script(
     inner: Arc<AppStateInner>,
 ) -> Result<String, String> {
     let script_path = resolve_script(&app, script_name)?;
-    let py = find_python_for_app(&app)?;
     let data_root = work_dir(&app);
+
+
+    // In production, ALWAYS use managed venv python (bootstrap if missing).
+    // In dev, keep existing behavior (find_python_for_app uses repo .venv / explicit PYTHON_PATH / PATH).
+    let py = if cfg!(debug_assertions) {
+        find_python_for_app(&app)?
+    } else {
+        ensure_python_env(&app, &window)?
+    };
 
     let _ = window.emit("terminal_update", format!("[System] Python: {}", py.display()));
     let _ = window.emit("terminal_update", format!("[System] Script: {}", script_path.display()));
@@ -825,7 +828,22 @@ fn run_python_script(
     let _ = stop_process_inner(&window, &inner);
 
     let mut cmd = Command::new(&py);
-    cmd.arg(&script_path);
+    // Use -u for unbuffered output so UI gets logs immediately
+    cmd.arg("-u").arg(&script_path);
+    // Ensure local imports work (grabscreen/models/etc live next to the script in versions/<ver>/)
+    if let Some(vdir) = script_path.parent() {
+        let _ = window.emit("terminal_update", format!("[System] VersionDir: {}", vdir.display()));
+        let old = std::env::var("PYTHONPATH").unwrap_or_default();
+        let sep = if is_windows() { ";" } else { ":" };
+        let newp = if old.is_empty() {
+            vdir.display().to_string()
+        } else {
+            format!("{}{}{}", vdir.display(), sep, old)
+        };
+        cmd.env("PYTHONPATH", newp);
+        cmd.env("BOT_VERSION_DIR", vdir);
+    }
+
     cmd.current_dir(&data_root);
 
     if cfg!(debug_assertions) {
