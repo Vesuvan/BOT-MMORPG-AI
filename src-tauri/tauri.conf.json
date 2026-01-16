@@ -47,9 +47,8 @@
         "drivers/**",
         "../versions/**",
         "../modelhub/**",
-        "../runtime/**",
-        "../pyproject.toml",
-        "../wheelhouse/**"
+        "../pyproject.toml"
+   
 
 
       ],
