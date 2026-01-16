@@ -46,7 +46,6 @@
         "resources/**",
         "drivers/**",
         "../versions/**",
-        "../modelhub/**",
         "../pyproject.toml"
    
 
