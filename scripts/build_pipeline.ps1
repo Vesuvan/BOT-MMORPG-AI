@@ -183,6 +183,18 @@ $scriptDir = Split-Path -Parent $scriptPath
 $root = (Resolve-Path (Join-Path $scriptDir "..")).Path
 
 # ===================== BUNDLE_PY_RUNTIME_BEGIN =====================
+
+# 1) Build wheelhouse + portable site-packages from pyproject.toml using embeddable python (NO venv)
+& (Join-Path $root "scripts\prepare_python_from_pyproject_embed311_target.ps1") `
+  -Extras @() `
+  -TargetTag "win_amd64_cp311" `
+  -RebuildTarget
+
+if ($LASTEXITCODE -ne 0) { exit 1 }
+
+# ===================== BUNDLE_PY_RUNTIME_END =====================
+
+
 # Ensure Python runtime is present at build time under:
 #   src-tauri\resources\python\python.exe
 #
