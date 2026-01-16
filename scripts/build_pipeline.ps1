@@ -182,6 +182,140 @@ if ([string]::IsNullOrWhiteSpace($scriptPath)) { $scriptPath = $PSCommandPath }
 $scriptDir = Split-Path -Parent $scriptPath
 $root = (Resolve-Path (Join-Path $scriptDir "..")).Path
 
+# ===================== BUNDLE_PY_RUNTIME_BEGIN =====================
+# Ensure Python runtime is present at build time under:
+#   src-tauri\resources\python\python.exe
+#
+# Fix:
+# - Search recursively for python.exe under:
+#     third_party\python
+#     src-tauri\resources\python
+# - If not found: auto-download official embeddable runtime (3.11.9 amd64) into third_party\python\
+# - Copy parent folder contents of python.exe into src-tauri\resources\python
+#
+# Result required for installer:
+#   src-tauri\resources\python\python.exe   (plus DLLs + stdlib zip)
+
+function Find-PythonExe {
+  param([string[]]$Roots)
+
+  foreach ($r in $Roots) {
+    if (-not (Test-Path $r)) { continue }
+
+    $hit = Get-ChildItem -Path $r -Recurse -File -Filter "python.exe" -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+
+    if ($hit) { return $hit.FullName }
+  }
+
+  return $null
+}
+
+function Write-PyRuntime-Manifest {
+  param([string]$DstDir, [string]$PickedFrom)
+
+  try {
+    $mf = Join-Path $DstDir "py_runtime_manifest.txt"
+    $lines = @()
+    $lines += ("BuiltAt=" + (Get-Date).ToString("s"))
+    $lines += ("Host=" + $env:COMPUTERNAME)
+    $lines += ("PickedFrom=" + $PickedFrom)
+    $lines += ("Root=" + $DstDir)
+
+    $files = Get-ChildItem -Path $DstDir -Recurse -File -ErrorAction SilentlyContinue |
+      Select-Object FullName, Length |
+      Sort-Object FullName
+
+    foreach ($f in $files) {
+      $lines += ("FILE=" + $f.FullName + " SIZE=" + $f.Length)
+    }
+    Set-Content -Path $mf -Value $lines -Encoding UTF8
+  } catch {
+    Log-Warn ("Could not write py_runtime_manifest.txt: " + $_.Exception.Message)
+  }
+}
+
+function Ensure-EmbeddedPythonDownloaded {
+  param([string]$Root)
+
+  $ver = "3.11.9"
+  $arch = "amd64"
+  $zipName = "python-$ver-embed-$arch.zip"
+  $url = "https://www.python.org/ftp/python/$ver/$zipName"
+
+  $dst = Join-Path $Root "third_party\python\python-$ver-embed-$arch"
+  New-Item -ItemType Directory -Force -Path $dst | Out-Null
+
+  # If python.exe already exists there, skip
+  if (Test-Path (Join-Path $dst "python.exe")) {
+    return $dst
+  }
+
+  $zipPath = Join-Path $dst $zipName
+
+  Log-Info ("Python runtime not found. Downloading embeddable Python: " + $url)
+  try {
+    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+    Expand-Archive -Path $zipPath -DestinationPath $dst -Force
+    Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+    return $dst
+  } catch {
+    throw ("Auto-download failed. Please manually download: " + $url + " and extract it to: " + $dst + "  Error=" + $_.Exception.Message)
+  }
+}
+
+try {
+  $pyDst = Join-Path $root "src-tauri\resources\python"
+  New-Item -ItemType Directory -Force -Path $pyDst | Out-Null
+
+  # Clean destination (keep README.txt if present)
+  Get-ChildItem $pyDst -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne "README.txt" } |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  $searchRoots = @(
+    (Join-Path $root "third_party\python"),
+    (Join-Path $root "src-tauri\resources\python")
+  )
+
+  $pyExePath = Find-PythonExe -Roots $searchRoots
+
+  if (-not $pyExePath) {
+    # Try auto-download and then search again
+    $dlDir = Ensure-EmbeddedPythonDownloaded -Root $root
+    $pyExePath = Find-PythonExe -Roots @($dlDir, (Join-Path $root "third_party\python"))
+  }
+
+  if (-not $pyExePath) {
+    # Diagnostics
+    $a = Join-Path $root "third_party\python"
+    $b = Join-Path $root "src-tauri\resources\python"
+    Log-Warn ("Search roots were: " + ($searchRoots -join " OR "))
+    if (Test-Path $a) { Log-Warn ("Dir third_party\python:\n" + (Get-ChildItem -Path $a -Depth 3 -ErrorAction SilentlyContinue | Select-Object FullName | Out-String)) }
+    if (Test-Path $b) { Log-Warn ("Dir src-tauri\resources\python:\n" + (Get-ChildItem -Path $b -Depth 3 -ErrorAction SilentlyContinue | Select-Object FullName | Out-String)) }
+    throw ("Python runtime not found. Expected python.exe somewhere under: " + ($searchRoots -join " OR "))
+  }
+
+  $pickedDir = Split-Path -Parent $pyExePath
+
+  Copy-Item -Recurse -Force (Join-Path $pickedDir "*") $pyDst
+  Log-Ok ("Bundled Python runtime from: " + $pickedDir)
+
+  # Hard check: python.exe must exist at root
+  $pyExeRoot = Join-Path $pyDst "python.exe"
+  if (-not (Test-Path $pyExeRoot)) {
+    throw ("Python runtime copy succeeded but python.exe not at root: " + $pyExeRoot + " (pickedDir=" + $pickedDir + ")")
+  }
+
+  Write-PyRuntime-Manifest -DstDir $pyDst -PickedFrom $pickedDir
+
+} catch {
+  throw $_
+}
+# ===================== BUNDLE_PY_RUNTIME_END =====================
+
+
+
 # ---- Guard: ensure versions folder exists (better error than Tauri glob failure) ----
 $versionsDir = Join-Path $root "versions"
 if (-not (Test-Path $versionsDir)) {
