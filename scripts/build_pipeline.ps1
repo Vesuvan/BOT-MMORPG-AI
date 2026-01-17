@@ -185,9 +185,9 @@ $root = (Resolve-Path (Join-Path $scriptDir "..")).Path
 # ===================== BUNDLE_PY_RUNTIME_BEGIN =====================
 
 # 1) Build wheelhouse + portable site-packages from pyproject.toml using embeddable python (NO venv)
-& (Join-Path $root "scripts\prepare_python_from_pyproject_embed311_target.ps1") `
+& (Join-Path $root "scripts\prepare_python_from_pyproject_embed310_target.ps1") `
   -Extras @() `
-  -TargetTag "win_amd64_cp311" `
+  -TargetTag "win_amd64_cp310" `
   -RebuildTarget
 
 if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -202,7 +202,7 @@ if ($LASTEXITCODE -ne 0) { exit 1 }
 # - Search recursively for python.exe under:
 #     third_party\python
 #     src-tauri\resources\python
-# - If not found: auto-download official embeddable runtime (3.11.9 amd64) into third_party\python\
+# - If not found: auto-download official embeddable runtime (3.10.11 amd64) into third_party\python\
 # - Copy parent folder contents of python.exe into src-tauri\resources\python
 #
 # Result required for installer:
@@ -250,7 +250,7 @@ function Write-PyRuntime-Manifest {
 function Ensure-EmbeddedPythonDownloaded {
   param([string]$Root)
 
-  $ver = "3.11.9"
+  $ver = "3.10.11"
   $arch = "amd64"
   $zipName = "python-$ver-embed-$arch.zip"
   $url = "https://www.python.org/ftp/python/$ver/$zipName"
@@ -504,7 +504,8 @@ if (-not $SkipPython) {
   try {
     if ($useUv) {
       Log-Info "Using uv for package installation (faster than pip)"
-      & uv pip install --python $venvPython -e . --quiet
+      #& uv pip install --python $venvPython -e . --quiet
+      & uv pip install --python $venvPython -e ".[packaging]" --quiet
       if ($LASTEXITCODE -ne 0) { throw "uv pip install project failed" }
     } else {
       Log-Info "Using pip for package installation"
