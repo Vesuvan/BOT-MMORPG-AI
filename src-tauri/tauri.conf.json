@@ -22,7 +22,10 @@
       "fs": {
         "all": true,
         "scope": [
-          "$APP/*"
+          "$APP/*",
+          "$APPDATA/*",
+          "$CONFIG/*",
+          "$LOCALDATA/*"
         ]
       }
     },
@@ -42,7 +45,11 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**"
+        "../versions/**",
+        "../pyproject.toml"
+   
+
+
       ],
       "windows": {
         "nsis": {

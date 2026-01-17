@@ -189,3 +189,8 @@ versions/0.01/data_reduced/undersampling/y_training_data.csv
 *.swo
 !*.exe
 * copy*
+src-tauri/resources/sidecar/main-backend/main-backend.exe
+/src-tauri/resources/sidecar
+/src-tauri/resources/python
+/third_party/python
+/third_party/wheelhouse
