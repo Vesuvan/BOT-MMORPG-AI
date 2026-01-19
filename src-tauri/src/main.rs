@@ -1,3 +1,4 @@
+// src-tauri/src/main.rs
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,12 @@ use tauri::{AppHandle, Manager, Window};
 const DEFAULT_GAME_ID: &str = "genshin_impact";
 const DEFAULT_VERSION: &str = "0.01";
 
+// IMPORTANT:
+// In production you are bundling Windows "embeddable" Python.
+// Embeddable Python often cannot create venv ("No module named venv").
+// So production uses a portable --target directory and adjusts python*. _pth to include it.
+const PROD_EXTRAS: &str = "launcher,backend"; // exclude ml here; install ML later on-demand
+
 // ---------------------------
 // APP STATE
 // ---------------------------
@@ -32,7 +39,6 @@ struct SidecarApi {
 
 struct AppStateInner {
     current_process: Mutex<Option<Child>>,
-    // keep the sidecar Child handle so we can kill it on app exit
     sidecar_process: Mutex<Option<Child>>,
     sidecar: Mutex<Option<SidecarApi>>,
     http: Client,
@@ -183,7 +189,7 @@ fn venv_bin_from_root(root: &Path) -> PathBuf {
     }
 }
 
-/// Optional bundled python (if you ever ship it)
+/// Optional bundled python path in resources (used for DEV fallback; PROD uses copy-to-LocalAppData)
 fn bundled_python_path(app: &AppHandle) -> Option<PathBuf> {
     let rel = if is_windows() {
         "resources/python/python.exe"
@@ -196,14 +202,6 @@ fn bundled_python_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn find_python_for_app(app: &AppHandle) -> Result<PathBuf, String> {
-    // Production: prefer managed venv python (avoid system python missing deps)
-    if !cfg!(debug_assertions) {
-        let vpy = managed_venv_python(app);
-        if vpy.exists() {
-            return Ok(vpy);
-        }
-    }
-
     // 1) .env explicit python path
     let explicit = get_env_var(app, "PYTHON_PATH");
     if !explicit.trim().is_empty() {
@@ -223,7 +221,7 @@ fn find_python_for_app(app: &AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    // 3) Prod: bundled python (if you add it later)
+    // 3) Bundled python if present
     if let Some(p) = bundled_python_path(app) {
         return Ok(p);
     }
@@ -257,11 +255,9 @@ fn apply_stable_python_env(cmd: &mut Command) {
     cmd.env("PYTHONIOENCODING", "utf-8");
 }
 
-
 // ---------------------------
 // PRODUCTION RUNTIME LAYOUT (LocalAppData)
 // ---------------------------
-
 fn local_data_root(app: &AppHandle) -> PathBuf {
     app.path_resolver()
         .app_local_data_dir()
@@ -280,25 +276,25 @@ fn ensure_runtime_layout(app: &AppHandle) -> PathBuf {
     root
 }
 
-// NOTE: keep ONLY one work_dir() in this module (patched below).
-
 fn managed_python_root(app: &AppHandle) -> PathBuf {
     ensure_runtime_layout(app).join("runtime").join("py")
 }
 
-fn managed_venv_python(app: &AppHandle) -> PathBuf {
-    if is_windows() {
-        managed_python_root(app).join("venv").join("Scripts").join("python.exe")
-    } else {
-        managed_python_root(app).join("venv").join("bin").join("python3")
-    }
+/// Where we install python packages in PROD (portable, no venv)
+fn managed_site_packages_dir(app: &AppHandle) -> PathBuf {
+    managed_python_root(app).join("site-packages")
+}
+
+/// Copy target for embedded python runtime in PROD
+fn managed_embedded_python_dir(app: &AppHandle) -> PathBuf {
+    managed_python_root(app).join("python")
 }
 
 fn bundled_python_dir(app: &AppHandle) -> Option<PathBuf> {
     // Try common resource layouts.
     let candidates = [
-        "python",              // <resource_dir>\python
-        "resources/python",    // sometimes resources are nested
+        "python",           // <resource_dir>\python
+        "resources/python", // sometimes resources are nested
         "resources\\python",
         "python\\",
     ];
@@ -327,18 +323,49 @@ fn bundled_python_dir(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
-
 fn bundled_wheelhouse_dir(app: &AppHandle) -> Option<PathBuf> {
-    app.path_resolver()
-        .resolve_resource("resources/wheelhouse")
-        .and_then(|p| if p.exists() { Some(p) } else { None })
+    // Expected (recommended) layout:
+    // resources/wheelhouse/<tag>/wheels/*.whl and requirements.lock.txt
+    // If you keep only a single folder, this still works.
+    let candidates = [
+        "resources/wheelhouse",
+        "wheelhouse",
+        "resources\\wheelhouse",
+    ];
+
+    for rel in candidates {
+        if let Some(p) = app.path_resolver().resolve_resource(rel) {
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+    None
 }
 
-fn bundled_requirements_lock(app: &AppHandle) -> Option<PathBuf> {
-    let rel = format!("versions/{}/requirements.lock.txt", DEFAULT_VERSION);
-    app.path_resolver()
-        .resolve_resource(&rel)
-        .and_then(|p| if p.exists() { Some(p) } else { None })
+/// Try to locate a lock file inside the wheelhouse
+fn find_requirements_lock_in_wheelhouse(wh: &Path) -> Option<PathBuf> {
+    // Accept either:
+    // - <wheelhouse>/requirements.lock.txt
+    // - <wheelhouse>/<tag>/requirements.lock.txt
+    let direct = wh.join("requirements.lock.txt");
+    if direct.exists() {
+        return Some(direct);
+    }
+
+    // Search one level deep (fast, avoids expensive recursion)
+    if let Ok(rd) = fs::read_dir(wh) {
+        for entry in rd.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let cand = p.join("requirements.lock.txt");
+                if cand.exists() {
+                    return Some(cand);
+                }
+            }
+        }
+    }
+    None
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -358,19 +385,68 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String> {
-    // If venv python exists, we are ready.
-    let vpy = managed_venv_python(app);
-    if vpy.exists() {
-        return Ok(vpy);
+/// Patch embeddable python *. _pth file so it can:
+/// - import site (enables stdlib site behaviors)
+/// - include our portable site-packages dir (absolute path) on sys.path
+///
+/// Without this, embeddable python may ignore env vars and refuse to import installed deps.
+fn patch_embedded_python_pth(py_dir: &Path, site_packages: &Path) -> Result<(), String> {
+    // Common: python310._pth (or python311._pth, etc.)
+    let mut pth_file: Option<PathBuf> = None;
+
+    if let Ok(rd) = fs::read_dir(py_dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_file() {
+                if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
+                    if name.starts_with("python") && name.ends_with("._pth") {
+                        pth_file = Some(p);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
+    let Some(pth) = pth_file else {
+        // Not present -> nothing to patch
+        return Ok(());
+    };
+
+    let mut lines: Vec<String> = fs::read_to_string(&pth)
+        .unwrap_or_default()
+        .lines()
+        .map(|s| s.trim_end().to_string())
+        .collect();
+
+    let sp = site_packages.display().to_string();
+
+    // Ensure site-packages is included
+    if !lines.iter().any(|l| l.trim() == sp) {
+        lines.push(sp);
+    }
+
+    // Ensure "import site" is present (must be a single line)
+    if !lines.iter().any(|l| l.trim() == "import site") {
+        lines.push("import site".to_string());
+    }
+
+    fs::write(&pth, lines.join("\r\n") + "\r\n").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Ensure embeddable python is present in LocalAppData and deps are installed into portable site-packages.
+/// Returns the python executable to run (base python).
+fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String> {
     let py_root = managed_python_root(app);
+    let local_py_dir = managed_embedded_python_dir(app);
+    let target_dir = managed_site_packages_dir(app);
 
-    // LocalAppData target where we install the bundled runtime
-    let local_py_dir = py_root.join("python");
+    let _ = fs::create_dir_all(&py_root);
+    let _ = fs::create_dir_all(&local_py_dir);
+    let _ = fs::create_dir_all(&target_dir);
 
-    // Copy bundled python to LocalAppData if python executable is missing
+    // 1) Ensure embedded python runtime copied to LocalAppData
     let base_py_candidate = if is_windows() {
         local_py_dir.join("python.exe")
     } else {
@@ -378,30 +454,29 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
     };
 
     if !base_py_candidate.exists() {
-        if let Some(bundled_dir) = bundled_python_dir(app) {
-            let _ = window.emit(
-                "terminal_update",
-                format!("[System] Bundled Python dir: {}", bundled_dir.display()),
-            );
-            let _ = window.emit(
-                "terminal_update",
-                format!(
-                    "[System] Installing bundled Python runtime -> {}",
-                    local_py_dir.display()
-                ),
-            );
+        let bundled_dir = bundled_python_dir(app).ok_or_else(|| {
+            "Bundled Python runtime not found in installed resources. Expected resources/python."
+                .to_string()
+        })?;
 
-            // Clean destination first to avoid partial/stale installs
-            let _ = fs::remove_dir_all(&local_py_dir);
+        let _ = window.emit(
+            "terminal_update",
+            format!("[System] Bundled Python dir: {}", bundled_dir.display()),
+        );
+        let _ = window.emit(
+            "terminal_update",
+            format!(
+                "[System] Installing bundled Python runtime -> {}",
+                local_py_dir.display()
+            ),
+        );
 
-            copy_dir_all(&bundled_dir, &local_py_dir)
-                .map_err(|e| format!("Failed to copy bundled python: {}", e))?;
-        } else {
-            return Err(
-                "Bundled Python runtime not found in installed resources (resources/python)."
-                    .to_string(),
-            );
-        }
+        // Clean destination first to avoid partial/stale installs
+        let _ = fs::remove_dir_all(&local_py_dir);
+        fs::create_dir_all(&local_py_dir).map_err(|e| e.to_string())?;
+
+        copy_dir_all(&bundled_dir, &local_py_dir)
+            .map_err(|e| format!("Failed to copy bundled python: {}", e))?;
     }
 
     // Re-check after copy
@@ -418,196 +493,235 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
         ));
     }
 
-    // Create venv
-    let venv_dir = py_root.join("venv");
+    // 2) Patch _pth to include our portable site-packages
+    patch_embedded_python_pth(&local_py_dir, &target_dir).map_err(|e| {
+        format!(
+            "Failed to patch embeddable python _pth ({}): {}",
+            local_py_dir.display(),
+            e
+        )
+    })?;
+
     let _ = window.emit(
         "terminal_update",
-        format!("[System] Creating venv: {}", venv_dir.display()),
+        format!(
+            "[System] Using portable site-packages: {}",
+            target_dir.display()
+        ),
     );
 
-    let out = Command::new(&base_py)
-        .arg("-m")
-        .arg("venv")
-        .arg(&venv_dir)
-        .output()
-        .map_err(|e| format!("Failed to run python -m venv: {}", e))?;
+    // 3) If our portable site-packages looks empty, install deps from bundled wheelhouse
+    let is_empty = fs::read_dir(&target_dir)
+        .map(|mut it| it.next().is_none())
+        .unwrap_or(true);
 
-    if !out.stdout.is_empty() {
+    if is_empty {
         let _ = window.emit(
             "terminal_update",
-            format!(
-                "[System] venv stdout: {}",
-                String::from_utf8_lossy(&out.stdout)
-            ),
+            "[System] site-packages empty -> installing bundled dependencies (offline wheelhouse)".to_string(),
         );
-    }
-    if !out.stderr.is_empty() {
-        let _ = window.emit(
-            "terminal_update",
+
+        // a) ensure pip exists (embeddable may or may not ship pip; ensurepip may succeed or fail)
+        {
+            let out = Command::new(&base_py)
+                .arg("-m")
+                .arg("ensurepip")
+                .arg("--upgrade")
+                .output()
+                .map_err(|e| format!("ensurepip failed to start: {}", e))?;
+
+            // don't fail if ensurepip writes warnings; only fail on exit != 0
+            if !out.stdout.is_empty() {
+                let _ = window.emit(
+                    "terminal_update",
+                    format!("[System] ensurepip stdout: {}", String::from_utf8_lossy(&out.stdout)),
+                );
+            }
+            if !out.stderr.is_empty() {
+                let _ = window.emit(
+                    "terminal_update",
+                    format!("[System] ensurepip stderr: {}", String::from_utf8_lossy(&out.stderr)),
+                );
+            }
+            if !out.status.success() {
+                return Err(format!(
+                    "Failed to bootstrap pip using ensurepip (exit={}).\n\
+                     Production fix: bundle pip with your embedded python OR ship wheels + a pip launcher.\n\
+                     stderr={}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr)
+                ));
+            }
+        }
+
+        // b) upgrade pip tooling (still offline-safe if wheelhouse includes those wheels; otherwise it may attempt internet)
+        // We'll do it only if wheelhouse exists; otherwise skip.
+        let wh = bundled_wheelhouse_dir(app);
+
+        if let Some(wh_dir) = wh.as_ref() {
+            let _ = window.emit(
+                "terminal_update",
+                format!("[System] Wheelhouse root: {}", wh_dir.display()),
+            );
+        } else {
+            let _ = window.emit(
+                "terminal_update",
+                "[System] No wheelhouse found in resources. Skipping dependency install.".to_string(),
+            );
+            return Ok(base_py);
+        }
+
+        let wh_dir = wh.unwrap();
+        let lock = find_requirements_lock_in_wheelhouse(&wh_dir).ok_or_else(|| {
             format!(
-                "[System] venv stderr: {}",
-                String::from_utf8_lossy(&out.stderr)
-            ),
-        );
-    }
-    if !out.status.success() {
-        return Err(format!(
-            "python -m venv failed (exit={}). If you used the Windows *embeddable* Python, it often cannot create venv unless you bundle Lib/venv (full stdlib).",
-            out.status
-        ));
-    }
-
-    // Confirm venv python exists
-    let vpy = managed_venv_python(app);
-    if !vpy.exists() {
-        return Err(format!("Venv python not found: {}", vpy.display()));
-    }
-
-    // Resolve pyproject.toml from bundled resources
-    let pyproject = app
-        .path_resolver()
-        .resolve_resource("pyproject.toml")
-        .ok_or_else(|| {
-            "pyproject.toml not found in bundled resources. Add it to tauri.conf.json bundle.resources."
-                .to_string()
+                "Wheelhouse found but requirements.lock.txt not found under: {}",
+                wh_dir.display()
+            )
         })?;
 
-    let _ = window.emit(
-        "terminal_update",
-        format!("[System] Using pyproject: {}", pyproject.display()),
-    );
+        // Determine which folder contains wheels (either wh_dir itself or <tag>/wheels)
+        // We'll pass --find-links to BOTH:
+        // - <wheelhouse>/wheels
+        // - <wheelhouse>/<tag>/wheels (if present)
+        let mut find_links: Vec<PathBuf> = vec![];
+        let direct_wheels = wh_dir.join("wheels");
+        if direct_wheels.exists() {
+            find_links.push(direct_wheels);
+        }
+        if let Some(tag_dir) = lock.parent() {
+            let tag_wheels = tag_dir.join("wheels");
+            if tag_wheels.exists() {
+                find_links.push(tag_wheels);
+            }
+        }
+        if find_links.is_empty() {
+            // fallback: allow wh_dir itself (pip can still find wheels if stored flat)
+            find_links.push(wh_dir.clone());
+        }
 
-    // Upgrade pip tooling first (helps with PEP 517 / pyproject builds)
-    {
-        let mut cmd = Command::new(&vpy);
-        cmd.arg("-m")
-            .arg("pip")
-            .arg("install")
-            .arg("--upgrade")
-            .arg("pip")
-            .arg("setuptools")
-            .arg("wheel");
+        // c) install from lock file into --target, offline
+        {
+            let mut cmd = Command::new(&base_py);
+            apply_stable_python_env(&mut cmd);
 
-        let out = cmd
-            .output()
-            .map_err(|e| format!("pip upgrade failed to start: {}", e))?;
+            cmd.arg("-m")
+                .arg("pip")
+                .arg("install")
+                .arg("--no-index");
 
-        if !out.stdout.is_empty() {
+            for fl in &find_links {
+                cmd.arg("--find-links").arg(fl);
+            }
+
+            cmd.arg("--target").arg(&target_dir);
+
+            // Install exactly what's locked
+            cmd.arg("-r").arg(&lock);
+
             let _ = window.emit(
                 "terminal_update",
                 format!(
-                    "[System] pip upgrade stdout: {}",
-                    String::from_utf8_lossy(&out.stdout)
+                    "[System] Installing offline deps into --target from lock: {}",
+                    lock.display()
                 ),
             );
-        }
-        if !out.stderr.is_empty() {
-            let _ = window.emit(
-                "terminal_update",
-                format!(
-                    "[System] pip upgrade stderr: {}",
+
+            let out = cmd
+                .output()
+                .map_err(|e| format!("pip install (offline) failed to start: {}", e))?;
+
+            if !out.stdout.is_empty() {
+                let _ = window.emit(
+                    "terminal_update",
+                    format!("[System] pip stdout: {}", String::from_utf8_lossy(&out.stdout)),
+                );
+            }
+            if !out.stderr.is_empty() {
+                let _ = window.emit(
+                    "terminal_update",
+                    format!("[System] pip stderr: {}", String::from_utf8_lossy(&out.stderr)),
+                );
+            }
+            if !out.status.success() {
+                return Err(format!(
+                    "pip install --target failed (exit={}).\n\
+                     Ensure wheelhouse contains all required wheels for cp310 win_amd64.\n\
+                     stderr={}",
+                    out.status,
                     String::from_utf8_lossy(&out.stderr)
-                ),
-            );
+                ));
+            }
         }
-        if !out.status.success() {
-            return Err(format!("pip upgrade failed (exit={})", out.status));
-        }
-    }
 
-    // Install dependencies from pyproject.toml
-    let pyproject_dir = pyproject
-        .parent()
-        .ok_or_else(|| "Invalid pyproject.toml path (no parent dir)".to_string())?;
+        // d) OPTIONAL: install your project wheel from wheelhouse (if you ship it)
+        // If your lock already includes bot-mmorpg-ai, skip this.
+        // If not, you should include bot_mmorpg_ai-*.whl in wheelhouse and install it explicitly.
+        {
+            let mut cmd = Command::new(&base_py);
+            apply_stable_python_env(&mut cmd);
 
-    let extras = "launcher,backend"; // choose what you want in production (or "" for base only)
+            cmd.arg("-m")
+                .arg("pip")
+                .arg("install")
+                .arg("--no-index");
 
-    let mut cmd = Command::new(&vpy);
-    cmd.arg("-m").arg("pip").arg("install");
+            for fl in &find_links {
+                cmd.arg("--find-links").arg(fl);
+            }
 
-    // Offline wheelhouse support
-    if let Some(wh) = bundled_wheelhouse_dir(app) {
-        // IMPORTANT: pass &wh so we don't move it (avoids E0382)
-        cmd.arg("--no-index").arg("--find-links").arg(&wh);
-        let _ = window.emit(
-            "terminal_update",
-            format!("[System] Using offline wheelhouse: {}", wh.display()),
-        );
-    }
+            cmd.arg("--target").arg(&target_dir);
 
-    // Install from pyproject directory
-    let target = if extras.trim().is_empty() {
-        pyproject_dir.to_string_lossy().to_string()
-    } else {
-        format!("{}[{}]", pyproject_dir.to_string_lossy(), extras)
-    };
+            // Prefer installing the project package (and PROD extras) if present as wheel
+            // NOTE: This requires bot-mmorpg-ai wheel to be in wheelhouse.
+            let pkg = if PROD_EXTRAS.trim().is_empty() {
+                "bot-mmorpg-ai".to_string()
+            } else {
+                format!("bot-mmorpg-ai[{}]", PROD_EXTRAS)
+            };
 
-    let _ = window.emit(
-        "terminal_update",
-        format!("[System] Installing from pyproject: {}", target),
-    );
-
-    cmd.arg(target);
-
-    let out = cmd
-        .output()
-        .map_err(|e| format!("pip install (pyproject) failed to start: {}", e))?;
-
-    if !out.stdout.is_empty() {
-        let _ = window.emit(
-            "terminal_update",
-            format!("[System] pip stdout: {}", String::from_utf8_lossy(&out.stdout)),
-        );
-    }
-    if !out.stderr.is_empty() {
-        let _ = window.emit(
-            "terminal_update",
-            format!("[System] pip stderr: {}", String::from_utf8_lossy(&out.stderr)),
-        );
-    }
-    if !out.status.success() {
-        return Err(format!(
-            "pip install from pyproject failed (exit={})",
-            out.status
-        ));
-    }
-
-    // Verify minimal imports
-    let verify = Command::new(&vpy)
-        .arg("-c")
-        .arg("import numpy; print('numpy_ok')")
-        .output();
-
-    match verify {
-        Ok(out) if out.status.success() => {
-            let _ = window.emit("terminal_update", "[System] Python env ready".to_string());
-        }
-        Ok(out) => {
             let _ = window.emit(
                 "terminal_update",
-                format!(
-                    "[System] verify stdout: {}",
-                    String::from_utf8_lossy(&out.stdout)
-                ),
+                format!("[System] Installing app package (if wheel present): {}", pkg),
             );
-            let _ = window.emit(
-                "terminal_update",
-                format!(
-                    "[System] verify stderr: {}",
+
+            let out = cmd.output().map_err(|e| format!("pip install bot package failed: {}", e))?;
+
+            // If it fails, don't hard-fail because lock install may already have installed it.
+            if !out.status.success() {
+                let _ = window.emit(
+                    "terminal_update",
+                    format!(
+                        "[System] Note: bot-mmorpg-ai wheel install step failed (may be OK if already installed by lock). stderr={}",
+                        String::from_utf8_lossy(&out.stderr)
+                    ),
+                );
+            }
+        }
+
+        // e) Verify minimal import
+        {
+            let out = Command::new(&base_py)
+                .arg("-c")
+                .arg("import numpy; print('numpy_ok')")
+                .output()
+                .map_err(|e| format!("verify failed to start: {}", e))?;
+
+            if !out.status.success() {
+                return Err(format!(
+                    "Deps installed but verification failed. stderr={}",
                     String::from_utf8_lossy(&out.stderr)
-                ),
-            );
-            return Err("Python env created but verification failed (numpy import).".to_string());
+                ));
+            }
         }
-        Err(_) => {
-            return Err("Python env created but verification failed (numpy import).".to_string())
-        }
+
+        let _ = window.emit(
+            "terminal_update",
+            "[System] Python deps installed (portable target)".to_string(),
+        );
     }
 
-    Ok(vpy)
+    Ok(base_py)
 }
-
-
 
 /// Writable runtime directory (datasets/models/logs) — production uses LocalAppData root.
 fn work_dir(app: &AppHandle) -> PathBuf {
@@ -615,6 +729,7 @@ fn work_dir(app: &AppHandle) -> PathBuf {
     let _ = fs::create_dir_all(&p);
     p
 }
+
 /// Resolve scripts in production in this order:
 ///  1) Local override:   %LOCALAPPDATA%\BOT-MMORPG-AI\content\versions\<ver>\...
 ///  2) Bundled resource: resolve_resource("versions/<ver>/<script>")
@@ -636,7 +751,7 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
             return Ok(content_candidate);
         }
 
-        // 2) bundled versions (from ../versions/** => resource path is versions/<ver>/...)
+        // 2) bundled versions
         let rel = format!("versions/{}/{}", DEFAULT_VERSION, script_name);
         if let Some(p) = app.path_resolver().resolve_resource(&rel) {
             if p.exists() {
@@ -644,7 +759,7 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
             }
         }
 
-        // 3) legacy staging support (LocalAppData)
+        // 3) legacy staging (LocalAppData)
         let legacy_up_local = root
             .join("_up_")
             .join("versions")
@@ -654,8 +769,7 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
             return Ok(legacy_up_local);
         }
 
-        // 4) legacy staging support (install dir / Program Files)
-        // Example: C:\Program Files\BOT-MMORPG-AI\_up_\versions\0.01\1-collect_data.py
+        // 4) legacy staging (install dir)
         if let Ok(exe) = std::env::current_exe() {
             if let Some(exe_dir) = exe.parent() {
                 let legacy_up_install = exe_dir
@@ -687,8 +801,6 @@ fn resolve_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String>
         Err(format!("Script not found (dev): {}", candidate.display()))
     }
 }
-
-
 
 // ---------------------------
 // SIDE-CAR STARTUP
@@ -724,22 +836,19 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
         format!("tkn-{}-{}", pid, now)
     };
 
-    // Writable data directory (datasets/models) - works in installed EXE
+    // Writable data directory
     let data_root = app
         .path_resolver()
         .app_data_dir()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     let _ = fs::create_dir_all(&data_root);
 
-    // Read-only resources directory (where bundled resources live in production)
+    // Read-only resources directory
     let resource_root = app
         .path_resolver()
         .resource_dir()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-    // Build the command:
-    // - DEV: run python script from repo (modelhub/tauri.py) via python
-    // - PROD: run bundled PyInstaller sidecar exe from resources
     let mut cmd = if cfg!(debug_assertions) {
         let py = find_python_for_app(app)?;
 
@@ -752,17 +861,14 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
         }
 
         if let Some(w) = app.get_window("main") {
-            let _ =
-                w.emit::<String>("terminal_update", format!("[System] Sidecar Python: {}", py.display()));
+            let _ = w.emit::<String>(
+                "terminal_update",
+                format!("[System] Sidecar Python: {}", py.display()),
+            );
             let _ = w.emit::<String>(
                 "terminal_update",
                 format!("[System] Sidecar Script: {}", script.display()),
             );
-            let _ = w.emit::<String>(
-                "terminal_update",
-                format!("[System] ResourceRoot: {}", resource_root.display()),
-            );
-            let _ = w.emit::<String>("terminal_update", format!("[System] DataRoot: {}", data_root.display()));
         }
 
         let mut c = Command::new(&py);
@@ -775,17 +881,15 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
             .path_resolver()
             .resolve_resource("resources/sidecar/main-backend/main-backend.exe")
             .ok_or_else(|| {
-                "Bundled sidecar exe not found: resources/sidecar/main-backend/main-backend.exe".to_string()
+                "Bundled sidecar exe not found: resources/sidecar/main-backend/main-backend.exe"
+                    .to_string()
             })?;
 
         if let Some(w) = app.get_window("main") {
-            let _ =
-                w.emit::<String>("terminal_update", format!("[System] Sidecar EXE: {}", sidecar_exe.display()));
             let _ = w.emit::<String>(
                 "terminal_update",
-                format!("[System] ResourceRoot: {}", resource_root.display()),
+                format!("[System] Sidecar EXE: {}", sidecar_exe.display()),
             );
-            let _ = w.emit::<String>("terminal_update", format!("[System] DataRoot: {}", data_root.display()));
         }
 
         let mut c = Command::new(sidecar_exe);
@@ -793,7 +897,6 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
         c
     };
 
-    // IMPORTANT: modelhub/tauri.py expects: --port --token --resource-root --data-root
     cmd.args([
         "--port",
         "0",
@@ -805,11 +908,8 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
         &data_root.to_string_lossy(),
     ]);
 
-    // Optional: also set env vars (tauri.py reads these too)
     cmd.env("MODELHUB_RESOURCE_ROOT", &resource_root);
     cmd.env("MODELHUB_DATA_ROOT", &data_root);
-
-    // Use a stable CWD (writable) to avoid permission issues in installed apps
     cmd.current_dir(&data_root);
 
     cmd.stdout(Stdio::piped());
@@ -822,7 +922,9 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to start sidecar: {e}"))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to start sidecar: {e}"))?;
 
     let stdout = child
         .stdout
@@ -835,7 +937,6 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
 
     let (tx, rx) = std::sync::mpsc::channel::<Result<SidecarApi, String>>();
 
-    // stdout thread: look for READY line
     let tx_out = tx.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
@@ -845,12 +946,9 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
                 return;
             }
         }
-        let _ = tx_out.send(Err(
-            "Sidecar exited without READY line (stdout)".to_string(),
-        ));
+        let _ = tx_out.send(Err("Sidecar exited without READY line (stdout)".to_string()));
     });
 
-    // stderr thread: forward lines to UI and detect FAILED
     let app_handle = app.clone();
     let tx_err = tx.clone();
     thread::spawn(move || {
@@ -908,7 +1006,11 @@ async fn api_get_with(inner: &Arc<AppStateInner>, path: &str) -> Result<Value, S
     Ok(body)
 }
 
-async fn api_post_with(inner: &Arc<AppStateInner>, path: &str, payload: Value) -> Result<Value, String> {
+async fn api_post_with(
+    inner: &Arc<AppStateInner>,
+    path: &str,
+    payload: Value,
+) -> Result<Value, String> {
     let api = inner
         .sidecar
         .lock()
@@ -982,7 +1084,6 @@ fn stop_process_inner(window: &Window, inner: &Arc<AppStateInner>) -> String {
     "No process running".to_string()
 }
 
-/// stop the sidecar backend process (main-backend.exe)
 fn stop_sidecar_inner(window: Option<&Window>, inner: &Arc<AppStateInner>) {
     let mut guard = inner.sidecar_process.lock().unwrap();
     if let Some(mut child) = guard.take() {
@@ -996,12 +1097,9 @@ fn stop_sidecar_inner(window: Option<&Window>, inner: &Arc<AppStateInner>) {
     }
 }
 
-/// ✅ FIX for E0515:
-/// Do not try to produce a borrowed Window from a temporary.
-/// Just stop things without requiring a Window reference.
 fn shutdown_all(app: &AppHandle, window: Option<&Window>) {
     if let Some(state) = app.try_state::<AppState>() {
-        // Stop user scripts (collect/train/test)
+        // Stop user scripts
         {
             let mut guard = state.inner.current_process.lock().unwrap();
             if let Some(mut child) = guard.take() {
@@ -1026,9 +1124,8 @@ fn run_python_script(
     let script_path = resolve_script(&app, script_name)?;
     let data_root = work_dir(&app);
 
-
-    // In production, ALWAYS use managed venv python (bootstrap if missing).
-    // In dev, keep existing behavior (find_python_for_app uses repo .venv / explicit PYTHON_PATH / PATH).
+    // DEV: system/repo python
+    // PROD: ensure embedded python + portable deps
     let py = if cfg!(debug_assertions) {
         find_python_for_app(&app)?
     } else {
@@ -1042,28 +1139,40 @@ fn run_python_script(
     let _ = stop_process_inner(&window, &inner);
 
     let mut cmd = Command::new(&py);
+    apply_stable_python_env(&mut cmd);
+
     // Use -u for unbuffered output so UI gets logs immediately
     cmd.arg("-u").arg(&script_path);
-    // Ensure local imports work (grabscreen/models/etc live next to the script in versions/<ver>/)
+
+    // Build PYTHONPATH:
+    //  - script directory (versions/<ver>)
+    //  - PROD portable site-packages
+    //  - existing PYTHONPATH
+    let sep = if is_windows() { ";" } else { ":" };
+    let mut pypaths: Vec<String> = vec![];
+
     if let Some(vdir) = script_path.parent() {
         let _ = window.emit("terminal_update", format!("[System] VersionDir: {}", vdir.display()));
-        let old = std::env::var("PYTHONPATH").unwrap_or_default();
-        let sep = if is_windows() { ";" } else { ":" };
-        let newp = if old.is_empty() {
-            vdir.display().to_string()
-        } else {
-            format!("{}{}{}", vdir.display(), sep, old)
-        };
-        cmd.env("PYTHONPATH", newp);
+        pypaths.push(vdir.display().to_string());
         cmd.env("BOT_VERSION_DIR", vdir);
     }
 
+    if !cfg!(debug_assertions) {
+        let sp = managed_site_packages_dir(&app);
+        pypaths.push(sp.display().to_string());
+    }
+
+    let old = std::env::var("PYTHONPATH").unwrap_or_default();
+    if !old.is_empty() {
+        pypaths.push(old);
+    }
+
+    cmd.env("PYTHONPATH", pypaths.join(sep));
     cmd.current_dir(&data_root);
 
     if cfg!(debug_assertions) {
         apply_dev_venv_env(&mut cmd, &dev_repo_root());
     }
-    apply_stable_python_env(&mut cmd);
 
     // AI settings
     let provider = {
@@ -1126,7 +1235,11 @@ fn run_python_script(
 fn get_provider(app: &AppHandle) -> String {
     let p = get_env_var(app, "AI_PROVIDER");
     let p = p.trim().to_lowercase();
-    if p.is_empty() { "gemini".to_string() } else { p }
+    if p.is_empty() {
+        "gemini".to_string()
+    } else {
+        p
+    }
 }
 
 fn normalize_provider(p: &str) -> String {
@@ -1249,8 +1362,6 @@ fn get_ai_config(app: AppHandle) -> AiConfig {
     }
 }
 
-/// - provider is always saved
-/// - api_key is OPTIONAL: if empty, we keep existing saved key
 #[tauri::command]
 fn save_configuration(app: AppHandle, provider: String, api_key: Option<String>) -> Result<bool, String> {
     let provider = provider.trim().to_lowercase();
@@ -1444,7 +1555,9 @@ fn install_drivers(app: tauri::AppHandle) -> Value {
             script.display()
         );
 
-        let out = Command::new("powershell").args(["-NoProfile", "-Command", &ps]).output();
+        let out = Command::new("powershell")
+            .args(["-NoProfile", "-Command", &ps])
+            .output();
 
         match out {
             Ok(o) => json!({ "ok": o.status.success(), "code": o.status.code() }),
@@ -1486,15 +1599,21 @@ fn main() {
                     *state.inner.sidecar_process.lock().unwrap() = Some(child);
 
                     if let Some(w) = app.get_window("main") {
-                        let _ = w.emit::<String>("terminal_update", "[System] Sidecar READY".to_string());
+                        let _ = w.emit::<String>(
+                            "terminal_update",
+                            "[System] Sidecar READY".to_string(),
+                        );
                     }
                 }
                 Err(e) => {
                     if let Some(w) = app.get_window("main") {
-                        let _ = w.emit::<String>("terminal_update", format!("[Fatal] Sidecar failed: {}", e));
                         let _ = w.emit::<String>(
                             "terminal_update",
-                            "[Hint] In PROD you must bundle the sidecar EXE at resources/sidecar/main-backend/main-backend.exe and bundle versions/0.01/*.py in resources so resolve_resource() can find them.".to_string(),
+                            format!("[Fatal] Sidecar failed: {}", e),
+                        );
+                        let _ = w.emit::<String>(
+                            "terminal_update",
+                            "[Hint] In PROD you must bundle the sidecar EXE at resources/sidecar/main-backend/main-backend.exe, bundle resources/python, and bundle resources/wheelhouse (with requirements.lock.txt + wheels) so ensure_python_env() can install deps offline.".to_string(),
                         );
                     }
                 }

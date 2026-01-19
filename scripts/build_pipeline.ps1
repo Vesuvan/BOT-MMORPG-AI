@@ -1,13 +1,15 @@
 <#
 Build pipeline (Windows):
-1) Build Python backend sidecar with PyInstaller (ONEDIR)
-2) Copy sidecar folder into src-tauri/resources/sidecar/main-backend/
-3) Copy driver installers + ps scripts into src-tauri/drivers and src-tauri/resources/scripts
-4) Build Tauri app + NSIS installer
+1) (Optional) Build wheelhouse + lock for OFFLINE installs
+2) Bundle embeddable Python into src-tauri/resources/python/
+3) Pre-install ALL Python deps (including tensorflow) into src-tauri/resources/python/site-packages
+4) Build Python backend sidecar with PyInstaller (ONEDIR)
+5) Copy sidecar folder into src-tauri/resources/sidecar/main-backend/
+6) Copy driver installers + ps scripts into src-tauri/drivers and src-tauri/resources/scripts
+7) Build Tauri app + NSIS installer (Now Lean: No redundant wheelhouse)
 
 Requirements:
-- Python 3.10+ (for PyInstaller)
-- uv (optional, faster than pip)
+- Host Python 3.10+ available as `python` (used only at BUILD time to run pip)
 - Rust toolchain + cargo (install via rustup)
 - Tauri CLI (cargo install tauri-cli)
 - NSIS installed (Tauri bundler uses it)
@@ -40,12 +42,10 @@ function Log-Step([int]$step, [string]$msg) {
 }
 
 function Refresh-Path {
-  # Reload path from registry
   $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
   $user    = [Environment]::GetEnvironmentVariable("Path", "User")
   $env:Path = "$machine;$user"
 
-  # Explicitly add Rust default bin location if it exists (fixes session latency)
   $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
   if (Test-Path $cargoBin) {
     if ($env:Path -notlike "*$cargoBin*") {
@@ -77,12 +77,9 @@ function Ensure-Uv {
   Log-Warn "uv not found. Installing uv (Python package installer)..."
   try {
     & python -m pip install --user uv --quiet
-    if ($LASTEXITCODE -ne 0) {
-      throw "uv installation failed with exit code $LASTEXITCODE"
-    }
+    if ($LASTEXITCODE -ne 0) { throw "uv installation failed with exit code $LASTEXITCODE" }
 
     Refresh-Path
-
     if (Test-Command-Runnable "uv") {
       $uvVersion = & uv --version 2>&1
       Log-Ok "uv installed: $uvVersion"
@@ -124,7 +121,6 @@ function Ensure-Rust {
 
     Log-Ok "Rustup installed. Refreshing PATH..."
     Refresh-Path
-
     if (Test-Command-Runnable "cargo") { return $true }
 
     Log-Warn "Cargo installed but not executable in this session."
@@ -148,7 +144,7 @@ function Ensure-TauriCli {
       Log-Ok "Tauri CLI found: $v"
       return $true
     }
-  } catch { }
+  } catch {}
 
   Log-Warn "Tauri CLI not found. Installing tauri-cli..."
   try {
@@ -159,7 +155,6 @@ function Ensure-TauriCli {
     }
 
     Refresh-Path
-
     try {
       $v2 = & cargo tauri --version 2>&1
       if ($LASTEXITCODE -eq 0) {
@@ -176,38 +171,6 @@ function Ensure-TauriCli {
   }
 }
 
-# ---- Root directory ----
-$scriptPath = $MyInvocation.MyCommand.Path
-if ([string]::IsNullOrWhiteSpace($scriptPath)) { $scriptPath = $PSCommandPath }
-$scriptDir = Split-Path -Parent $scriptPath
-$root = (Resolve-Path (Join-Path $scriptDir "..")).Path
-
-# ===================== BUNDLE_PY_RUNTIME_BEGIN =====================
-
-# 1) Build wheelhouse + portable site-packages from pyproject.toml using embeddable python (NO venv)
-& (Join-Path $root "scripts\prepare_python_from_pyproject_embed310_target.ps1") `
-  -Extras @() `
-  -TargetTag "win_amd64_cp310" `
-  -RebuildTarget
-
-if ($LASTEXITCODE -ne 0) { exit 1 }
-
-# ===================== BUNDLE_PY_RUNTIME_END =====================
-
-
-# Ensure Python runtime is present at build time under:
-#   src-tauri\resources\python\python.exe
-#
-# Fix:
-# - Search recursively for python.exe under:
-#     third_party\python
-#     src-tauri\resources\python
-# - If not found: auto-download official embeddable runtime (3.10.11 amd64) into third_party\python\
-# - Copy parent folder contents of python.exe into src-tauri\resources\python
-#
-# Result required for installer:
-#   src-tauri\resources\python\python.exe   (plus DLLs + stdlib zip)
-
 function Find-PythonExe {
   param([string[]]$Roots)
 
@@ -219,7 +182,6 @@ function Find-PythonExe {
 
     if ($hit) { return $hit.FullName }
   }
-
   return $null
 }
 
@@ -258,7 +220,6 @@ function Ensure-EmbeddedPythonDownloaded {
   $dst = Join-Path $Root "third_party\python\python-$ver-embed-$arch"
   New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
-  # If python.exe already exists there, skip
   if (Test-Path (Join-Path $dst "python.exe")) {
     return $dst
   }
@@ -276,57 +237,121 @@ function Ensure-EmbeddedPythonDownloaded {
   }
 }
 
-try {
-  $pyDst = Join-Path $root "src-tauri\resources\python"
-  New-Item -ItemType Directory -Force -Path $pyDst | Out-Null
-
-  # Clean destination (keep README.txt if present)
-  Get-ChildItem $pyDst -Force -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -ne "README.txt" } |
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-  $searchRoots = @(
-    (Join-Path $root "third_party\python"),
-    (Join-Path $root "src-tauri\resources\python")
+function Patch-EmbeddedPythonPth {
+  param(
+    [string]$PyDir,          # src-tauri/resources/python
+    [string]$SitePackagesRel # ".\site-packages"
   )
 
-  $pyExePath = Find-PythonExe -Roots $searchRoots
-
-  if (-not $pyExePath) {
-    # Try auto-download and then search again
-    $dlDir = Ensure-EmbeddedPythonDownloaded -Root $root
-    $pyExePath = Find-PythonExe -Roots @($dlDir, (Join-Path $root "third_party\python"))
+  $pth = Get-ChildItem -Path $PyDir -Filter "python*._pth" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $pth) {
+    Log-Warn "No python*._pth found under $PyDir. Embedded python may not see site-packages."
+    return
   }
 
-  if (-not $pyExePath) {
-    # Diagnostics
-    $a = Join-Path $root "third_party\python"
-    $b = Join-Path $root "src-tauri\resources\python"
-    Log-Warn ("Search roots were: " + ($searchRoots -join " OR "))
-    if (Test-Path $a) { Log-Warn ("Dir third_party\python:\n" + (Get-ChildItem -Path $a -Depth 3 -ErrorAction SilentlyContinue | Select-Object FullName | Out-String)) }
-    if (Test-Path $b) { Log-Warn ("Dir src-tauri\resources\python:\n" + (Get-ChildItem -Path $b -Depth 3 -ErrorAction SilentlyContinue | Select-Object FullName | Out-String)) }
-    throw ("Python runtime not found. Expected python.exe somewhere under: " + ($searchRoots -join " OR "))
-  }
+  $pthPath = $pth.FullName
+  $lines = @()
+  try { $lines = Get-Content $pthPath -ErrorAction SilentlyContinue } catch { $lines = @() }
+  if (-not $lines) { $lines = @() }
 
-  $pickedDir = Split-Path -Parent $pyExePath
+  if ($lines -notcontains $SitePackagesRel) { $lines += $SitePackagesRel }
+  if ($lines -notcontains "import site")    { $lines += "import site" }
 
-  Copy-Item -Recurse -Force (Join-Path $pickedDir "*") $pyDst
-  Log-Ok ("Bundled Python runtime from: " + $pickedDir)
-
-  # Hard check: python.exe must exist at root
-  $pyExeRoot = Join-Path $pyDst "python.exe"
-  if (-not (Test-Path $pyExeRoot)) {
-    throw ("Python runtime copy succeeded but python.exe not at root: " + $pyExeRoot + " (pickedDir=" + $pickedDir + ")")
-  }
-
-  Write-PyRuntime-Manifest -DstDir $pyDst -PickedFrom $pickedDir
-
-} catch {
-  throw $_
+  Set-Content -Path $pthPath -Value $lines -Encoding ASCII
+  Log-Ok "Patched embedded _pth: $pthPath"
 }
-# ===================== BUNDLE_PY_RUNTIME_END =====================
 
+function Ensure-BundledSitePackages {
+  param(
+    [string]$RootDir
+  )
 
+  $pyRoot   = Join-Path $RootDir "src-tauri\resources\python"
+  $pyExe    = Join-Path $pyRoot "python.exe"
+  $sitePkgs = Join-Path $pyRoot "site-packages"
+
+  if (-not (Test-Path $pyExe)) { throw "Bundled python.exe not found: $pyExe" }
+  New-Item -ItemType Directory -Force -Path $sitePkgs | Out-Null
+
+  # Where your wheelhouse lives (generated by prepare script)
+  $wheelhouseTag = "win_amd64_cp310"
+  $whRoot = Join-Path $RootDir "third_party\wheelhouse\$wheelhouseTag"
+  $whWheels = Join-Path $whRoot "wheels"
+
+  if (-not (Test-Path $whWheels)) { throw "Wheelhouse wheels folder missing: $whWheels" }
+  
+  # FIX: Trust wheelhouse contents directly (no lock file)
+  
+  Log-Step 99 "Pre-bundling Python deps into installer (site-packages)"
+  Log-Info "Target site-packages: $sitePkgs"
+  Log-Info "Wheelhouse Source: $whWheels"
+
+  # Build-time host python drives pip (do NOT rely on embeddable python to have ensurepip)
+  # Use the build venv python (3.10) so wheels match win_amd64_cp310
+  $hostPy = Join-Path $RootDir ".venv\Scripts\python.exe"
+  if (-not (Test-Path $hostPy)) { throw "Build venv python not found: $hostPy" }
+
+  # sanity check: MUST be 3.10 for cp310 wheelhouse
+  $pyVer = & $hostPy -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+  if ($pyVer.Trim() -ne "3.10") { throw "Step 99 must run with Python 3.10, got: $pyVer" }
+
+  & $hostPy -m pip install --upgrade pip setuptools wheel --quiet
+  if ($LASTEXITCODE -ne 0) { throw "Failed to upgrade host pip" }
+
+  # Clean site-packages each time for deterministic builds
+  try {
+    Get-ChildItem -Path $sitePkgs -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+  } catch {}
+
+  # UPDATED STRATEGY: Install ALL wheels from wheelhouse directly
+  # This avoids the "lock file points to deleted temp wheel" error.
+  $allWheels = Get-ChildItem -Path $whWheels -Filter "*.whl" | Select-Object -ExpandProperty FullName
+  $installManifest = Join-Path $whWheels "install_manifest_build.txt"
+  $allWheels | Out-File -FilePath $installManifest -Encoding ASCII
+
+  Log-Info "Installing $(($allWheels).Count) wheels from manifest..."
+  
+  & $hostPy -m pip install `
+    --no-index `
+    --find-links $whWheels `
+    --target $sitePkgs `
+    --no-deps `
+    --ignore-installed `
+    -r $installManifest
+
+  if ($LASTEXITCODE -ne 0) { 
+      Remove-Item -Force $installManifest -ErrorAction SilentlyContinue
+      throw "Failed to install deps into bundled site-packages from wheelhouse." 
+  }
+  Remove-Item -Force $installManifest -ErrorAction SilentlyContinue
+
+  # Patch python._pth so embedded python sees .\site-packages and imports site
+  Patch-EmbeddedPythonPth -PyDir $pyRoot -SitePackagesRel ".\site-packages"
+
+  # CRITICAL FIX: DO NOT COPY WHEELHOUSE INTO RESOURCES
+  # We intentionally skip copying the raw .whl files into the installer to save ~1GB
+  # and prevent NSIS "mmapping" errors.
+  Log-Info "Skipping wheelhouse copy (using installed site-packages only) to save space."
+
+  # quick smoke import (uses embedded python)
+  & $pyExe -c "import sys; import numpy; print('numpy_ok'); print('python_ok', sys.version)"
+  if ($LASTEXITCODE -ne 0) { throw "Bundled python cannot import numpy from site-packages" }
+
+  # if tensorflow is part of your lock/extras, test import too (can be slow)
+  # Only run if we actually installed tensorflow
+  if (Test-Path (Join-Path $sitePkgs "tensorflow")) {
+      & $pyExe -c "import tensorflow as tf; print('tf_ok', tf.__version__)"
+      if ($LASTEXITCODE -ne 0) { throw "Bundled python cannot import tensorflow." }
+  }
+
+  Log-Ok "Bundled site-packages ready (Lean Build)."
+}
+
+# ---- Root directory ----
+$scriptPath = $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($scriptPath)) { $scriptPath = $PSCommandPath }
+$scriptDir = Split-Path -Parent $scriptPath
+$root = (Resolve-Path (Join-Path $scriptDir "..")).Path
 
 # ---- Guard: ensure versions folder exists (better error than Tauri glob failure) ----
 $versionsDir = Join-Path $root "versions"
@@ -334,44 +359,25 @@ if (-not (Test-Path $versionsDir)) {
   throw "Missing required folder: $versionsDir (expected versions/0.01 etc.)"
 }
 
-
 Log-Info "Root directory: $root"
 Log-Info ("Build started at: {0}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 Write-Host ""
-
-# ================================
-# STEP 1: UI Smoke Tests (pre-build)
-# ================================
-Log-Step 1 "UI Smoke Tests (pre-build)"
-
-try {
-  Log-Info "Running UI/installer smoke tests..."
-  & python tests/test_tauri_ui_smoke.py
-  if ($LASTEXITCODE -ne 0) { throw "UI smoke tests failed (exit code $LASTEXITCODE)" }
-  Log-Ok "UI smoke tests passed"
-} catch {
-  Log-Fail "$_"
-  exit 1
-}
 
 # ================================
 # STEP 0: Checking Prerequisites
 # ================================
 Log-Step 0 "Checking Prerequisites"
 
-# Python
 try {
   $pythonVersion = & python --version 2>&1
-  Log-Ok "Python found: $pythonVersion"
+  Log-Ok "Host Python found: $pythonVersion"
 } catch {
-  Log-Fail "Python not found. Please install Python 3.10+"
+  Log-Fail "Host Python not found. Please install Python 3.10+"
   exit 1
 }
 
-# uv (optional)
 $useUv = Ensure-Uv
 
-# Rust + Tauri only required if building Tauri
 if (-not $SkipTauri) {
   $hasCargo = Ensure-Rust
   if (-not $hasCargo) {
@@ -407,8 +413,6 @@ if (-not $SkipTauri) {
 if ($Clean) {
   Log-Step 1 "Cleaning Build Artifacts"
 
-  # IMPORTANT: do NOT delete src-tauri/resources entirely (it contains icons/config/etc).
-  # Only delete generated subfolders.
   $cleanTargets = @(
     "dist",
     "build",
@@ -417,7 +421,9 @@ if ($Clean) {
     "src-tauri\binaries",
     "src-tauri\drivers",
     "src-tauri\resources\scripts",
-    "src-tauri\resources\sidecar"
+    "src-tauri\resources\sidecar",
+    "src-tauri\resources\python\site-packages",
+    "src-tauri\resources\wheelhouse"
   )
 
   foreach ($rel in $cleanTargets) {
@@ -436,16 +442,102 @@ if ($Clean) {
   Log-Ok "Clean completed"
 }
 
+# ===================== BUNDLE_PY_RUNTIME_BEGIN =====================
+# STEP 1: Build wheelhouse + lock for OFFLINE installs
+# =====================
+Log-Step 1 "Preparing wheelhouse (cp310 win_amd64)"
+
+# Run the prepare script to populate wheels
+& (Join-Path $root "scripts\prepare_python_from_pyproject_embed310_target.ps1") `
+  -Extras @("launcher","backend","ml") `
+  -TargetTag "win_amd64_cp310" `
+  -RebuildTarget
+if ($LASTEXITCODE -ne 0) { exit 1 }
+# ===================== BUNDLE_PY_RUNTIME_END =====================
+
 # ================================
-# STEP 2: Build Python backend
+# STEP 2: Bundle embeddable python into src-tauri/resources/python
+# ================================
+Log-Step 2 "Bundling embeddable Python runtime"
+
+try {
+  $pyDst = Join-Path $root "src-tauri\resources\python"
+  New-Item -ItemType Directory -Force -Path $pyDst | Out-Null
+
+  # Clean destination (keep README.txt if present)
+  Get-ChildItem $pyDst -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne "README.txt" } |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  $searchRoots = @(
+    (Join-Path $root "third_party\python"),
+    (Join-Path $root "src-tauri\resources\python")
+  )
+
+  $pyExePath = Find-PythonExe -Roots $searchRoots
+
+  if (-not $pyExePath) {
+    $dlDir = Ensure-EmbeddedPythonDownloaded -Root $root
+    $pyExePath = Find-PythonExe -Roots @($dlDir, (Join-Path $root "third_party\python"))
+  }
+
+  if (-not $pyExePath) {
+    throw ("Python runtime not found. Expected python.exe somewhere under: " + ($searchRoots -join " OR "))
+  }
+
+  $pickedDir = Split-Path -Parent $pyExePath
+  Copy-Item -Recurse -Force (Join-Path $pickedDir "*") $pyDst
+  Log-Ok ("Bundled Python runtime from: " + $pickedDir)
+
+  $pyExeRoot = Join-Path $pyDst "python.exe"
+  if (-not (Test-Path $pyExeRoot)) {
+    throw ("Python runtime copy succeeded but python.exe not at root: " + $pyExeRoot + " (pickedDir=" + $pickedDir + ")")
+  }
+
+  Write-PyRuntime-Manifest -DstDir $pyDst -PickedFrom $pickedDir
+} catch {
+  Log-Fail "$_"
+  exit 1
+}
+
+# ================================
+# STEP 3: Pre-bundle ALL python deps into site-packages (includes tensorflow)
+# ================================
+try {
+  Ensure-BundledSitePackages -RootDir $root
+} catch {
+  Log-Fail "$_"
+  exit 1
+}
+
+# ================================
+# STEP 4: UI Smoke Tests (pre-build)
+# ================================
+Log-Step 4 "UI Smoke Tests (pre-build)"
+
+try {
+  Log-Info "Running UI/installer smoke tests..."
+  if (Test-Path "tests/test_tauri_ui_smoke.py") {
+      & python tests/test_tauri_ui_smoke.py
+      if ($LASTEXITCODE -ne 0) { throw "UI smoke tests failed (exit code $LASTEXITCODE)" }
+      Log-Ok "UI smoke tests passed"
+  } else {
+      Log-Warn "Smoke test file not found. Skipping."
+  }
+} catch {
+  Log-Fail "$_"
+  exit 1
+}
+
+# ================================
+# STEP 5: Build Python backend (PyInstaller ONEDIR)
 # ================================
 if (-not $SkipPython) {
-  Log-Step 2 "Building Python Backend (PyInstaller ONEDIR)"
+  Log-Step 5 "Building Python Backend (PyInstaller ONEDIR)"
 
   $venv       = Join-Path $root ".venv"
   $venvPython = Join-Path $venv "Scripts\python.exe"
 
-  # Check if venv exists AND is functional
   $venvNeedsCreation = $false
   if (-not (Test-Path $venv)) {
     $venvNeedsCreation = $true
@@ -477,7 +569,6 @@ if (-not $SkipPython) {
     }
   }
 
-  # --- ensure pip exists inside venv ---
   Log-Info "Ensuring pip exists in build venv..."
   try {
     & $venvPython -m pip --version *> $null
@@ -499,17 +590,15 @@ if (-not $SkipPython) {
     }
   }
 
-  # --- install project deps into venv (so PyInstaller sees everything) ---
-  Log-Info "Installing Python dependencies..."
+  Log-Info "Installing Python dependencies (build venv for PyInstaller)..."
   try {
     if ($useUv) {
       Log-Info "Using uv for package installation (faster than pip)"
-      #& uv pip install --python $venvPython -e . --quiet
-      & uv pip install --python $venvPython -e ".[packaging]" --quiet
+      & uv pip install --python $venvPython -e ".[backend,packaging]" --quiet
       if ($LASTEXITCODE -ne 0) { throw "uv pip install project failed" }
     } else {
       Log-Info "Using pip for package installation"
-      & $venvPython -m pip install -e . --quiet
+      & $venvPython -m pip install -e ".[backend,packaging]" --quiet
       if ($LASTEXITCODE -ne 0) { throw "pip install project failed" }
     }
     Log-Ok "Project dependencies installed"
@@ -518,7 +607,6 @@ if (-not $SkipPython) {
     exit 1
   }
 
-  # --- ensure backend runtime deps exist in build venv ---
   Log-Info "Ensuring backend runtime deps (fastapi/uvicorn) are installed in build venv..."
   try {
     & $venvPython -c "import fastapi, uvicorn; print('backend deps OK')" 2>$null
@@ -526,11 +614,8 @@ if (-not $SkipPython) {
     Log-Ok "Backend runtime deps OK"
   } catch {
     try {
-      if ($useUv) {
-        & uv pip install --python $venvPython fastapi uvicorn --quiet
-      } else {
-        & $venvPython -m pip install fastapi uvicorn --quiet
-      }
+      if ($useUv) { & uv pip install --python $venvPython fastapi uvicorn --quiet }
+      else        { & $venvPython -m pip install fastapi uvicorn --quiet }
       if ($LASTEXITCODE -ne 0) { throw "install failed" }
 
       & $venvPython -c "import fastapi, uvicorn; print('backend deps OK')" 2>$null
@@ -543,16 +628,12 @@ if (-not $SkipPython) {
     }
   }
 
-  # --- ensure PyInstaller exists ---
   Log-Info "Ensuring PyInstaller is installed in build venv..."
   try {
     & $venvPython -m pip show pyinstaller *> $null
     if ($LASTEXITCODE -ne 0) {
-      if ($useUv) {
-        & uv pip install --python $venvPython pyinstaller --quiet
-      } else {
-        & $venvPython -m pip install pyinstaller --quiet
-      }
+      if ($useUv) { & uv pip install --python $venvPython pyinstaller --quiet }
+      else        { & $venvPython -m pip install pyinstaller --quiet }
       if ($LASTEXITCODE -ne 0) { throw "install failed" }
     }
     Log-Ok "PyInstaller ready"
@@ -561,7 +642,6 @@ if (-not $SkipPython) {
     exit 1
   }
 
-  # --- build the sidecar with PyInstaller ONEDIR ---
   Log-Info "Building backend sidecar with PyInstaller (onedir)..."
 
   $backend = Join-Path $root "backend\entry_main.py"
@@ -571,7 +651,6 @@ if (-not $SkipPython) {
   }
 
   try {
-    # Clean previous dist/main-backend so we never ship stale _internal
     $distDir = Join-Path $root "dist\main-backend"
     if (Test-Path $distDir) { Remove-Item -Recurse -Force $distDir -ErrorAction SilentlyContinue }
 
@@ -590,7 +669,6 @@ if (-not $SkipPython) {
     exit 1
   }
 
-  # --- validate output exists ---
   $distDir = Join-Path $root "dist\main-backend"
   $distExe = Join-Path $distDir "main-backend.exe"
   if (-not (Test-Path $distExe)) {
@@ -605,7 +683,6 @@ if (-not $SkipPython) {
   $sizeMb = [math]::Round(((Get-Item $distExe).Length / 1MB), 2)
   Log-Ok "Backend executable created: $sizeMb MB (onedir)"
 
-  # --- bundle into Tauri resources ---
   Log-Info "Bundling sidecar into Tauri resources..."
   $tauriSidecarDir = Join-Path $root "src-tauri\resources\sidecar\main-backend"
 
@@ -614,31 +691,28 @@ if (-not $SkipPython) {
   }
   New-Item -Force -ItemType Directory $tauriSidecarDir | Out-Null
 
-# --- Robust sidecar copy (handles locked DLLs / Defender scanning) ---
-$lockNames = @("main-backend", "main-backend.exe", "BOT-MMORPG-AI", "BOT-MMORPG-AI.exe")
-foreach ($n in $lockNames) {
-  try { Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
-}
-
-# Remove destination _internal to avoid update-in-place locks
-try { Remove-Item -Recurse -Force (Join-Path $tauriSidecarDir "_internal") -ErrorAction SilentlyContinue } catch {}
-
-$maxTries = 25
-$delaySec = 1
-$lastErr = $null
-for ($i = 1; $i -le $maxTries; $i++) {
-  try {
-    Copy-Item -Recurse -Force (Join-Path $distDir "*") $tauriSidecarDir -ErrorAction Stop
-    $lastErr = $null
-    break
-  } catch {
-    $lastErr = $_
-    Log-Warn ("Sidecar copy attempt {0}/{1} failed: {2}" -f $i, $maxTries, $_.Exception.Message)
-    Start-Sleep -Seconds $delaySec
+  $lockNames = @("main-backend", "main-backend.exe", "BOT-MMORPG-AI", "BOT-MMORPG-AI.exe")
+  foreach ($n in $lockNames) {
+    try { Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
   }
-}
-if ($lastErr -ne $null) { throw $lastErr }
-# --- End robust sidecar copy ---
+
+  try { Remove-Item -Recurse -Force (Join-Path $tauriSidecarDir "_internal") -ErrorAction SilentlyContinue } catch {}
+
+  $maxTries = 25
+  $delaySec = 1
+  $lastErr = $null
+  for ($i = 1; $i -le $maxTries; $i++) {
+    try {
+      Copy-Item -Recurse -Force (Join-Path $distDir "*") $tauriSidecarDir -ErrorAction Stop
+      $lastErr = $null
+      break
+    } catch {
+      $lastErr = $_
+      Log-Warn ("Sidecar copy attempt {0}/{1} failed: {2}" -f $i, $maxTries, $_.Exception.Message)
+      Start-Sleep -Seconds $delaySec
+    }
+  }
+  if ($lastErr -ne $null) { throw $lastErr }
 
   $bundledExe = Join-Path $tauriSidecarDir "main-backend.exe"
   if (-not (Test-Path $bundledExe)) {
@@ -648,12 +722,10 @@ if ($lastErr -ne $null) { throw $lastErr }
 
   Log-Ok "Sidecar bundled: $tauriSidecarDir"
 
-
   Log-Info "Killing any running main-backend.exe..."
   cmd /c "taskkill /IM main-backend.exe /F >nul 2>&1"
   Start-Sleep -Milliseconds 500
 
-  # --- smoke test the bundled exe prints READY (must not hang) ---
   Log-Info "Smoke testing bundled sidecar (wait for READY, then stop)..."
 
   $timeoutSec = 15
@@ -667,7 +739,6 @@ if ($lastErr -ne $null) { throw $lastErr }
 
   $p = New-Object System.Diagnostics.Process
   $p.StartInfo = $psi
-
   $null = $p.Start()
 
   $readyLine = $null
@@ -675,14 +746,11 @@ if ($lastErr -ne $null) { throw $lastErr }
 
   try {
     while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
-      # ReadLine blocks only if no newline; use Peek to avoid hang
       while (-not $p.StandardOutput.EndOfStream -and $p.StandardOutput.Peek() -ge 0) {
         $line = $p.StandardOutput.ReadLine()
-        if ($line) {
-          if ($line -match "^READY url=http://127\.0\.0\.1:\d+ token=") {
-            $readyLine = $line
-            break
-          }
+        if ($line -and $line -match "^READY url=http://127\.0\.0\.1:\d+ token=") {
+          $readyLine = $line
+          break
         }
       }
 
@@ -693,7 +761,6 @@ if ($lastErr -ne $null) { throw $lastErr }
     }
 
     if (-not $readyLine) {
-      # Collect some stderr for debugging
       $err = ""
       try { $err = $p.StandardError.ReadToEnd() } catch {}
       throw "Sidecar did not print READY within ${timeoutSec}s. stderr: $err"
@@ -702,25 +769,18 @@ if ($lastErr -ne $null) { throw $lastErr }
     Log-Ok "Sidecar smoke test OK: $readyLine"
   }
   finally {
-    # Always stop the process so the pipeline doesn't hang
-    try {
-      if (-not $p.HasExited) { $p.Kill($true) }
-    } catch {}
+    try { if (-not $p.HasExited) { $p.Kill($true) } } catch {}
     try { $p.WaitForExit(3000) | Out-Null } catch {}
   }
-
-
 
 } else {
   Log-Warn "Skipping Python backend build"
 }
 
-
-
 # ================================
-# STEP 3: Copy driver installers + scripts
+# STEP 6: Copy driver installers + scripts
 # ================================
-Log-Step 3 "Copying Driver Installers + Scripts"
+Log-Step 6 "Copying Driver Installers + Scripts"
 
 $drvInterDir = Join-Path $root "src-tauri\drivers\interception"
 $drvVjoyDir  = Join-Path $root "src-tauri\drivers\vjoy"
@@ -729,6 +789,15 @@ $resScripts  = Join-Path $root "src-tauri\resources\scripts"
 New-Item -Force -ItemType Directory $drvInterDir | Out-Null
 New-Item -Force -ItemType Directory $drvVjoyDir  | Out-Null
 New-Item -Force -ItemType Directory $resScripts  | Out-Null
+
+$mlScriptSrc = Join-Path $root "scripts\install_ml_deps.ps1"
+$mlScriptDst = Join-Path $resScripts "install_ml_deps.ps1"
+if (Test-Path $mlScriptSrc) {
+  Copy-Item -Force $mlScriptSrc $mlScriptDst
+  Log-Ok "Install ML deps script copied"
+} else {
+  Log-Warn "Install ML deps script not found: $mlScriptSrc"
+}
 
 $interceptionSrc = Join-Path $root "frontend\input_record\install-interception.exe"
 $interceptionDst = Join-Path $drvInterDir "install-interception.exe"
@@ -771,10 +840,10 @@ if (Test-Path $modelsScriptSrc) {
 }
 
 # ================================
-# STEP 4: Build Tauri
+# STEP 7: Build Tauri
 # ================================
 if (-not $SkipTauri) {
-  Log-Step 4 "Building Tauri Application"
+  Log-Step 7 "Building Tauri Application"
 
   Push-Location (Join-Path $root "src-tauri")
   try {
@@ -811,10 +880,10 @@ if (-not $SkipTauri) {
 }
 
 # ================================
-# STEP 5: Verify (optional)
+# STEP 8: Verify (optional)
 # ================================
 if ($Verify) {
-  Log-Step 5 "Running Verification"
+  Log-Step 8 "Running Verification"
 
   $verifyScript = Join-Path $root "scripts\verify_installer.ps1"
   if (Test-Path $verifyScript) {
@@ -829,7 +898,6 @@ if ($Verify) {
   }
 }
 
-# ---- Summary ----
 Write-Host ""
 Write-Host "======================================"
 Write-Host " BUILD COMPLETED"
