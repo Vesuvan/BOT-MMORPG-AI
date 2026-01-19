@@ -446,14 +446,31 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
     let _ = fs::create_dir_all(&local_py_dir);
     let _ = fs::create_dir_all(&target_dir);
 
-    // 1) Ensure embedded python runtime copied to LocalAppData
-    let base_py_candidate = if is_windows() {
-        local_py_dir.join("python.exe")
-    } else {
-        local_py_dir.join("bin").join("python3")
+    // Helper: check if site-packages directory is empty (or missing/unreadable -> treat as empty)
+    let site_packages_empty = || -> bool {
+        fs::read_dir(&target_dir)
+            .map(|mut it| it.next().is_none())
+            .unwrap_or(true)
     };
 
-    if !base_py_candidate.exists() {
+    // Helper: resolve python executable path inside local embedded python dir
+    let python_exe_path = |dir: &Path| -> PathBuf {
+        if is_windows() {
+            dir.join("python.exe")
+        } else {
+            dir.join("bin").join("python3")
+        }
+    };
+
+    // 0) Detect "stale state":
+    // - python.exe exists (so old install looks "present")
+    // - but site-packages is empty/corrupt
+    // In that case, we MUST recopy bundled python/runtime instead of trying ensurepip.
+    let base_py_candidate = python_exe_path(&local_py_dir);
+    let needs_repair_recopy = base_py_candidate.exists() && site_packages_empty();
+
+    // 1) Ensure embedded python runtime copied to LocalAppData (install OR repair)
+    if !base_py_candidate.exists() || needs_repair_recopy {
         let bundled_dir = bundled_python_dir(app).ok_or_else(|| {
             "Bundled Python runtime not found in installed resources. Expected resources/python."
                 .to_string()
@@ -463,13 +480,22 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
             "terminal_update",
             format!("[System] Bundled Python dir: {}", bundled_dir.display()),
         );
-        let _ = window.emit(
-            "terminal_update",
-            format!(
-                "[System] Installing bundled Python runtime -> {}",
-                local_py_dir.display()
-            ),
-        );
+
+        if needs_repair_recopy {
+            let _ = window.emit(
+                "terminal_update",
+                "[System] Detected stale/corrupt install (python exists but site-packages empty) -> repairing by recopying bundled runtime..."
+                    .to_string(),
+            );
+        } else {
+            let _ = window.emit(
+                "terminal_update",
+                format!(
+                    "[System] Installing bundled Python runtime -> {}",
+                    local_py_dir.display()
+                ),
+            );
+        }
 
         // Clean destination first to avoid partial/stale installs
         let _ = fs::remove_dir_all(&local_py_dir);
@@ -477,15 +503,13 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
 
         copy_dir_all(&bundled_dir, &local_py_dir)
             .map_err(|e| format!("Failed to copy bundled python: {}", e))?;
+
+        // IMPORTANT: after recopy, also ensure target_dir exists (it might be inside the bundle or external)
+        let _ = fs::create_dir_all(&target_dir);
     }
 
     // Re-check after copy
-    let base_py = if is_windows() {
-        local_py_dir.join("python.exe")
-    } else {
-        local_py_dir.join("bin").join("python3")
-    };
-
+    let base_py = python_exe_path(&local_py_dir);
     if !base_py.exists() {
         return Err(format!(
             "Bundled Python runtime missing executable after copy: {}",
@@ -493,7 +517,7 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
         ));
     }
 
-    // 2) Patch _pth to include our portable site-packages
+    // 2) Patch _pth to include our portable site-packages (always do this)
     patch_embedded_python_pth(&local_py_dir, &target_dir).map_err(|e| {
         format!(
             "Failed to patch embeddable python _pth ({}): {}",
@@ -510,52 +534,14 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
         ),
     );
 
-    // 3) If our portable site-packages looks empty, install deps from bundled wheelhouse
-    let is_empty = fs::read_dir(&target_dir)
-        .map(|mut it| it.next().is_none())
-        .unwrap_or(true);
-
-    if is_empty {
+    // 3) If our portable site-packages looks empty, install deps from bundled wheelhouse (offline)
+    //    CRITICAL FIX: Do NOT call ensurepip (missing in embeddable python). We only proceed if we have a wheelhouse.
+    if site_packages_empty() {
         let _ = window.emit(
             "terminal_update",
             "[System] site-packages empty -> installing bundled dependencies (offline wheelhouse)".to_string(),
         );
 
-        // a) ensure pip exists (embeddable may or may not ship pip; ensurepip may succeed or fail)
-        {
-            let out = Command::new(&base_py)
-                .arg("-m")
-                .arg("ensurepip")
-                .arg("--upgrade")
-                .output()
-                .map_err(|e| format!("ensurepip failed to start: {}", e))?;
-
-            // don't fail if ensurepip writes warnings; only fail on exit != 0
-            if !out.stdout.is_empty() {
-                let _ = window.emit(
-                    "terminal_update",
-                    format!("[System] ensurepip stdout: {}", String::from_utf8_lossy(&out.stdout)),
-                );
-            }
-            if !out.stderr.is_empty() {
-                let _ = window.emit(
-                    "terminal_update",
-                    format!("[System] ensurepip stderr: {}", String::from_utf8_lossy(&out.stderr)),
-                );
-            }
-            if !out.status.success() {
-                return Err(format!(
-                    "Failed to bootstrap pip using ensurepip (exit={}).\n\
-                     Production fix: bundle pip with your embedded python OR ship wheels + a pip launcher.\n\
-                     stderr={}",
-                    out.status,
-                    String::from_utf8_lossy(&out.stderr)
-                ));
-            }
-        }
-
-        // b) upgrade pip tooling (still offline-safe if wheelhouse includes those wheels; otherwise it may attempt internet)
-        // We'll do it only if wheelhouse exists; otherwise skip.
         let wh = bundled_wheelhouse_dir(app);
 
         if let Some(wh_dir) = wh.as_ref() {
@@ -566,7 +552,8 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
         } else {
             let _ = window.emit(
                 "terminal_update",
-                "[System] No wheelhouse found in resources. Skipping dependency install.".to_string(),
+                "[System] No wheelhouse found in resources. Cannot install deps. Reinstall app or bundle site-packages."
+                    .to_string(),
             );
             return Ok(base_py);
         }
@@ -599,7 +586,7 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
             find_links.push(wh_dir.clone());
         }
 
-        // c) install from lock file into --target, offline
+        // Install from lock file into --target, offline
         {
             let mut cmd = Command::new(&base_py);
             apply_stable_python_env(&mut cmd);
@@ -645,7 +632,8 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
             if !out.status.success() {
                 return Err(format!(
                     "pip install --target failed (exit={}).\n\
-                     Ensure wheelhouse contains all required wheels for cp310 win_amd64.\n\
+                     This build must bundle pip (or a pip launcher) AND a complete wheelhouse for your platform.\n\
+                     Ensure wheelhouse contains all required wheels for your Python + OS.\n\
                      stderr={}",
                     out.status,
                     String::from_utf8_lossy(&out.stderr)
@@ -653,9 +641,9 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
             }
         }
 
-        // d) OPTIONAL: install your project wheel from wheelhouse (if you ship it)
-        // If your lock already includes bot-mmorpg-ai, skip this.
-        // If not, you should include bot_mmorpg_ai-*.whl in wheelhouse and install it explicitly.
+        // OPTIONAL: install your project wheel from wheelhouse (if you ship it)
+        // NOTE: Your original code forgot to actually pass the package argument to pip.
+        // If your lock already includes bot-mmorpg-ai, you can delete this whole block.
         {
             let mut cmd = Command::new(&base_py);
             apply_stable_python_env(&mut cmd);
@@ -671,20 +659,23 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
 
             cmd.arg("--target").arg(&target_dir);
 
-            // Prefer installing the project package (and PROD extras) if present as wheel
-            // NOTE: This requires bot-mmorpg-ai wheel to be in wheelhouse.
             let pkg = if PROD_EXTRAS.trim().is_empty() {
                 "bot-mmorpg-ai".to_string()
             } else {
                 format!("bot-mmorpg-ai[{}]", PROD_EXTRAS)
             };
 
+            // FIX: actually install the package
+            cmd.arg(&pkg);
+
             let _ = window.emit(
                 "terminal_update",
                 format!("[System] Installing app package (if wheel present): {}", pkg),
             );
 
-            let out = cmd.output().map_err(|e| format!("pip install bot package failed: {}", e))?;
+            let out = cmd
+                .output()
+                .map_err(|e| format!("pip install bot package failed to start: {}", e))?;
 
             // If it fails, don't hard-fail because lock install may already have installed it.
             if !out.status.success() {
@@ -698,7 +689,7 @@ fn ensure_python_env(app: &AppHandle, window: &Window) -> Result<PathBuf, String
             }
         }
 
-        // e) Verify minimal import
+        // Verify minimal import
         {
             let out = Command::new(&base_py)
                 .arg("-c")
