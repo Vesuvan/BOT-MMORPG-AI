@@ -907,6 +907,24 @@ if (Test-Path $modelsScriptSrc) {
   Log-Warn "Download models script not found: $modelsScriptSrc"
 }
 
+
+Log-Step 6.5 "Bundling versions into resources"
+
+$srcVersions = Join-Path $root "versions"
+$dstVersions = Join-Path $root "src-tauri\resources\versions"
+
+if (-not (Test-Path $srcVersions)) { throw "Missing versions folder: $srcVersions" }
+
+if (Test-Path $dstVersions) {
+  Remove-Item $dstVersions -Recurse -Force -ErrorAction SilentlyContinue
+}
+New-Item -ItemType Directory -Force -Path $dstVersions | Out-Null
+
+Copy-Item -Recurse -Force (Join-Path $srcVersions "*") $dstVersions
+Log-Ok "Versions copied to: $dstVersions"
+
+
+
 # ================================
 # STEP 7: Build Tauri
 # ================================

@@ -45,7 +45,6 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**",
         "../pyproject.toml"
    
 

@@ -195,3 +195,4 @@ src-tauri/resources/sidecar/main-backend/main-backend.exe
 /third_party/python
 /third_party/wheelhouse
 /src-tauri/resources/wheelhouse
+/src-tauri/resources
