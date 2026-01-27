@@ -787,9 +787,15 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
         <div style="display:flex; gap:10px;">
-          <button class="btn" onclick="startTraining()">
-            <span>🧠</span> Start Training
-          </button>
+          
+<button class="btn" onclick="startTraining()" id="btn-start-training">
+  <span>🧠</span> Start Training
+</button>
+
+<button class="btn btn-danger" onclick="stopTraining()" id="btn-stop-training" disabled>
+  <span>■</span> Stop Training
+</button>
+
           <button class="btn btn-secondary" onclick="refreshCatalog()">
             <span>↻</span> Refresh Catalog
           </button>
@@ -809,10 +815,21 @@
           <label class="form-label">Model name</label>
           <input class="form-input" id="train-model-name" placeholder="e.g. genshin_combat_v1"/>
         </div>
-        <div>
-          <label class="form-label">Dataset ID</label>
-          <input class="form-input" id="train-dataset-id" placeholder="Pick from ModelHub or paste id"/>
-        </div>
+        
+<div>
+  <label class="form-label">Dataset</label>
+  <select class="form-select" id="train-dataset-select">
+    <option value="">Loading datasets…</option>
+  </select>
+
+  <div style="display:flex; gap:10px; margin-top:10px;">
+    <button class="btn btn-small btn-secondary" onclick="refreshTrainDatasets()">↻ Refresh</button>
+    <span style="font-size:11px; color:var(--text-dim); align-self:center;">
+      Datasets are detected automatically from ModelHub.
+    </span>
+  </div>
+</div>
+
         <div>
           <label class="form-label">Neural Network</label>
           <select class="form-select" id="train-arch">
@@ -1529,23 +1546,36 @@
     // Expose python -> UI terminal output
     eel.expose(update_terminal);
     function update_terminal(line) {
-      logSystem(line);
+  logSystem(line);
 
-      // simple progress parsing (if your logs include "Epoch X/Y")
-      if (line.includes('Epoch')) {
-        const match = line.match(/Epoch\s+(\d+)\s*\/\s*(\d+)/i);
-        if (match) {
-          const percent = (parseInt(match[1]) / parseInt(match[2])) * 100;
-          document.getElementById('progress-bar').style.width = percent + '%';
-          document.getElementById('train-pct').innerText = Math.round(percent) + '%';
-        }
-      }
-
-      // When training ends, refresh catalog automatically (best-effort)
-      if (line.toLowerCase().includes("saving model") || line.toLowerCase().includes("archived model")) {
-        // do nothing special, just a hint
-      }
+  // progress parsing (if your logs include "Epoch X/Y")
+  if (line.includes('Epoch')) {
+    const match = line.match(/Epoch\s+(\d+)\s*\/\s*(\d+)/i);
+    if (match) {
+      const percent = (parseInt(match[1]) / parseInt(match[2])) * 100;
+      const bar = document.getElementById('progress-bar');
+      const pct = document.getElementById('train-pct');
+      if (bar) bar.style.width = percent + '%';
+      if (pct) pct.innerText = Math.round(percent) + '%';
     }
+  }
+
+  // training completion heuristics
+  const done =
+    line.includes("Training Complete") ||
+    line.includes("Training Complete!") ||
+    line.includes("Final model saved") ||
+    line.toLowerCase().includes("final model saved");
+
+  if (done) {
+    const stopBtn = document.getElementById("btn-stop-training");
+    const startBtn = document.getElementById("btn-start-training");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+    refreshCatalog();
+    refreshTrainDatasets(true);
+  }
+}
 
     // -------------------------
     // AI Calls (unchanged)
@@ -1828,17 +1858,15 @@
     }
 
     function selectDatasetForTraining(datasetId) {
-      // Fill in the Train tab dataset field
-      const trainDataset = document.getElementById('train-dataset-id');
-      if (trainDataset) trainDataset.value = datasetId;
+  const sel = document.getElementById('train-dataset-select');
+  if (sel) sel.value = datasetId;
 
-      // Also fill Train wizard if open
-      const twDataset = document.getElementById('tw-dataset');
-      if (twDataset) twDataset.value = datasetId;
+  const twDataset = document.getElementById('tw-dataset');
+  if (twDataset) twDataset.value = datasetId;
 
-      toast("Dataset Selected", `Using: ${datasetId}`, "ok");
-      showTab('train');
-    }
+  toast("Dataset Selected", `Using: ${datasetId}`, "ok");
+  showTab('train');
+}
 
     async function deleteDataset(datasetId, path) {
       if (!confirm(`Delete dataset "${datasetId}"?\n\nThis cannot be undone.`)) return;
@@ -2297,26 +2325,35 @@
 
     // Start training from main Train tab form
     async function startTraining() {
-      const gameId = (document.getElementById("train-game-id")?.value || "").trim() || DEFAULT_GAME;
-      const modelName = (document.getElementById("train-model-name")?.value || "").trim() || `${gameId}_model_${Date.now()}`;
-      const datasetId = (document.getElementById("train-dataset-id")?.value || "").trim();
-      const arch = document.getElementById("train-arch")?.value || "efficientnet_lstm";
+  const gameId = (document.getElementById("train-game-id")?.value || "").trim() || DEFAULT_GAME;
+  const modelName = (document.getElementById("train-model-name")?.value || "").trim() || `${gameId}_model_${Date.now()}`;
+  const arch = document.getElementById("train-arch")?.value || "efficientnet_lstm";
 
-      if (!datasetId) {
-        toast("Training", "Please enter a dataset ID or record data first in the Teach tab.", "warn");
-        return;
-      }
+  const dsSel = document.getElementById("train-dataset-select");
+  const datasetId = (dsSel?.value || "").trim();
 
-      logSystem(`🧠 Training requested: name="${modelName}", game="${gameId}", dataset="${datasetId}", arch="${arch}"`);
-      toast("Training", `Started: ${modelName}`, "ok");
+  if (!datasetId) {
+    toast("Training", "Pick a dataset from the dropdown (or record one in Teach tab).", "warn");
+    return;
+  }
 
-      try {
-        await eel.start_training(gameId, modelName, datasetId, arch)();
-      } catch(e) {
-        console.error(e);
-        toast("Training", "Failed to start training.", "err");
-      }
-    }
+  logSystem(`🧠 Training requested: name="${modelName}", game="${gameId}", dataset="${datasetId}", arch="${arch}"`);
+  toast("Training", `Started: ${modelName}`, "ok");
+
+  const startBtn = document.getElementById("btn-start-training");
+  const stopBtn = document.getElementById("btn-stop-training");
+  if (startBtn) startBtn.disabled = true;
+  if (stopBtn) stopBtn.disabled = false;
+
+  try {
+    await eel.start_training(gameId, modelName, datasetId, arch)();
+  } catch(e) {
+    console.error(e);
+    toast("Training", "Failed to start training.", "err");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+  }
+}
 
     async function twRefreshDatasets(silent=false){
       const gameId = document.getElementById("tw-game")?.value || activeGameId || DEFAULT_GAME;
@@ -2345,6 +2382,63 @@
         if (!silent) toast("Datasets", "Failed to load datasets.", "err");
       }
     }
+
+
+// -------------------------
+// Train tab: Dataset dropdown (auto-detected)
+// -------------------------
+async function refreshTrainDatasets(silent=false){
+  const gid = (document.getElementById("train-game-id")?.value || activeGameId || DEFAULT_GAME).trim() || DEFAULT_GAME;
+  const sel = document.getElementById("train-dataset-select");
+  if (!sel || typeof eel === "undefined") return;
+
+  try {
+    const payload = await eel.mh_get_catalog_data(gid)();
+    const ds = payload?.datasets || [];
+
+    sel.innerHTML = "";
+    if (ds.length === 0) {
+      sel.innerHTML = `<option value="">(No datasets found — record in Teach tab)</option>`;
+      if (!silent) toast("Datasets", "No datasets found. Record in Teach tab first.", "warn");
+      return;
+    }
+
+    sel.innerHTML = `<option value="">Select dataset…</option>`;
+    for (const d of ds) {
+      const label = `${d.name || d.id} ${d.created_at ? "— " + d.created_at : ""}`;
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.dataset.path = d.path || "";
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    console.error(e);
+    sel.innerHTML = `<option value="">(Failed to load datasets)</option>`;
+    if (!silent) toast("Datasets", "Failed to load datasets.", "err");
+  }
+}
+
+// -------------------------
+// Train tab: Stop Training
+// -------------------------
+async function stopTraining(){
+  if (typeof eel === "undefined") return;
+
+  try {
+    await eel.stop_process()(); // stops current process (training/recording/bot)
+    toast("Stopped", "Training process stopped.", "warn");
+    const stopBtn = document.getElementById("btn-stop-training");
+    const startBtn = document.getElementById("btn-start-training");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+    await refreshCatalog();
+    await refreshTrainDatasets(true);
+  } catch (e) {
+    console.error(e);
+    toast("Error", "Failed to stop training.", "err");
+  }
+}
 
     // -------------------------
     // Training button in Train tab (kept for fallback)

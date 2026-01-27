@@ -16,12 +16,13 @@ import argparse
 import sys
 import os
 import time
+import logging
 from pathlib import Path
-from typing import Optional, Tuple, List
-from random import shuffle
+from typing import Optional, Tuple
+from datetime import timedelta
 
 import numpy as np
-import cv2
+import cv2  # noqa: F401  (kept for compatibility; not used directly here)
 
 # PyTorch imports
 try:
@@ -43,6 +44,52 @@ try:
     MODELS_AVAILABLE = True
 except ImportError:
     MODELS_AVAILABLE = False
+
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+def setup_logger() -> logging.Logger:
+    logger = logging.getLogger("trainer")
+    if logger.handlers:
+        return logger  # prevent duplicate handlers if re-imported
+
+    level_str = os.getenv("BOTMMO_LOG_LEVEL", "INFO").upper().strip()
+    level = getattr(logging, level_str, logging.INFO)
+    logger.setLevel(level)
+
+    handler = logging.StreamHandler(stream=sys.stdout)
+    handler.setLevel(level)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-7s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    # Make sure prints from libraries don't hide our output
+    logger.propagate = False
+    return logger
+
+
+LOG = setup_logger()
+
+
+def hr(title: str = "", width: int = 72) -> str:
+    if not title:
+        return "=" * width
+    pad = max(0, width - len(title) - 2)
+    left = pad // 2
+    right = pad - left
+    return f"{'=' * left} {title} {'=' * right}"
+
+
+def fmt_seconds(seconds: float) -> str:
+    if seconds < 0:
+        seconds = 0
+    return str(timedelta(seconds=int(seconds)))
 
 
 # =============================================================================
@@ -76,14 +123,6 @@ class GameplayDataset(Dataset):
         limit_files: Optional[int] = None,
         file_pattern: str = "training_data-*.npy",
     ):
-        """
-        Args:
-            data_dir: Directory containing training_data-*.npy files
-            seq_len: Number of consecutive frames per sample (for temporal models)
-            transform: Optional transforms to apply
-            limit_files: Limit number of files to load (for testing)
-            file_pattern: Glob pattern for data files
-        """
         self.data_dir = Path(data_dir)
         self.seq_len = seq_len
         self.transform = transform
@@ -103,26 +142,35 @@ class GameplayDataset(Dataset):
         if not self.files:
             raise ValueError(f"No training data found in {data_dir}")
 
-        print(f"[Dataset] Found {len(self.files)} data files")
+        LOG.info(f"[Dataset] Found {len(self.files)} data file(s) in: {self.data_dir.resolve()}")
+        LOG.info(f"[Dataset] Patterns: {patterns}")
 
-        # Load all data into memory
         self._load_data()
 
     def _load_data(self):
         """Load all data files into memory."""
         all_frames = []
         all_actions = []
+        skipped_files = 0
+        skipped_items = 0
 
+        t0 = time.time()
         for f in self.files:
             try:
                 data = np.load(f, allow_pickle=True)
                 for item in data:
-                    if len(item) >= 2:
-                        frame, action = item[0], item[1]
-                        all_frames.append(frame)
-                        all_actions.append(action)
+                    try:
+                        if len(item) >= 2:
+                            frame, action = item[0], item[1]
+                            all_frames.append(frame)
+                            all_actions.append(action)
+                        else:
+                            skipped_items += 1
+                    except Exception:
+                        skipped_items += 1
             except Exception as e:
-                print(f"[Dataset] Warning: Could not load {f}: {e}")
+                skipped_files += 1
+                LOG.warning(f"[Dataset] Could not load {f}: {e}")
 
         if not all_frames:
             raise ValueError("No valid data loaded from files")
@@ -130,35 +178,31 @@ class GameplayDataset(Dataset):
         self.frames = np.array(all_frames)
         self.actions = np.array(all_actions, dtype=np.float32)
 
-        print(f"[Dataset] Loaded {len(self.frames)} samples")
-        print(f"[Dataset] Frame shape: {self.frames[0].shape}")
-        print(f"[Dataset] Action shape: {self.actions[0].shape}")
+        dt = time.time() - t0
+        LOG.info(f"[Dataset] Loaded {len(self.frames)} sample(s) in {dt:.1f}s")
+        LOG.info(f"[Dataset] Skipped files: {skipped_files}, skipped items: {skipped_items}")
+        LOG.info(f"[Dataset] Frame shape: {self.frames[0].shape}")
+        LOG.info(f"[Dataset] Action shape: {self.actions[0].shape}")
 
     def __len__(self) -> int:
         return max(0, len(self.frames) - self.seq_len + 1)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Get a training sample."""
-        # Get sequence of frames
         if self.seq_len > 1:
             frames = self.frames[idx:idx + self.seq_len]
         else:
             frames = self.frames[idx:idx + 1]
 
-        # Get action for last frame in sequence
         action = self.actions[idx + self.seq_len - 1]
 
-        # Convert to tensor (NCHW format for PyTorch)
         frames = torch.tensor(frames, dtype=torch.float32)
         frames = frames.permute(0, 3, 1, 2)  # (seq, C, H, W)
-        frames = frames / 255.0  # Normalize to [0, 1]
+        frames = frames / 255.0
 
-        # Remove sequence dim if seq_len == 1
         if self.seq_len == 1:
             frames = frames.squeeze(0)
 
         action = torch.tensor(action, dtype=torch.float32)
-
         return frames, action
 
 
@@ -173,34 +217,33 @@ def train_epoch(
     criterion: nn.Module,
     device: torch.device,
     epoch: int,
+    log_every_batches: int = 10,
 ) -> float:
     """Train for one epoch."""
     model.train()
     total_loss = 0.0
     num_batches = len(dataloader)
 
-    for batch_idx, (frames, actions) in enumerate(dataloader):
+    if num_batches == 0:
+        return 0.0
+
+    for batch_idx, (frames, actions) in enumerate(dataloader, start=1):
         frames = frames.to(device)
         actions = actions.to(device)
 
-        # Forward pass
         optimizer.zero_grad()
         outputs = model(frames)
         loss = criterion(outputs, actions)
-
-        # Backward pass
         loss.backward()
 
         # Gradient clipping
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
         optimizer.step()
-
         total_loss += loss.item()
 
-        # Progress
-        if (batch_idx + 1) % 10 == 0 or batch_idx == num_batches - 1:
-            print(f"  Batch {batch_idx + 1}/{num_batches} - Loss: {loss.item():.4f}")
+        if (batch_idx % log_every_batches == 0) or (batch_idx == num_batches):
+            LOG.info(f"    [Epoch {epoch}] Batch {batch_idx:>4}/{num_batches} | loss={loss.item():.4f}")
 
     return total_loss / num_batches
 
@@ -217,6 +260,9 @@ def validate(
     correct = 0
     total = 0
 
+    if dataloader is None or len(dataloader) == 0:
+        return 0.0, 0.0
+
     with torch.no_grad():
         for frames, actions in dataloader:
             frames = frames.to(device)
@@ -226,14 +272,12 @@ def validate(
             loss = criterion(outputs, actions)
             total_loss += loss.item()
 
-            # Calculate accuracy (for multi-label, use threshold)
             preds = (torch.sigmoid(outputs) > 0.5).float()
             correct += (preds == actions).all(dim=1).sum().item()
             total += actions.size(0)
 
     avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0.0
     accuracy = correct / total if total > 0 else 0.0
-
     return avg_loss, accuracy
 
 
@@ -250,74 +294,92 @@ def train_model(
     """Full training loop with validation and checkpointing."""
     model = model.to(device)
 
-    # Optimizer and scheduler
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Loss function (multi-label binary cross-entropy)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
     criterion = nn.BCEWithLogitsLoss()
 
-    # Training history
-    best_val_loss = float('inf')
+    best_val_loss = float("inf")
+    start_time = time.time()
 
-    print(f"\n{'='*60}")
-    print(f"Training Configuration")
-    print(f"{'='*60}")
-    print(f"  Model: {model.__class__.__name__}")
-    print(f"  Parameters: {count_parameters(model):,}")
-    print(f"  Device: {device}")
-    print(f"  Epochs: {epochs}")
-    print(f"  Learning Rate: {learning_rate}")
-    print(f"  Train Batches: {len(train_loader)}")
-    if val_loader:
-        print(f"  Val Batches: {len(val_loader)}")
-    print(f"{'='*60}\n")
+    LOG.info(hr("TRAINING CONFIG"))
+    LOG.info(f"Model           : {model_name} ({model.__class__.__name__})")
+    LOG.info(f"Parameters      : {count_parameters(model):,}")
+    LOG.info(f"Device          : {device}")
+    LOG.info(f"Epochs          : {epochs}")
+    LOG.info(f"Learning rate   : {learning_rate}")
+    LOG.info(f"Train batches   : {len(train_loader)}")
+    LOG.info(f"Val batches     : {len(val_loader) if val_loader else 0}")
+    LOG.info(f"Artifacts dir   : {save_dir.resolve()}")
+    LOG.info(hr())
 
-    for epoch in range(epochs):
-        epoch_start = time.time()
-        print(f"Epoch {epoch + 1}/{epochs}")
-        print("-" * 40)
+    for ep in range(1, epochs + 1):
+        epoch_t0 = time.time()
+        lr_now = optimizer.param_groups[0]["lr"]
 
-        # Train
-        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, epoch)
+        LOG.info(hr(f"EPOCH {ep}/{epochs}", width=72))
 
-        # Validate
+        train_loss = train_epoch(
+            model=model,
+            dataloader=train_loader,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
+            epoch=ep,
+            log_every_batches=10,
+        )
+
+        val_loss = None
+        val_acc = None
         if val_loader:
             val_loss, val_acc = validate(model, val_loader, criterion, device)
-            print(f"  Train Loss: {train_loss:.4f}")
-            print(f"  Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
 
-            # Save best model
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                save_path = save_dir / f"{model_name}_best.pth"
-                save_model(
-                    model, str(save_path),
-                    optimizer=optimizer,
-                    epoch=epoch,
-                    loss=val_loss,
-                    model_name=model.__class__.__name__,
-                )
-                print(f"  Saved best model to {save_path}")
-        else:
-            print(f"  Train Loss: {train_loss:.4f}")
-
-        # Step scheduler
         scheduler.step()
 
-        # Checkpoint every 5 epochs
-        if (epoch + 1) % 5 == 0:
-            save_path = save_dir / f"{model_name}_epoch{epoch + 1}.pth"
-            save_model(model, str(save_path), optimizer=optimizer, epoch=epoch, loss=train_loss)
-            print(f"  Checkpoint saved to {save_path}")
+        epoch_dt = time.time() - epoch_t0
+        elapsed = time.time() - start_time
+        avg_epoch = elapsed / ep
+        eta = avg_epoch * (epochs - ep)
 
-        epoch_time = time.time() - epoch_start
-        print(f"  Time: {epoch_time:.1f}s\n")
+        if val_loader:
+            LOG.info(
+                f"[Epoch {ep}/{epochs}] "
+                f"train_loss={train_loss:.4f} | val_loss={val_loss:.4f} | val_acc={val_acc:.4f} | "
+                f"lr={lr_now:.2e} | time={epoch_dt:.1f}s | eta={fmt_seconds(eta)}"
+            )
+        else:
+            LOG.info(
+                f"[Epoch {ep}/{epochs}] "
+                f"train_loss={train_loss:.4f} | lr={lr_now:.2e} | time={epoch_dt:.1f}s | eta={fmt_seconds(eta)}"
+            )
+
+        # Save best model (if validation exists)
+        if val_loader and val_loss is not None and val_loss < best_val_loss:
+            best_val_loss = val_loss
+            save_path = save_dir / f"{model_name}_best.pth"
+            save_model(
+                model, str(save_path),
+                optimizer=optimizer,
+                epoch=ep - 1,
+                loss=val_loss,
+                model_name=model.__class__.__name__,
+            )
+            LOG.info(f"[Save] New best model -> {save_path.resolve()} (val_loss={val_loss:.4f})")
+
+        # Checkpoint every 5 epochs
+        if ep % 5 == 0:
+            save_path = save_dir / f"{model_name}_epoch{ep}.pth"
+            save_model(model, str(save_path), optimizer=optimizer, epoch=ep - 1, loss=train_loss)
+            LOG.info(f"[Save] Checkpoint -> {save_path.resolve()}")
 
     # Save final model
     save_path = save_dir / f"{model_name}_final.pth"
     save_model(model, str(save_path), optimizer=optimizer, epoch=epochs - 1)
-    print(f"Final model saved to {save_path}")
+    LOG.info(hr("TRAINING DONE"))
+    LOG.info(f"[Save] Final model -> {save_path.resolve()}")
+    LOG.info(hr())
 
     return model
 
@@ -351,60 +413,55 @@ def main(argv=None) -> int:
     # List models and exit
     if args.list_models:
         if not MODELS_AVAILABLE:
-            print("[Error] models_pytorch.py not found")
+            LOG.error("[Error] models_pytorch.py not found")
             return 1
-        print("\nAvailable Models:")
-        print("=" * 60)
+        LOG.info("\nAvailable Models:")
+        LOG.info(hr())
         for name in list_models():
             info = get_model_info(name)
             rec = " [RECOMMENDED]" if info.get("recommended") else ""
-            print(f"\n  {name}{rec}")
-            print(f"    {info['description']}")
-            print(f"    Params: {info['params']}, Inference: {info['inference_ms']}")
+            LOG.info(f"\n  {name}{rec}")
+            LOG.info(f"    {info['description']}")
+            LOG.info(f"    Params: {info['params']}, Inference: {info['inference_ms']}")
         return 0
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
+        LOG.error("[Error] PyTorch not available. Install with: pip install torch torchvision")
         return 1
 
     if not MODELS_AVAILABLE:
-        print("[Error] models_pytorch.py not found")
+        LOG.error("[Error] models_pytorch.py not found")
         return 1
 
-    # Paths
     data_dir = Path(args.data)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not data_dir.exists():
-        print(f"[Error] Data directory not found: {data_dir}")
+        LOG.error(f"[Error] Data directory not found: {data_dir}")
         return 1
 
-    # Device
     device = torch.device("cpu") if args.cpu else get_device()
 
-    print(f"\n{'='*60}")
-    print(f"BOT-MMORPG-AI Training")
-    print(f"{'='*60}")
-    print(f"Data: {data_dir}")
-    print(f"Output: {out_dir}")
-    print(f"Model: {args.model}")
-    print(f"Device: {device}")
+    LOG.info(hr("BOT-MMORPG-AI TRAINING"))
+    LOG.info(f"Data dir     : {data_dir.resolve()}")
+    LOG.info(f"Artifacts dir: {out_dir.resolve()}")
+    LOG.info(f"Model        : {args.model}")
+    LOG.info(f"Device       : {device}")
 
-    # Check if model is temporal
     model_info = get_model_info(args.model)
     is_temporal = model_info.get("temporal", False)
     seq_len = args.seq_len if is_temporal else 1
-
-    print(f"Temporal: {is_temporal} (seq_len={seq_len})")
+    LOG.info(f"Temporal     : {is_temporal} (seq_len={seq_len})")
+    LOG.info(hr())
 
     # Create dataset
-    print(f"\nLoading data...")
+    LOG.info("Loading data...")
     try:
         dataset = GameplayDataset(data_dir, seq_len=seq_len, limit_files=args.limit_files)
     except ValueError as e:
-        print(f"[Error] {e}")
+        LOG.error(f"[Error] {e}")
         return 1
 
     # Split train/val
@@ -412,42 +469,54 @@ def main(argv=None) -> int:
     val_size = int(total_size * args.val_split)
     train_size = total_size - val_size
 
+    if train_size <= 0:
+        LOG.error("[Error] Not enough samples to train. Try collecting more data or lowering --val-split.")
+        return 1
+
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    print(f"Train samples: {len(train_dataset)}")
-    print(f"Val samples: {len(val_dataset)}")
+    LOG.info(f"Train samples : {len(train_dataset)}")
+    LOG.info(f"Val samples   : {len(val_dataset)}")
 
-    # Create dataloaders
+    # Dataloaders
     train_loader = DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
-        num_workers=0, pin_memory=device.type == "cuda",
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=(device.type == "cuda"),
     )
 
-    val_loader = DataLoader(
-        val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0,
-    ) if val_size > 0 else None
+    val_loader = (
+        DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+        if val_size > 0 else None
+    )
 
     # Create model
-    print(f"\nCreating model: {args.model}")
+    LOG.info(f"Creating model: {args.model}")
     model = get_model(
-        args.model, num_actions=args.num_actions,
-        temporal_frames=seq_len, pretrained=not args.no_pretrained,
+        args.model,
+        num_actions=args.num_actions,
+        temporal_frames=seq_len,
+        pretrained=not args.no_pretrained,
     )
 
-    print(f"Parameters: {count_parameters(model):,}")
+    LOG.info(f"Parameters   : {count_parameters(model):,}")
+    LOG.info("Starting training...")
+    LOG.info("NOTE: Artifacts will be saved as .pth into the artifacts dir above.")
 
-    # Train
-    print(f"\nStarting training...")
-    model = train_model(
-        model=model, train_loader=train_loader, val_loader=val_loader,
-        device=device, epochs=args.epochs, learning_rate=args.lr,
-        save_dir=out_dir, model_name=args.model,
+    train_model(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        device=device,
+        epochs=args.epochs,
+        learning_rate=args.lr,
+        save_dir=out_dir,
+        model_name=args.model,
     )
 
-    print(f"\n{'='*60}")
-    print(f"Training Complete!")
-    print(f"{'='*60}")
-
+    LOG.info(hr("TRAINING COMPLETE"))
     return 0
 
 
