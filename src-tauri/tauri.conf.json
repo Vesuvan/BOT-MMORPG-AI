@@ -45,11 +45,9 @@
       "resources": [
         "resources/**",
         "drivers/**",
-        "../versions/**",
-        "../pyproject.toml"
-   
-
-
+        "../pyproject.toml",
+        "../backend/**",
+        "../modelhub/**"
       ],
       "windows": {
         "nsis": {

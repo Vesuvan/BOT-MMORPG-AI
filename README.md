@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.8%2B-orange.svg)](https://www.tensorflow.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 [Features](#-why-gamers-love-bot-mmorpg-ai) • [Quick Start](#-quick-start-for-gamers) • [See It In Action](#-see-it-in-action) • [Setup Guide](USAGE.md) • [Support](#-community--support)
@@ -326,19 +326,23 @@ BOT-MMORPG-AI/
 │       ├── models/          # Neural network architectures
 │       ├── utils/           # Utility functions
 │       └── scripts/         # Entry point scripts
+│           ├── models_pytorch.py  # PyTorch model architectures
+│           ├── train_model.py     # Training script
+│           └── test_model.py      # Inference script
 ├── versions/
 │   └── 0.01/                # Version-specific implementations
 │       ├── 1-collect_data.py
 │       ├── 2-train_model.py
 │       ├── 3-test_model.py
-│       ├── models.py        # Model definitions
-│       ├── grabscreen.py    # Screen capture
-│       ├── getkeys.py       # Keyboard input
-│       ├── getgamepad.py    # Gamepad input
-│       └── directkeys.py    # Key simulation
+│       ├── models_pytorch.py  # PyTorch models (EfficientNet, MobileNet, etc.)
+│       ├── grabscreen.py      # Screen capture
+│       ├── getkeys.py         # Keyboard input
+│       ├── getgamepad.py      # Gamepad input
+│       └── directkeys.py      # Key simulation
 ├── frontend/
 │   ├── input_record/        # Input recording utilities
 │   └── video_record/        # Video recording utilities
+├── modelhub/                # Model metadata and versioning
 ├── tests/                   # Test suite
 ├── assets/                  # Images and resources
 ├── pyproject.toml          # Project configuration
@@ -401,15 +405,18 @@ make ci
 
 ### Neural Network Architectures
 
-The project supports multiple neural network architectures:
+The project uses **PyTorch 2.x** and supports multiple modern neural network architectures optimized for real-time game AI:
 
-| Model | Size | Top-1 Acc | Top-5 Acc | Parameters | Inference (GPU) |
-|-------|------|-----------|-----------|------------|-----------------|
-| InceptionV3 | 92 MB | 77.9% | 93.7% | 23.9M | 6.9 ms |
-| ResNet50 | 98 MB | 74.9% | 92.1% | 25.6M | 4.6 ms |
-| ResNet101 | 171 MB | 76.4% | 92.8% | 44.7M | 5.2 ms |
-| VGG16 | 528 MB | 71.3% | 90.1% | 138.4M | 4.2 ms |
-| MobileNetV2 | 14 MB | 71.3% | 90.1% | 3.5M | 3.8 ms |
+| Model | Size | Parameters | Temporal | Speed | Best For |
+|-------|------|------------|----------|-------|----------|
+| **EfficientNet-LSTM** | ~20MB | ~5M | Yes | Medium | Best accuracy with temporal awareness |
+| **EfficientNet-Simple** | ~15MB | ~4M | No | Fast | Single-frame predictions |
+| **MobileNetV3** | ~10MB | ~2.5M | No | Fastest | Low-end hardware / real-time |
+| **ResNet18-LSTM** | ~50MB | ~12M | Yes | Medium | Good balance of speed/accuracy |
+| **InceptionV3** | ~30MB | ~7M | No | Slow | Legacy compatibility |
+| **AlexNet** | ~230MB | ~60M | No | Medium | Legacy compatibility |
+
+**Recommended**: `efficientnet_lstm` for best results with temporal game context.
 
 ### Output Classes
 
@@ -457,10 +464,10 @@ The project supports cloud-based training on:
 
 ### Experimental Features
 
-- **U-Net Models**: For semantic segmentation of game paths
-- **LSTM Networks**: For temporal action prediction
-- **ResNeXt**: Advanced residual network architectures
-- **3D Convolutions**: For multi-frame temporal learning
+- **Temporal LSTM Models**: EfficientNet and ResNet backbones with LSTM heads for temporal action prediction
+- **3D Convolutions**: SentNet architecture with 3D convolutions for multi-frame temporal learning
+- **Mixed Precision Training**: PyTorch AMP for faster training on modern GPUs
+- **TorchScript Export**: Optimized model deployment with torch.jit.script
 
 ---
 
@@ -558,12 +565,13 @@ Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 This project builds upon excellent work from the community:
 
+- **[PyTorch](https://pytorch.org/)** - The deep learning framework powering our AI
+- **[torchvision](https://pytorch.org/vision/)** - Pre-trained models (EfficientNet, MobileNetV3, ResNet)
 - **[gamePyd](https://github.com/4amVim/gamePyd)** - Game control utilities
 - **[vJoy](http://vjoystick.sourceforge.net/)** - Virtual joystick interface
 - **[ScpVBus](https://github.com/nefarius/ScpVBus)** by [nefarius](https://github.com/nefarius)
 - **[PYXInput](https://github.com/bayangan1991/PYXInput)** contributors
 - **[PyGTA5](https://github.com/Sentdex/pygta5)** by Sentdex
-- **Inception V3** architecture by Google Research
 
 Special thanks to the AI Gaming Community for their continuous support and feedback.
 
