@@ -41,6 +41,7 @@ window.showTab = function (tabId) {
     run: "Run Bot",
     strategist: "AI Strategist",
     models: "ModelHub",
+    wizard: "Training School",
   };
 
   const pageTitle = document.getElementById("page-title");

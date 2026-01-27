@@ -1,0 +1,92 @@
+# Guild Wars 2 Profile
+# Optimized for action combat with dodge mechanics
+
+game:
+  id: "guild_wars_2"
+  name: "Guild Wars 2"
+  publisher: "ArenaNet / NCSoft"
+
+display:
+  typical_resolution: [1920, 1080]
+  ui_scale_range: [0.75, 1.25]
+  important_regions:
+    health_bar: [0.42, 0.88, 0.16, 0.04]
+    skill_bar: [0.30, 0.92, 0.40, 0.07]
+    minimap: [0.82, 0.70, 0.17, 0.28]
+    center_focus: [0.30, 0.25, 0.40, 0.50]
+
+input:
+  action_space: "hybrid"
+  num_actions: 15
+  requires_mouse: true
+  mouse_precision: "medium"
+  default_bindings:
+    - {key: "1", action: "weapon_1"}
+    - {key: "2", action: "weapon_2"}
+    - {key: "3", action: "weapon_3"}
+    - {key: "4", action: "weapon_4"}
+    - {key: "5", action: "weapon_5"}
+    - {key: "6", action: "heal"}
+    - {key: "7", action: "utility_1"}
+    - {key: "8", action: "utility_2"}
+    - {key: "9", action: "utility_3"}
+    - {key: "0", action: "elite"}
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "move_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "move_right"}
+    - {key: "V", action: "dodge"}
+
+training:
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [224, 224]
+  temporal_frames: 6
+  minimum_samples: 8000
+  class_balance_tolerance: 0.2
+  learning_rate:
+    initial: 0.0006
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+hardware_tiers:
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 6
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+  medium:
+    architecture: "efficientnet_lstm"
+    batch_size: 12
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 4
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 24
+    input_size: [256, 256]
+    temporal_frames: 6
+    workers: 8
+
+tasks:
+  combat:
+    description: "Action combat with dodge timing"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, noise]
+    fps_target: 45
+  farming:
+    description: "Material gathering and events"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "mobilenetv3"
+    augmentation: [rotation, brightness]
+    fps_target: 20
+  world_boss:
+    description: "Large-scale boss encounters"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast]
+    fps_target: 30

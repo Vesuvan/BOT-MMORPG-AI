@@ -22,6 +22,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+  <!-- Training School Styles -->
+  <link rel="stylesheet" href="./styles/training-school.css">
+
   <style>
     :root {
       --bg-dark: #121212;
@@ -397,6 +400,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM6 8v8h12V8z"/></svg>
         ModelHub
       </a>
+      <a data-tab="wizard" class="nav-btn" id="btn-wizard" href="#">
+        <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+        Training School 🎓
+      </a>
       <a data-tab="strategist" class="nav-btn" id="btn-strategist" href="#">
         <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
         AI Strategist ✨
@@ -462,6 +469,11 @@
           <div class="card-icon" style="color: #FFD700;">✨</div>
           <h3>Ask AI Strategist</h3>
           <p>Optional cloud chat (Gemini/OpenAI) using your API key.</p>
+        </div>
+        <div class="card" onclick="window.showTab && window.showTab('wizard')">
+          <div class="card-icon" style="color: #BB86FC;">🎓</div>
+          <h3>Training School</h3>
+          <p>Zero-to-Hero setup wizard. Configure game, task, and model.</p>
         </div>
       </div>
 
@@ -670,6 +682,47 @@
       </div>
     </div>
 
+    <!-- TRAINING SCHOOL WIZARD -->
+    <div id="tab-wizard" class="tab-content">
+      <div class="wizard-container">
+        <div class="wizard-header">
+          <h2 class="wizard-title">🎓 AI Training School</h2>
+          <p class="wizard-subtitle">Zero-to-Hero Setup Wizard</p>
+        </div>
+
+        <div class="wizard-progress">
+          <div class="wizard-progress-step" data-step="0">Hardware</div>
+          <div class="wizard-progress-step" data-step="1">Game</div>
+          <div class="wizard-progress-step" data-step="2">Task</div>
+          <div class="wizard-progress-step" data-step="3">Model</div>
+          <div class="wizard-progress-step" data-step="4">Data</div>
+          <div class="wizard-progress-step" data-step="5">Review</div>
+        </div>
+
+        <div id="wizard-content" class="wizard-body">
+          <!-- Wizard steps render here -->
+          <div class="wizard-step-content" style="text-align: center; padding: 40px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎮</div>
+            <h2>Welcome to Training School</h2>
+            <p style="color: var(--text-dim); margin: 15px 0 25px;">
+              This wizard will guide you through setting up your AI bot training configuration.
+            </p>
+            <button class="btn btn-wide" id="btn-start-wizard" style="max-width: 300px;">
+              Start Setup Wizard
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 6</span>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-wizard-back" disabled>Back</button>
+            <button class="btn" id="btn-wizard-next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- STRATEGIST -->
     <div id="tab-strategist" class="tab-content">
       <div class="chat-container">
@@ -817,7 +870,53 @@
     });
   </script>
 
+  <!-- Training School Wizard -->
+  <script src="./js/wizard.js"></script>
+
   <!-- IMPORTANT: load your Tauri JS last -->
   <script src="./main.js"></script>
+
+  <!-- Wizard initialization -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize wizard when start button is clicked
+      const startBtn = document.getElementById('btn-start-wizard');
+      const backBtn = document.getElementById('btn-wizard-back');
+      const nextBtn = document.getElementById('btn-wizard-next');
+
+      let wizard = null;
+
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          wizard = new SetupWizard();
+          wizard.onComplete = (config) => {
+            console.log('Wizard completed:', config);
+            // Optionally switch to train tab
+            if (window.showTab) window.showTab('train');
+          };
+          await wizard.start();
+          backBtn.disabled = true;
+        });
+      }
+
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          if (wizard) {
+            wizard.back();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', async () => {
+          if (wizard) {
+            await wizard.next();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

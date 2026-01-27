@@ -5,8 +5,16 @@ This module contains shared pytest fixtures and configuration
 for the test suite.
 """
 
+import sys
+from pathlib import Path
+
 import pytest
 from typing import Generator
+
+# Add project root to path for launcher module imports
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 @pytest.fixture
