@@ -1,0 +1,135 @@
+# Game Profile Template
+# Copy this folder to create a custom game profile
+# All fields are documented with their purpose and valid values
+
+game:
+  # Unique identifier (lowercase, underscores)
+  id: "my_custom_game"
+  # Display name shown in UI
+  name: "My Custom Game"
+  # Game publisher (optional, for reference)
+  publisher: "Game Studio"
+
+display:
+  # Common resolution for this game
+  typical_resolution: [1920, 1080]
+  # UI scale range [min, max] - used for augmentation
+  ui_scale_range: [0.8, 1.2]
+  # Screen regions of interest (x, y, width, height as percentages 0-1)
+  important_regions:
+    health_bar: [0.01, 0.85, 0.15, 0.05]
+    action_bar: [0.3, 0.9, 0.4, 0.08]
+    minimap: [0.85, 0.01, 0.14, 0.2]
+    center_focus: [0.25, 0.25, 0.5, 0.5]
+
+input:
+  # Action space type: discrete (keyboard), continuous (mouse), hybrid (both)
+  action_space: "hybrid"
+  # Number of distinct actions/key bindings
+  num_actions: 12
+  # Whether mouse control is needed
+  requires_mouse: true
+  # Mouse precision: low (menus), medium (combat), high (aiming)
+  mouse_precision: "medium"
+  # Default key bindings (can be overridden by user)
+  default_bindings:
+    - {key: "1", action: "skill_1"}
+    - {key: "2", action: "skill_2"}
+    - {key: "3", action: "skill_3"}
+    - {key: "4", action: "skill_4"}
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "move_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "move_right"}
+    - {key: "SPACE", action: "jump"}
+    - {key: "SHIFT", action: "dodge"}
+    - {key: "TAB", action: "target"}
+    - {key: "mouse_left", action: "attack"}
+
+training:
+  # Recommended neural network architecture
+  # Options: mobilenetv3, efficientnet_simple, efficientnet_lstm, resnet18_lstm
+  recommended_architecture: "efficientnet_lstm"
+  # Input image size [height, width]
+  recommended_input_size: [224, 224]
+  # Number of frames for temporal models (0 = non-temporal)
+  temporal_frames: 4
+  # Minimum training samples recommended
+  minimum_samples: 5000
+  # Maximum class imbalance ratio tolerated (0.0-1.0)
+  class_balance_tolerance: 0.3
+  # Learning rate schedule
+  learning_rate:
+    initial: 0.001
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+# Hardware-specific configurations
+hardware_tiers:
+  # Low-end: < 4GB VRAM (integrated GPU, old cards)
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 8
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+
+  # Medium: 4-8GB VRAM (GTX 1060-1080, RTX 2060-3060)
+  medium:
+    architecture: "efficientnet_simple"
+    batch_size: 16
+    input_size: [224, 224]
+    temporal_frames: 2
+    workers: 4
+
+  # High: > 8GB VRAM (RTX 3070+, RTX 4000 series)
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 32
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 8
+
+# Task-specific configurations
+tasks:
+  combat:
+    description: "Real-time combat with reaction requirements"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation:
+      - brightness
+      - contrast
+      - noise
+    fps_target: 30
+
+  farming:
+    description: "Resource gathering and repetitive tasks"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "mobilenetv3"
+    augmentation:
+      - rotation
+      - flip
+      - color_jitter
+    fps_target: 15
+
+  navigation:
+    description: "Pathfinding and movement"
+    priority: "spatial_awareness"
+    temporal: true
+    recommended_architecture: "resnet18_lstm"
+    augmentation:
+      - brightness
+      - perspective
+    fps_target: 20
+
+  crafting:
+    description: "Crafting UI interaction and sequences"
+    priority: "precision"
+    temporal: false
+    recommended_architecture: "efficientnet_simple"
+    augmentation:
+      - brightness
+      - contrast
+    fps_target: 10

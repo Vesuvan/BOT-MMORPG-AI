@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-uv venv sync clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
+.PHONY: help install install-dev install-uv venv sync install-drivers download-drivers clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
 
 # Default target
 .DEFAULT_GOAL := help
@@ -40,7 +40,7 @@ endif
 	@echo uv is installed
 	@echo If 'uv' is not found, restart your terminal so PATH updates take effect.
 
-venv: ## Create the virtual environment (Forces Python 3.10 for TensorFlow Windows compatibility)
+venv: ## Create the virtual environment (Python 3.10 for best compatibility)
 	@echo Creating virtual environment with Python 3.10...
 	@uv venv --python 3.10
 	@echo Virtual environment created in .venv/
@@ -60,15 +60,78 @@ install-launcher: install-uv venv ## Install launcher dependencies (Eel)
 	@uv pip install -e ".[launcher]"
 	@echo Launcher dependencies installed
 
+launcher: ## Run the Python/Eel launcher for development
+	@echo "========================================"
+	@echo " Starting BOT-MMORPG-AI Launcher (Dev)"
+	@echo "========================================"
+	@echo "Note: Install launcher dependencies first with 'make install-launcher'"
+	@echo ""
+	$(RUN_PYTHON) launcher/launcher.py
+
 install-all: install-uv venv ## Install all dependencies (requires pyproject.toml update)
 	@echo Installing all dependencies...
 	@uv pip install -e ".[all]"
 	@echo All dependencies installed
 
-sync: install-uv venv ## Sync dependencies using uv
+sync: install-uv venv ## Refresh/reinstall dependencies from pyproject.toml
 	@echo Syncing dependencies with uv...
-	@uv pip sync requirements.txt
+	@uv pip install -e . --reinstall
 	@echo Dependencies synced
+
+install-drivers: ## Install vJoy and Interception drivers (Windows only, requires Admin)
+ifeq ($(IS_WINDOWS),1)
+	@echo "========================================"
+	@echo " Installing Gaming Drivers"
+	@echo "========================================"
+	@echo "This will install:"
+	@echo "  - vJoy (virtual joystick driver)"
+	@echo "  - Interception (keyboard/mouse driver)"
+	@echo ""
+	@echo "NOTE: Requires Administrator privileges."
+	@echo "      Uses drivers from repository."
+	@echo "      Use 'make download-drivers' to download from source first."
+	@echo ""
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install_drivers.ps1
+else
+	@echo "========================================"
+	@echo " Driver Installation"
+	@echo "========================================"
+	@echo "ERROR: Driver installation is only supported on Windows."
+	@echo ""
+	@echo "These drivers are Windows-specific:"
+	@echo "  - vJoy: Virtual joystick for game input simulation"
+	@echo "  - Interception: Low-level keyboard/mouse driver"
+	@echo ""
+	@echo "For Linux/macOS, alternative input methods may be available"
+	@echo "but are not currently supported by this project."
+	@echo ""
+endif
+
+download-drivers: ## Download drivers from official sources and install (Windows only)
+ifeq ($(IS_WINDOWS),1)
+	@echo "========================================"
+	@echo " Downloading & Installing Gaming Drivers"
+	@echo "========================================"
+	@echo "This will:"
+	@echo "  1. Download drivers from official GitHub releases"
+	@echo "  2. Install vJoy and Interception drivers"
+	@echo ""
+	@echo "Download sources:"
+	@echo "  - vJoy: https://github.com/shauleiz/vJoy"
+	@echo "  - Interception: https://github.com/oblitum/Interception"
+	@echo ""
+	@echo "NOTE: Requires Administrator privileges."
+	@echo ""
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install_drivers.ps1 -Download
+else
+	@echo "========================================"
+	@echo " Driver Download"
+	@echo "========================================"
+	@echo "ERROR: Driver download is only supported on Windows."
+	@echo ""
+	@echo "These drivers are Windows-specific and cannot be used on Linux/macOS."
+	@echo ""
+endif
 
 ##@ Code Quality
 
@@ -129,11 +192,25 @@ build: clean-build ## Build distribution packages
 	@$(RUN_PYTHON) -m build
 	@echo Distribution packages built in dist/
 
-docs: ## Generate documentation using Sphinx
-	@echo Generating documentation...
-	@uv pip install -e ".[docs]"
-	@cd docs && make html
-	@echo Documentation generated in docs/_build/html/
+docs: ## Generate documentation (Sphinx setup required)
+	@echo "========================================"
+	@echo " Documentation Generation"
+	@echo "========================================"
+	@echo "NOTE: Sphinx documentation is not yet configured."
+	@echo ""
+	@echo "Available documentation:"
+	@echo "  - README.md       : Project overview"
+	@echo "  - USAGE.md        : User guide for gamers"
+	@echo "  - SETUP_GUIDE.md  : Setup instructions"
+	@echo "  - INSTALLER.md    : Installer guide"
+	@echo "  - docs/*.md       : Additional docs"
+	@echo ""
+	@echo "To set up Sphinx documentation:"
+	@echo "  1. uv pip install -e '.[docs]'"
+	@echo "  2. sphinx-quickstart docs/"
+	@echo "  3. Configure docs/conf.py"
+	@echo "  4. Run: cd docs && make html"
+	@echo ""
 
 ##@ Cleaning
 

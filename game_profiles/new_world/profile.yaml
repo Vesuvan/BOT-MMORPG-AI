@@ -1,0 +1,91 @@
+# New World Profile
+# Optimized for action combat with blocking/dodging
+
+game:
+  id: "new_world"
+  name: "New World"
+  publisher: "Amazon Games"
+
+display:
+  typical_resolution: [1920, 1080]
+  ui_scale_range: [0.80, 1.20]
+  important_regions:
+    health_bar: [0.40, 0.90, 0.20, 0.04]
+    stamina_bar: [0.40, 0.94, 0.20, 0.02]
+    ability_bar: [0.35, 0.88, 0.30, 0.06]
+    compass: [0.40, 0.01, 0.20, 0.04]
+    center_focus: [0.30, 0.25, 0.40, 0.50]
+
+input:
+  action_space: "hybrid"
+  num_actions: 13
+  requires_mouse: true
+  mouse_precision: "high"
+  default_bindings:
+    - {key: "1", action: "ability_1"}
+    - {key: "2", action: "ability_2"}
+    - {key: "3", action: "ability_3"}
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "move_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "move_right"}
+    - {key: "SPACE", action: "dodge"}
+    - {key: "SHIFT", action: "block"}
+    - {key: "mouse_left", action: "light_attack"}
+    - {key: "mouse_right", action: "heavy_attack"}
+    - {key: "R", action: "sheathe"}
+    - {key: "TAB", action: "swap_weapon"}
+
+training:
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [224, 224]
+  temporal_frames: 6
+  minimum_samples: 8000
+  class_balance_tolerance: 0.2
+  learning_rate:
+    initial: 0.0006
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+hardware_tiers:
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 6
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+  medium:
+    architecture: "efficientnet_lstm"
+    batch_size: 12
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 4
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 24
+    input_size: [256, 256]
+    temporal_frames: 6
+    workers: 8
+
+tasks:
+  combat:
+    description: "Souls-like combat with stamina management"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, noise]
+    fps_target: 45
+  gathering:
+    description: "Resource harvesting (mining, logging, etc)"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "mobilenetv3"
+    augmentation: [rotation, brightness]
+    fps_target: 15
+  expedition:
+    description: "Dungeon boss mechanics"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast]
+    fps_target: 30

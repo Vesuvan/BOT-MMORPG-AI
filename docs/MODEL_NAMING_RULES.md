@@ -18,8 +18,11 @@
 trained_models/<game_id>/<model_id>/
 
 Required:
-- profile.json
-- model.keras OR model.h5
+- metadata.json (or legacy profile.json)
+- model.pth OR model_best.pth (PyTorch checkpoint)
+
+Legacy formats (still supported):
+- model.keras OR model.h5 (TensorFlow/Keras)
 
 Optional:
 - metrics.json

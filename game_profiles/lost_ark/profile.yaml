@@ -1,0 +1,89 @@
+# Lost Ark Profile
+# Optimized for isometric action combat
+
+game:
+  id: "lost_ark"
+  name: "Lost Ark"
+  publisher: "Smilegate / Amazon Games"
+
+display:
+  typical_resolution: [1920, 1080]
+  ui_scale_range: [0.80, 1.20]
+  important_regions:
+    health_bar: [0.40, 0.92, 0.20, 0.03]
+    skill_bar: [0.32, 0.88, 0.36, 0.08]
+    minimap: [0.84, 0.01, 0.15, 0.22]
+    center_focus: [0.25, 0.20, 0.50, 0.60]
+
+input:
+  action_space: "hybrid"
+  num_actions: 12
+  requires_mouse: true
+  mouse_precision: "high"
+  default_bindings:
+    - {key: "Q", action: "skill_1"}
+    - {key: "W", action: "skill_2"}
+    - {key: "E", action: "skill_3"}
+    - {key: "R", action: "skill_4"}
+    - {key: "A", action: "skill_5"}
+    - {key: "S", action: "skill_6"}
+    - {key: "D", action: "skill_7"}
+    - {key: "F", action: "skill_8"}
+    - {key: "SPACE", action: "dodge"}
+    - {key: "Z", action: "awakening"}
+    - {key: "mouse_left", action: "move"}
+    - {key: "mouse_right", action: "basic_attack"}
+
+training:
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [256, 256]
+  temporal_frames: 6
+  minimum_samples: 10000
+  class_balance_tolerance: 0.2
+  learning_rate:
+    initial: 0.0005
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+hardware_tiers:
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 6
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+  medium:
+    architecture: "efficientnet_lstm"
+    batch_size: 12
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 4
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 24
+    input_size: [256, 256]
+    temporal_frames: 6
+    workers: 8
+
+tasks:
+  combat:
+    description: "Isometric combat with skill combos"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, noise]
+    fps_target: 60
+  chaos_dungeon:
+    description: "Fast-paced dungeon clearing"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast]
+    fps_target: 45
+  guardian_raid:
+    description: "Boss mechanics and patterns"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, noise]
+    fps_target: 30

@@ -1,0 +1,37 @@
+# Game Profiles Registry
+# This file indexes all available game profiles for the BOT-MMORPG-AI system
+version: "1.0"
+
+profiles:
+  genshin_impact:
+    name: "Genshin Impact"
+    status: "supported"
+    path: "genshin_impact/profile.yaml"
+
+  world_of_warcraft:
+    name: "World of Warcraft"
+    status: "supported"
+    path: "world_of_warcraft/profile.yaml"
+
+  guild_wars_2:
+    name: "Guild Wars 2"
+    status: "supported"
+    path: "guild_wars_2/profile.yaml"
+
+  final_fantasy_xiv:
+    name: "Final Fantasy XIV"
+    status: "supported"
+    path: "final_fantasy_xiv/profile.yaml"
+
+  lost_ark:
+    name: "Lost Ark"
+    status: "supported"
+    path: "lost_ark/profile.yaml"
+
+  new_world:
+    name: "New World"
+    status: "supported"
+    path: "new_world/profile.yaml"
+
+# Users can add custom profiles here
+custom_profiles: []
