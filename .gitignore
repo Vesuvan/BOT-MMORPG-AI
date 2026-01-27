@@ -203,3 +203,5 @@ modelhub_registry.json
 active_model.json
 active_model.json
 trained_models/genshin_impact/genshin_impact_combat_v1/profile.json
+*.json
+*.json

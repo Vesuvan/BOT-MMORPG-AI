@@ -563,6 +563,65 @@
       width: 0%;
       transition: width 0.5s ease;
     }
+  
+    /* --- LOADOUT / NEW CATALOG UI --- */
+    .loadout-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+    .game-select-wrap label { display:block; font-size:10px; font-weight:900; color:var(--text-dim); margin-bottom:5px; letter-spacing:1px; text-transform:uppercase; }
+    .game-select-wrap select { background:var(--bg-panel); border:1px solid var(--border); padding:10px; width:250px; font-weight:bold; height: 45px; border-radius: 10px; color: #fff; }
+
+    .loadout-main { display:grid; grid-template-columns: 1fr 360px; gap:24px; height:calc(100vh - 260px); }
+
+    .inventory-section { display:flex; flex-direction:column; overflow:hidden; }
+    .section-title { font-size:12px; font-weight:900; color:var(--text-dim); margin-bottom:10px; letter-spacing:1px; text-transform:uppercase; }
+    .inventory-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px; overflow-y:auto; padding-right:5px; align-content:start; padding-bottom: 20px; }
+
+    .brain-card { 
+      background:var(--bg-panel); border:1px solid var(--border); border-radius:12px; padding:15px; 
+      cursor:pointer; transition:all 0.2s ease; position:relative; overflow:hidden;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+    }
+    .brain-card:hover { transform:translateY(-3px); border-color:var(--text-dim); background: rgba(255,255,255,0.05); }
+    .brain-card.selected { border-color:var(--primary); box-shadow:0 0 15px rgba(187, 134, 252, 0.15); }
+    .brain-card.equipped { border:1px solid var(--secondary); background:rgba(3,218,198,0.05); }
+
+    .brain-card .card-status { 
+        position:absolute; top:10px; right:10px; font-size: 10px; font-weight: 900; 
+        padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.5); color: var(--text-dim);
+    }
+    .brain-card.equipped .card-status { background:var(--secondary); color: #000; box-shadow:0 0 8px var(--secondary); }
+
+    .brain-name { font-weight:800; font-size:14px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .brain-meta { font-size:11px; color:var(--text-dim); display:flex; flex-wrap: wrap; gap:6px; }
+
+    .inspector-section { background:var(--bg-panel); border-radius:16px; border:1px solid var(--border); padding:20px; display:flex; flex-direction:column; box-shadow: var(--shadow); height: fit-content; min-height: 420px; }
+    .inspector-content.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; opacity:0.65; min-height: 320px; }
+    .placeholder-icon { font-size:48px; margin-bottom:10px; filter:grayscale(1); opacity: 0.6; }
+
+    .insp-header { border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:15px; }
+    .insp-title { font-size:20px; font-weight:900; color:#fff; line-height:1.2; word-break:break-word; }
+    .insp-path { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); margin-top: 5px; word-break: break-word; }
+    .insp-badge { display:inline-block; padding:4px 8px; border-radius:999px; background:var(--bg-dark); font-size:10px; margin-top:10px; border:1px solid var(--border); margin-right: 6px; color: var(--text-dim); font-weight: 900; }
+
+    .insp-stats { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; flex:1; }
+    .stat-row { display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); gap: 10px; }
+    .stat-label { color:var(--text-dim); }
+    .stat-val { color:#fff; font-weight:600; font-family:'JetBrains Mono', monospace; text-align: right; }
+
+    .action-area { margin-top:auto; display: flex; flex-direction: column; gap: 10px; }
+    .big-btn { width:100%; padding:16px; border-radius:12px; font-weight:900; font-size:14px; letter-spacing:1px; cursor:pointer; border:none; transition:all 0.2s; text-transform: uppercase; }
+
+    .btn-equip { background:var(--bg-card); color:#fff; border:1px solid var(--text-dim); }
+    .btn-equip:hover { background:#fff; color:#000; transform: translateY(-2px); }
+
+    .btn-deploy { background:var(--secondary); color:#000; box-shadow:0 0 20px rgba(3,218,198,0.3); animation:pulse 2s infinite; }
+    .btn-deploy:hover { filter: brightness(1.1); }
+
+    .btn-delete { background: transparent; color: var(--accent); border: 1px solid var(--border); padding: 10px; font-size: 12px; cursor: pointer; border-radius: 10px; opacity: 0.8; font-weight: 800; }
+    .btn-delete:hover { opacity: 1; border-color: var(--accent); background: rgba(207, 102, 121, 0.1); }
+
+    @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(3,218,198,0.55); } 70% { box-shadow:0 0 0 10px rgba(3,218,198,0); } 100% { box-shadow:0 0 0 0 rgba(3,218,198,0); } }
+
   </style>
 </head>
 
@@ -678,7 +737,7 @@
         <div class="card" onclick="showTab('models')">
           <div class="card-icon" style="color: #69F0AE;">📚</div>
           <h3>Open Catalog</h3>
-          <p>Pick any model (built-in or trained), set it active, then run the bot.</p>
+          <p>Pick any model (built-in or trained), equip it, then launch the bot.</p>
         </div>
         <div class="card" onclick="showTab('strategist')">
           <div class="card-icon" style="color: #FFD700;">✨</div>
@@ -926,7 +985,7 @@
       <div class="soft-panel" style="margin-bottom: 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
           <div style="color:var(--text-dim); font-size:12px;">
-            Tip: pick a model in <b>Model Catalog</b>, click <b>Set Active</b>, then press <b>Start Bot</b>.
+            Tip: pick a model in <b>Model Catalog</b>, click <b>Equip</b>, then press <b>Start Bot</b>.
           </div>
           <button class="btn btn-secondary btn-small" onclick="showTab('models')">Open Catalog</button>
         </div>
@@ -955,73 +1014,79 @@
     <div id="tab-models" class="tab-content">
       <div class="hero-status" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border);">
         <div class="hero-text">
-          <h2>Model Catalog</h2>
-          <p>Built-in testing models + your trained models. Set active, validate, run.</p>
+          <h2>Model Loadout</h2>
+          <p>Select a game, equip a brain, then launch the bot.</p>
         </div>
         <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="mh-status">Loading…</div>
       </div>
 
-      <div class="catalog-grid">
-        <!-- LEFT PANEL -->
-        <div class="card" style="cursor: default;">
-          <h3 style="margin-bottom: 10px;">Game</h3>
-          <select class="form-select" id="mh-game" onchange="refreshCatalog()">
-            <option value="">Select game…</option>
+      <div class="loadout-header">
+        <div class="game-select-wrap">
+          <label>Current Operation</label>
+          <select id="mh-game" class="form-select" onchange="refreshCatalog()">
+             <option value="">Loading...</option>
           </select>
+        </div>
+        <div style="display:flex; gap: 10px;">
+             <button class="btn btn-secondary" onclick="refreshCatalog()"><span>↻</span> Refresh</button>
+             <button class="btn" onclick="openTrainWizard()"><span>🧠</span> Train New Brain</button>
+        </div>
+      </div>
 
-          <div style="display:flex; gap:10px; margin-top:12px;">
-            <button class="btn btn-secondary btn-small" onclick="refreshCatalog()" style="flex:1;">
-              ↻ Refresh
-            </button>
-            <button class="btn btn-secondary btn-small" onclick="openTrainWizard()" style="flex:1;">
-              🧠 Train
-            </button>
+      <div class="loadout-main">
+        <div class="inventory-section">
+          <div class="section-title">Available Brains</div>
+          <div id="mh-models-list" class="inventory-grid">
+            <div class="log-entry" style="padding:10px;">Loading inventory...</div>
           </div>
-
-          <h3 style="margin: 16px 0 10px;">Dataset Folder (offline evaluation)</h3>
-          <input class="form-input" id="mh-dataset" placeholder="e.g. datasets/genshin_impact/<dataset_id>/" />
-
-          <div style="display:flex; gap:10px; margin-top: 14px;">
-            <button class="btn btn-secondary" onclick="mhValidate()" id="mh-validate" disabled>
-              Validate
-            </button>
-            <button class="btn btn-ai" onclick="mhEval()" id="mh-eval" disabled>
-              Offline Evaluate
-            </button>
-          </div>
-
-          <p style="font-size: 11px; color: var(--text-dim); margin-top: 10px;">
-            Training scripts are treated as black boxes. The launcher detects new files and archives them.
-          </p>
         </div>
 
-        <!-- RIGHT PANEL -->
-        <div>
-          <div class="catalog-list" style="margin-bottom: 14px;">
-            <div class="list-head">
-              <h3>Models</h3>
-              <div class="pill">Active: <span id="mh-active-pill">—</span></div>
-            </div>
-            <div class="catalog-items" id="mh-models-list">
-              <div class="log-entry" style="padding:10px;"><span class="log-time">[ModelHub]</span> Loading catalog…</div>
-            </div>
+        <div class="inspector-section">
+          <div id="inspector-empty" class="inspector-content empty">
+            <div class="placeholder-icon">🤖</div>
+            <h3>Select a Neural Model</h3>
+            <p style="color: var(--text-dim); margin-top: 5px;">Select a model to view stats,<br>equip it, or delete it.</p>
           </div>
 
-          <div class="ai-analysis-box" id="mh-details" style="display:block; max-height: 320px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-              <strong>Selected Model</strong>
-              <div style="display:flex; gap:10px;">
-                <button class="btn btn-secondary btn-small" onclick="mhSetActive()" id="mh-set-active" disabled>Set Active</button>
-                <button class="btn btn-success btn-small" onclick="mhRunSelected()" id="mh-run" disabled>Run</button>
-              </div>
+          <div id="inspector-content" style="display:none; flex-direction:column; height:100%;">
+            <div class="insp-header">
+               <div id="insp-title" class="insp-title">Model Name</div>
+               <div id="insp-path" class="insp-path">path/to/model</div>
+               <div id="insp-badges"></div>
             </div>
-            <pre id="mh-details-pre" style="margin-top:10px; white-space: pre-wrap; color:#d1d5db;">(none)</pre>
+
+            <div class="insp-stats">
+               <div class="stat-row">
+                  <span class="stat-label">Architecture</span>
+                  <span class="stat-val" id="insp-arch">—</span>
+               </div>
+               <div class="stat-row">
+                  <span class="stat-label">Created</span>
+                  <span class="stat-val" id="insp-date">—</span>
+               </div>
+               <div class="stat-row">
+                  <span class="stat-label">Status</span>
+                  <span class="stat-val" id="insp-status" style="color:var(--text-dim)">—</span>
+               </div>
+            </div>
+
+            <div class="action-area">
+                <button id="btn-main-action" class="big-btn btn-equip" onclick="mhHandleMainAction()">EQUIP MODEL</button>
+                <div style="display:flex; justify-content: center; margin-top: 10px;">
+                   <button class="btn-delete" onclick="mhDeleteSelected()">Delete Model</button>
+                </div>
+            </div>
           </div>
         </div>
       </div>
+
+      <div style="margin-top: 10px; display:flex; justify-content: space-between; align-items:center; gap:12px;">
+        <div class="pill">Active: <span id="mh-active-pill">—</span></div>
+        <div style="color: var(--text-dim); font-size: 12px;">Tip: Equip a model here, then press <b>Start Bot</b> in <b>Run Bot</b>.</div>
+      </div>
     </div>
 
-    <!-- QUICK START / WIZARD -->
+<!-- QUICK START / WIZARD -->
     <div id="tab-wizard" class="tab-content">
       <div class="wizard-container">
         <div class="wizard-header">
@@ -2184,7 +2249,7 @@
 
       const ok = await eel.mh_set_active(gameId, modelId, modelPath)();
       if (ok) {
-        toast("Active Model", `Set active: ${modelId}`, "ok");
+        toast("Equipped", `Equipped: ${modelId}`, "ok");
         await refreshCatalog();
         document.getElementById("run-active-model").innerText = modelId;
         showTab("run");
@@ -2580,6 +2645,203 @@ async function stopTraining(){
         });
       }
     });
-  </script>
+  
+    // ----------------------------------------------------
+    // PATCHED CATALOG UI (Loadout + Inspector)
+    // - Removes dataset-folder/validator cognitive load
+    // - Renames "Set Active" -> "Equip"
+    // - Renames "Run" -> "Launch/Deploy"
+    // ----------------------------------------------------
+
+    // override: refreshCatalog()
+    async function refreshCatalog() {
+      const gid = document.getElementById('mh-game')?.value || activeGameId || DEFAULT_GAME;
+      activeGameId = gid;
+
+      // keep other tabs in sync
+      const pill = document.getElementById("active-game-pill");
+      if (pill) pill.innerText = activeGameId;
+      const teachGame = document.getElementById("teach-game");
+      if (teachGame) teachGame.innerText = activeGameId;
+
+      // clear selection
+      mhSelected = null;
+      const empty = document.getElementById('inspector-empty');
+      const insp = document.getElementById('inspector-content');
+      if (empty) empty.style.display = 'flex';
+      if (insp) insp.style.display = 'none';
+
+      const list = document.getElementById('mh-models-list');
+      if (list) list.innerHTML = `<div style="color:var(--text-dim); padding:20px;">Loading inventory...</div>`;
+
+      try {
+        const payload = await eel.mh_get_catalog_data(gid)();
+        mhCache = payload;
+
+        // Update stats bar (dashboard + run + active pill)
+        if (typeof _setStatsFromCatalog === "function") _setStatsFromCatalog(payload);
+
+        const active = payload?.active || null;
+        const activeId = active?.model_id || null;
+        const builtins = payload?.builtin_models || [];
+        const managed = payload?.models || [];
+
+        const allModels = [
+          ...builtins.map(m => ({...m, kind: 'builtin'})),
+          ...managed.map(m => ({...m, kind: 'managed'})),
+        ];
+
+        if (!list) return;
+        list.innerHTML = "";
+
+        if (allModels.length === 0) {
+          list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:var(--text-dim); padding:40px;">No models found.<br>Train a new brain to get started.</div>`;
+          return;
+        }
+
+        for (const m of allModels) {
+          const id = m.id || m.model_id || m.name || "unknown";
+          const isEquipped = (activeId && id === activeId);
+          const el = renderBrainCard(gid, m, m.kind, isEquipped);
+          list.appendChild(el);
+        }
+
+        // keep train wizard dataset list updated
+        if (typeof twRefreshDatasets === "function") await twRefreshDatasets(true);
+
+      } catch (e) {
+        console.error(e);
+        if (list) list.innerHTML = `<div style="color:var(--accent); padding:20px;">Failed to load inventory.</div>`;
+      }
+    }
+
+    function renderBrainCard(gameId, model, kind, isEquipped) {
+      const el = document.createElement("div");
+      const name = model.name || model.profile_name || model.id || "Unnamed";
+      const arch = model.architecture || model.profile?.architecture || "Custom";
+      const created = model.created_at || model.profile?.created_at || (kind === "builtin" ? "Built-in" : "—");
+
+      el.className = `brain-card ${isEquipped ? 'equipped' : ''}`;
+
+      let statusHtml = "";
+      if (isEquipped) statusHtml = `<div class="card-status">EQUIPPED</div>`;
+      else if (kind === 'builtin') statusHtml = `<div class="card-status" style="background:rgba(255,215,0,0.2); color:#FFD700;">BUILT-IN</div>`;
+
+      const createdShort = (typeof created === "string" && created.length >= 10) ? created.substring(0, 10) : created;
+
+      el.innerHTML = `
+        ${statusHtml}
+        <div class="brain-name">${escapeHtml(name)}</div>
+        <div class="brain-meta">
+           <span class="tag">🧬 ${escapeHtml(arch)}</span>
+           <span class="tag">📅 ${escapeHtml(String(createdShort))}</span>
+        </div>
+      `;
+
+      el.onclick = () => mhSelectCard(gameId, model, kind, isEquipped, el);
+      return el;
+    }
+
+    function mhSelectCard(gameId, model, kind, isEquipped, el) {
+      document.querySelectorAll('.brain-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+
+      mhSelected = { gameId, model, kind, isEquipped };
+
+      // Update Inspector
+      document.getElementById('inspector-empty').style.display = 'none';
+      document.getElementById('inspector-content').style.display = 'flex';
+
+      const name = model.name || model.profile_name || model.id || "Unnamed";
+      const path = model.path || model.paths?.dir || model.dir || "Internal";
+      const arch = model.architecture || model.profile?.architecture || "Custom";
+      const created = model.created_at || model.profile?.created_at || (kind === "builtin" ? "Built-in" : "—");
+
+      document.getElementById('insp-title').innerText = name;
+      document.getElementById('insp-path').innerText = path;
+      document.getElementById('insp-arch').innerText = arch;
+      document.getElementById('insp-date').innerText = created;
+
+      const statusEl = document.getElementById('insp-status');
+      statusEl.innerText = isEquipped ? "Equipped on Bot" : "In Storage";
+      statusEl.style.color = isEquipped ? "var(--secondary)" : "var(--text-dim)";
+
+      // badges
+      const badges = document.getElementById('insp-badges');
+      badges.innerHTML = "";
+      badges.innerHTML += `<span class="insp-badge">${isEquipped ? "ACTIVE" : "INVENTORY"}</span>`;
+      badges.innerHTML += `<span class="insp-badge">${kind === "builtin" ? "BUILT-IN" : "TRAINED"}</span>`;
+
+      // Main button
+      const btn = document.getElementById('btn-main-action');
+      if (isEquipped) {
+         btn.innerText = "LAUNCH / DEPLOY";
+         btn.className = "big-btn btn-deploy";
+      } else {
+         btn.innerText = "EQUIP MODEL";
+         btn.className = "big-btn btn-equip";
+      }
+    }
+
+    async function mhHandleMainAction() {
+      if (!mhSelected) return;
+      const { gameId, model, kind, isEquipped } = mhSelected;
+
+      if (isEquipped) {
+        // Launch
+        showTab('run');
+        if (!isBotRunning) {
+          const btn = document.getElementById('btn-bot');
+          await toggleBot(btn);
+        }
+        return;
+      }
+
+      // Equip
+      const modelId = model.id || model.model_id || model.name || "unknown";
+      const modelPath = (kind === "builtin")
+        ? (model.paths?.dir || model.dir || model.path || "")
+        : (model.path || model.paths?.dir || model.dir || "");
+
+      if (!modelPath) { toast("Equip", "Missing model path.", "err"); return; }
+
+      const ok = await eel.mh_set_active(gameId, modelId, modelPath)();
+      if (ok) {
+        toast("Equipped", `${modelId} is now active.`, "ok");
+        await refreshCatalog();
+      } else {
+        toast("Equip", "Failed to equip model.", "err");
+      }
+    }
+
+    async function mhDeleteSelected() {
+      if (!mhSelected) return;
+      const { gameId, model, kind } = mhSelected;
+
+      if (kind === 'builtin') {
+        alert("Cannot delete built-in models.");
+        return;
+      }
+
+      const modelId = model.id || model.name || "unknown";
+      const path = model.path || model.paths?.dir || model.dir || "";
+
+      if (!confirm(`Delete '${modelId}'?\n\nThis cannot be undone.`)) return;
+
+      try {
+        const res = await eel.delete_model(gameId, modelId, path)();
+        if (res && res.ok) {
+          toast("Deleted", "Model removed.", "ok");
+          await refreshCatalog();
+        } else {
+          toast("Error", (res && (res.error || res.message)) || "Delete failed", "err");
+        }
+      } catch (e) {
+        console.warn('Delete failed:', e);
+        toast("Error", "Delete failed", "err");
+      }
+    }
+
+</script>
 </body>
 </html>
