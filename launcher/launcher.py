@@ -451,6 +451,186 @@ def modelhub_run_offline_evaluation(model_dir, dataset_dir):
     return {"ok": True, "cmd": cmd}
 
 
+# --- SCREEN CAPTURE & PREVIEW ---
+
+@eel.expose
+def list_monitors():
+    """List available monitors for screen capture."""
+    try:
+        from bot_mmorpg.scripts.grabscreen import list_monitors as _list_monitors
+        return _list_monitors()
+    except Exception as e:
+        print(f"[Error] list_monitors: {e}")
+        return [{"id": 1, "name": "Primary (Unknown)", "width": 1920, "height": 1080, "left": 0, "top": 0}]
+
+
+@eel.expose
+def get_screen_preview(monitor_id=1):
+    """Get base64-encoded screen preview for display in UI."""
+    try:
+        from bot_mmorpg.scripts.grabscreen import grab_screen_base64
+        return {"ok": True, "image": grab_screen_base64(monitor_id, 640, 360, 60)}
+    except Exception as e:
+        print(f"[Error] get_screen_preview: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+# --- DATASET MANAGEMENT ---
+
+@eel.expose
+def generate_dataset_name(game_id, task="general"):
+    """Generate a standardized dataset name based on game and timestamp."""
+    from datetime import datetime
+    gid = _normalize_game_id(game_id)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    task_clean = task.replace(" ", "_").lower()
+    return f"{gid}_{task_clean}_{timestamp}"
+
+
+@eel.expose
+def list_datasets(game_id):
+    """List all datasets for a game."""
+    gid = _normalize_game_id(game_id)
+
+    datasets = []
+
+    # Check content/ directory (legacy location)
+    content_dir = PROJECT_ROOT / "content"
+    if content_dir.exists():
+        for item in content_dir.iterdir():
+            if item.is_dir() and (gid in item.name.lower() or gid == "all"):
+                # Count files
+                file_count = len(list(item.glob("*.png"))) + len(list(item.glob("*.npy")))
+                datasets.append({
+                    "id": item.name,
+                    "name": item.name,
+                    "path": str(item.relative_to(PROJECT_ROOT)),
+                    "samples": file_count,
+                    "location": "content"
+                })
+
+    # Check datasets/ directory (new location)
+    datasets_dir = PROJECT_ROOT / "datasets" / gid
+    if datasets_dir.exists():
+        for item in datasets_dir.iterdir():
+            if item.is_dir():
+                file_count = len(list(item.glob("*.png"))) + len(list(item.glob("*.npy")))
+                datasets.append({
+                    "id": item.name,
+                    "name": item.name,
+                    "path": str(item.relative_to(PROJECT_ROOT)),
+                    "samples": file_count,
+                    "location": "datasets"
+                })
+
+    return datasets
+
+
+@eel.expose
+def delete_dataset(game_id, dataset_id, path):
+    """Delete a dataset from disk."""
+    gid = _normalize_game_id(game_id)
+
+    try:
+        full_path = PROJECT_ROOT / path
+
+        # Safety: only allow deletes under content/ or datasets/
+        content_root = (PROJECT_ROOT / "content").resolve()
+        datasets_root = (PROJECT_ROOT / "datasets").resolve()
+        target = full_path.resolve()
+
+        is_safe = (
+            (content_root in target.parents or target == content_root) or
+            (datasets_root in target.parents or target == datasets_root)
+        )
+
+        if not is_safe:
+            print(f"[Safety] Refusing to delete outside content/ or datasets/: {target}")
+            return {"ok": False, "error": "Invalid path"}
+
+        if target.exists():
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            print(f"[Dataset] Deleted: {target}")
+            return {"ok": True}
+
+        return {"ok": False, "error": "Dataset not found"}
+    except Exception as e:
+        print(f"[Error] delete_dataset: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+@eel.expose
+def list_trained_models(game_id):
+    """List all trained models for a game."""
+    gid = _normalize_game_id(game_id)
+    models = []
+
+    # Check trained_models/<game_id>/
+    models_dir = PROJECT_ROOT / "trained_models" / gid
+    if models_dir.exists():
+        for item in models_dir.iterdir():
+            if item.is_dir():
+                # Look for model files
+                has_model = (
+                    (item / "model.pt").exists() or
+                    (item / "model.pth").exists() or
+                    any(item.glob("*.pt")) or
+                    any(item.glob("*.pth"))
+                )
+                if has_model:
+                    models.append({
+                        "id": item.name,
+                        "name": item.name,
+                        "path": str(item.relative_to(PROJECT_ROOT)),
+                        "location": "trained_models"
+                    })
+
+    # Check versions/0.01/model/ (legacy)
+    legacy_dir = PROJECT_ROOT / "versions" / "0.01" / "model"
+    if legacy_dir.exists() and any(legacy_dir.glob("*.pt")):
+        models.append({
+            "id": "legacy_model",
+            "name": "Legacy Model (v0.01)",
+            "path": str(legacy_dir.relative_to(PROJECT_ROOT)),
+            "location": "versions"
+        })
+
+    return models
+
+
+@eel.expose
+def delete_model(game_id, model_id, path):
+    """Delete a trained model from disk."""
+    gid = _normalize_game_id(game_id)
+
+    try:
+        full_path = PROJECT_ROOT / path
+
+        # Safety: only allow deletes under trained_models/
+        safe_root = (PROJECT_ROOT / "trained_models").resolve()
+        target = full_path.resolve()
+
+        if safe_root not in target.parents and target != safe_root:
+            print(f"[Safety] Refusing to delete outside trained_models/: {target}")
+            return {"ok": False, "error": "Invalid path"}
+
+        if target.exists():
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            print(f"[Model] Deleted: {target}")
+            return {"ok": True}
+
+        return {"ok": False, "error": "Model not found"}
+    except Exception as e:
+        print(f"[Error] delete_model: {e}")
+        return {"ok": False, "error": str(e)}
+
+
 # --- SYSTEM HANDLERS ---
 
 def signal_handler(sig, frame):

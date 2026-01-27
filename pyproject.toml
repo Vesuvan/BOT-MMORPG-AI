@@ -10,7 +10,7 @@ maintainers = [
 ]
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.8,<3.11"
+requires-python = ">=3.8,<3.12"
 keywords = [
     "ai",
     "machine-learning",
@@ -19,6 +19,7 @@ keywords = [
     "bot",
     "computer-vision",
     "deep-learning",
+    "pytorch",
     "tensorflow",
     "automation"
 ]
@@ -39,15 +40,19 @@ classifiers = [
 ]
 
 dependencies = [
+    # Core dependencies
     "numpy>=1.19.0,<2.0.0",
     "pandas>=1.3.0,<3.0.0",
-    "tensorflow>=2.10.1,<2.13",
     "opencv-python>=4.5.0,<5.0.0",
-    "tflearn==0.5.0",
-    "pillow>=9.0.0,<10.0.0",
+    "pillow>=9.0.0,<11.0.0",
+    # Platform-specific
     "pywin32>=300; platform_system=='Windows'",
     "pynput>=1.7.0,<2.0.0",
     "mss>=6.1.0,<10.0.0",
+    # ML dependencies (PyTorch 2.x) - required for all ML features
+    "torch>=2.0.0,<3.0.0",
+    "torchvision>=0.15.0,<1.0.0",
+    "timm>=0.9.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -73,7 +78,7 @@ jupyter = [
 ]
 
 launcher =[
-    "eel>=0.16.0",
+    "eel>=0.16.0,<1.0.0",
     "python-dotenv>=1.0.0"
 ]
 
@@ -84,6 +89,12 @@ backend = [
 
 packaging = [
   "pyinstaller>=6.0"
+]
+
+ml-legacy = [
+  # TensorFlow legacy support (optional, not recommended)
+  "tensorflow==2.11.1",
+  "tflearn>=0.5.0"
 ]
 
 all = [
@@ -162,6 +173,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
+    "health: marks tests as health/smoke tests",
 ]
 
 # Coverage configuration
@@ -210,6 +222,9 @@ module = [
     "pynput.*",
     "win32api.*",
     "win32con.*",
+    "torch.*",
+    "torchvision.*",
+    "timm.*",
 ]
 ignore_missing_imports = true
 

@@ -1,0 +1,102 @@
+# Genshin Impact Profile
+# Optimized settings for action combat and exploration
+
+game:
+  id: "genshin_impact"
+  name: "Genshin Impact"
+  publisher: "miHoYo / HoYoverse"
+
+display:
+  typical_resolution: [1920, 1080]
+  ui_scale_range: [0.8, 1.2]
+  important_regions:
+    health_bar: [0.02, 0.02, 0.15, 0.04]
+    stamina_bar: [0.42, 0.92, 0.16, 0.02]
+    minimap: [0.84, 0.01, 0.15, 0.22]
+    party_list: [0.88, 0.40, 0.10, 0.30]
+    center_focus: [0.25, 0.20, 0.50, 0.55]
+    elemental_burst: [0.90, 0.75, 0.08, 0.10]
+
+input:
+  action_space: "discrete"
+  num_actions: 16
+  requires_mouse: true
+  mouse_precision: "high"
+  default_bindings:
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "strafe_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "strafe_right"}
+    - {key: "SPACE", action: "jump"}
+    - {key: "LSHIFT", action: "sprint"}
+    - {key: "E", action: "elemental_skill"}
+    - {key: "Q", action: "elemental_burst"}
+    - {key: "1", action: "switch_char_1"}
+    - {key: "2", action: "switch_char_2"}
+    - {key: "3", action: "switch_char_3"}
+    - {key: "4", action: "switch_char_4"}
+    - {key: "LMOUSE", action: "normal_attack"}
+    - {key: "RMOUSE", action: "aimed_shot"}
+    - {key: "F", action: "interact"}
+    - {key: "M", action: "map"}
+
+training:
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [224, 224]
+  temporal_frames: 4
+  minimum_samples: 5000
+  class_balance_tolerance: 0.30
+  learning_rate:
+    initial: 0.001
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+hardware_tiers:
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 8
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+  medium:
+    architecture: "efficientnet_simple"
+    batch_size: 16
+    input_size: [224, 224]
+    temporal_frames: 2
+    workers: 4
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 32
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 8
+
+tasks:
+  combat:
+    description: "Real-time action combat with elemental reactions"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, motion_blur]
+    fps_target: 30
+  farming:
+    description: "Resource gathering and material collection routes"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "mobilenetv3"
+    augmentation: [rotation, brightness, color_jitter]
+    fps_target: 15
+  exploration:
+    description: "Map navigation and chest/oculi hunting"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "efficientnet_simple"
+    augmentation: [brightness, scale]
+    fps_target: 20
+  domains:
+    description: "Domain runs and boss fights"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast, noise]
+    fps_target: 30
