@@ -10,7 +10,13 @@ Production updates:
 - Windows-safe stop (CTRL_BREAK_EVENT via CREATE_NEW_PROCESS_GROUP) with graceful fallback
 - Avoids double-finalization: start_* stops previous process WITHOUT finalizing; stop/final exit finalizes
 - Removes duplicated imports and improves reliability/log clarity
+
+Additional production fixes (this patch):
+- start_bot(): prevents passing resolution/preset strings as --model by mistake
+- start_bot(): falls back to active model from ModelHub if UI passes garbage/empty
+- start_bot(): supports relative model paths by resolving against PROJECT_ROOT
 """
+
 from __future__ import annotations
 
 import os
@@ -190,6 +196,70 @@ def _drain_output_queue() -> None:
             pass
 
 
+def _looks_like_model_path(s: str) -> bool:
+    """
+    Heuristic: accept if it looks like a path or a model file.
+    Reject presets like '480x270'.
+    """
+    if not s:
+        return False
+    s = str(s).strip()
+    if not s:
+        return False
+
+    # common preset pattern like 480x270 or 1920x1080
+    if "x" in s:
+        parts = s.lower().split("x")
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            return False
+
+    lowered = s.lower()
+    if any(lowered.endswith(ext) for ext in (".pt", ".pth", ".onnx", ".safetensors")):
+        return True
+
+    # path-ish
+    if ("/" in s) or ("\\" in s):
+        return True
+
+    return False
+
+
+def _resolve_model_arg(game_id: str | None, model_path: str | None) -> str | None:
+    """
+    Return a safe model path to pass to 3-test_model.py.
+
+    Priority:
+      1) UI-provided model_path if it actually looks like a path/file
+      2) Active model from ModelHub (active_model.json)
+      3) None
+    """
+    # 1) UI-provided path (only if it looks valid)
+    if isinstance(model_path, str) and _looks_like_model_path(model_path):
+        p = Path(model_path)
+        # If relative, resolve against PROJECT_ROOT
+        if not p.is_absolute():
+            p = (PROJECT_ROOT / p).resolve()
+        return str(p)
+
+    # 2) Active model from ModelHub
+    if mh_get_active_model:
+        try:
+            active = mh_get_active_model()
+        except Exception:
+            active = None
+
+        if isinstance(active, dict):
+            ap = active.get("path") or active.get("model_path")
+            if isinstance(ap, str) and ap.strip():
+                p = Path(ap.strip())
+                if not p.is_absolute():
+                    p = (PROJECT_ROOT / p).resolve()
+                return str(p)
+
+    # 3) None
+    return None
+
+
 # --- EEL EXPOSED FUNCTIONS ---
 
 @eel.expose
@@ -346,12 +416,16 @@ def start_training(game_id="unknown", model_name="New Model", dataset_id="", arc
     except Exception as e:
         return f"Error starting training: {str(e)}"
 
+
 @eel.expose
 def start_bot(game_id=None, model_path=None):
     """
     Start 3-test_model.py.
-    UI may pass (game_id, model_path) or (game_id, model_id).
-    Accept them to avoid Eel TypeError.
+
+    Production behavior:
+    - Accepts UI args (game_id, model_path) but validates them.
+    - If UI accidentally passes a preset/resolution (e.g., '480x270'), ignore it.
+    - Falls back to ModelHub active model (active_model.json) if available.
     """
     global current_process
     script_path = SCRIPTS_PATH / "3-test_model.py"
@@ -361,12 +435,18 @@ def start_bot(game_id=None, model_path=None):
 
     try:
         _stop_process_internal(finalize=False)
-        print(f"[Process] Starting bot: {script_path}")
 
-        # If UI provides a model path, pass it to 3-test_model.py
-        cmd = [sys.executable, str(script_path)]
-        if model_path:
-            cmd += ["--model", str(model_path)]
+        gid = _normalize_game_id(game_id)
+
+        resolved_model = _resolve_model_arg(gid, model_path)
+        if not resolved_model:
+            return "Error: No valid model selected. Equip a model first in Model Manager."
+
+        print(f"[Process] Starting bot: {script_path}")
+        print(f"[Process]   Game : {gid}")
+        print(f"[Process]   Model: {resolved_model}")
+
+        cmd = [sys.executable, str(script_path), "--model", resolved_model]
 
         creationflags = 0
         if os.name == "nt":
@@ -385,7 +465,6 @@ def start_bot(game_id=None, model_path=None):
         return "Bot started successfully"
     except Exception as e:
         return f"Error starting bot: {str(e)}"
-
 
 
 def _stop_process_internal(finalize: bool = True):
