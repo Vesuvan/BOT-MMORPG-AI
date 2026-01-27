@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-uv venv sync install-drivers download-drivers clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
+.PHONY: help install install-dev install-uv venv sync install-drivers download-drivers clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
 
 # Default target
 .DEFAULT_GOAL := help
@@ -59,6 +59,14 @@ install-launcher: install-uv venv ## Install launcher dependencies (Eel)
 	@echo Installing launcher dependencies...
 	@uv pip install -e ".[launcher]"
 	@echo Launcher dependencies installed
+
+launcher: ## Run the Python/Eel launcher for development
+	@echo "========================================"
+	@echo " Starting BOT-MMORPG-AI Launcher (Dev)"
+	@echo "========================================"
+	@echo "Note: Install launcher dependencies first with 'make install-launcher'"
+	@echo ""
+	$(RUN_PYTHON) launcher/launcher.py
 
 install-all: install-uv venv ## Install all dependencies (requires pyproject.toml update)
 	@echo Installing all dependencies...

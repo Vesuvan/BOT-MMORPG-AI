@@ -25,9 +25,14 @@ class TestModelImports:
         """Test that list_models function is available."""
         from bot_mmorpg.scripts.models_pytorch import list_models
         models = list_models()
-        assert len(models) == 8
+        # 8 original + 3 new advanced models (transformer, multihead, attention)
+        assert len(models) == 11
         assert 'efficientnet_lstm' in models
         assert 'mobilenet_v3' in models
+        # New advanced models
+        assert 'efficientnet_transformer' in models
+        assert 'multihead_action' in models
+        assert 'game_attention' in models
 
     def test_get_model_available(self):
         """Test that get_model factory function is available."""
@@ -137,14 +142,6 @@ class TestForwardPass:
         """Frame sequence input: (batch=1, seq=4, C=3, H=270, W=480)."""
         return torch.randn(1, 4, 3, 270, 480)
 
-    @pytest.fixture
-    def video_3d(self):
-        """3D video input for SentNet: (batch=1, C=3, D=16, H=270, W=480).
-
-        Note: SentNet uses Conv3d with kernel_size=11, so D must be >= 11.
-        """
-        return torch.randn(1, 3, 16, 270, 480)
-
     def test_efficientnet_lstm_forward_single(self, single_frame):
         """Test EfficientNet-LSTM forward pass with single frame."""
         from bot_mmorpg.scripts.models_pytorch import get_model
@@ -217,20 +214,10 @@ class TestForwardPass:
             output = model(single_frame)
         assert output.shape == (1, 29)
 
-    @pytest.mark.skip(reason="SentNet 3D legacy model requires very large inputs (>512x960) due to multiple 3D pooling layers")
-    def test_sentnet_forward(self, video_3d):
-        """Test SentNet 3D forward pass.
-
-        Note: This test is skipped because SentNet 3D is a legacy model
-        that requires very large video inputs (D>64, H>512, W>960) to pass
-        through its multiple AvgPool3d layers without dimension collapse.
-        """
-        from bot_mmorpg.scripts.models_pytorch import get_model
-        model = get_model('sentnet', num_actions=29)
-        model.eval()
-        with torch.no_grad():
-            output = model(video_3d)
-        assert output.shape == (1, 29)
+    # Note: SentNet 3D forward test is omitted because the legacy model
+    # requires very large video inputs (D>64, H>512, W>960) to pass through
+    # its multiple AvgPool3d layers without dimension collapse.
+    # The model instantiation is tested in TestModelInstantiation.
 
     def test_sentnet_2d_forward(self, single_frame):
         """Test SentNet 2D forward pass."""

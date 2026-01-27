@@ -407,28 +407,89 @@ make ci
 
 The project uses **PyTorch 2.x** and supports multiple modern neural network architectures optimized for real-time game AI:
 
-| Model | Size | Parameters | Temporal | Speed | Best For |
-|-------|------|------------|----------|-------|----------|
-| **EfficientNet-LSTM** | ~20MB | ~5M | Yes | Medium | Best accuracy with temporal awareness |
-| **EfficientNet-Simple** | ~15MB | ~4M | No | Fast | Single-frame predictions |
-| **MobileNetV3** | ~10MB | ~2.5M | No | Fastest | Low-end hardware / real-time |
-| **ResNet18-LSTM** | ~50MB | ~12M | Yes | Medium | Good balance of speed/accuracy |
-| **InceptionV3** | ~30MB | ~7M | No | Slow | Legacy compatibility |
-| **AlexNet** | ~230MB | ~60M | No | Medium | Legacy compatibility |
+#### 🌟 Modern Models (Recommended)
+
+| Model | Parameters | Temporal | Speed | Best For |
+|-------|------------|----------|-------|----------|
+| **EfficientNet-LSTM** | ~5M | Yes | ~8ms | Best accuracy with temporal awareness |
+| **EfficientNet-Simple** | ~5M | No | ~5ms | Single-frame predictions |
+| **MobileNetV3** | ~2M | No | ~3ms | Low-end hardware / real-time |
+| **ResNet18-LSTM** | ~12M | Yes | ~10ms | Good balance of speed/accuracy |
+
+#### 🚀 Advanced Models (Experimental)
+
+| Model | Parameters | Features | Best For |
+|-------|------------|----------|----------|
+| **EfficientNet-Transformer** | ~12M | Transformer attention | Long action sequences (better than LSTM) |
+| **Multi-Head Action** | ~6M | Separate output heads | Simultaneous actions (move + attack) |
+| **Game Attention Network** | ~6M | Spatial attention | Complex UIs (HP bars, minimap, cooldowns) |
+
+#### 📜 Legacy Models (Compatibility)
+
+| Model | Parameters | Notes |
+|-------|------------|-------|
+| **InceptionV3** | ~7M | Original architecture |
+| **AlexNet** | ~60M | Classic deep learning |
+| **SentNet 2D/3D** | ~70M | 3D convolutions for video |
 
 **Recommended**: `efficientnet_lstm` for best results with temporal game context.
 
-### Output Classes
+### Action Spaces
 
-The model predicts 29 different actions:
+The bot supports multiple action space configurations for different game types:
+
+| Action Space | Actions | Output Type | Best For |
+|--------------|---------|-------------|----------|
+| **basic** | 9 | Single-label | WASD movement only (simple routing) |
+| **standard** | 29 | Single-label | Keyboard + full gamepad (default) |
+| **combat** | 48 | Multi-label | Movement + skills + combat (action RPGs) |
+| **extended** | 73 | Multi-label | Full MMORPG (all action categories) |
+
+#### Standard Actions (29)
 - **Keyboard** (9): W, S, A, D, WA, WD, SA, SD, NOKEY
 - **Gamepad** (20): LT, RT, Lx, Ly, Rx, Ry, D-Pad, Buttons (A, B, X, Y, etc.)
+
+#### Extended Actions (73) - Full MMORPG Support
+- **Movement** (16): WASD, jump, sprint, dodge, mount, swim
+- **Skills** (20): Hotbar 1-9, F1-F4, Shift+number combos
+- **Combat** (12): Attack, block, interact, heal, ultimate, combos
+- **Targeting** (8): Tab-target, party targeting, focus
+- **Camera** (8): Mouse look, zoom, reset
+- **UI** (8): Inventory, map, menus
+
+**Game-Specific Recommendations:**
+- **Genshin, Lost Ark, BDO**: `combat` (48 actions, multi-label)
+- **WoW, FFXIV**: `extended` (73 actions, multi-label)
+- **RuneScape, Albion**: `standard` (29 actions, single-label)
+
+### Resolution Settings
+
+The bot supports variable input resolutions for different performance needs:
+
+| Resolution | Performance | Memory | Recommended For |
+|------------|-------------|--------|-----------------|
+| **480x270** ⭐ | 1.0x (fastest) | 1.0x | Default - best training speed |
+| **640x360** | 0.56x | 1.78x | Good balance of detail/speed |
+| **960x540** | 0.25x | 4.0x | Complex UIs (experimental) |
+| **1280x720** | 0.14x | 7.1x | HD maximum (experimental) |
+
+**Game-Specific Resolution Presets:**
+
+| Game | Recommended | Notes |
+|------|-------------|-------|
+| Genshin Impact | 480x270 | Mobile UI scales well |
+| World of Warcraft | 640x360 | Complex addon UI |
+| Final Fantasy XIV | 640x360 | Detailed hotbars |
+| Lost Ark | 640x360 | Many skill indicators |
+| Guild Wars 2 | 480x270 | Clean UI design |
+| Elder Scrolls Online | 480x270 | Minimal UI |
+| Path of Exile | 640x360 | Complex loot system |
 
 ### Training Data Format
 
 Data is stored as NumPy arrays:
-- **Input**: Screen captures (480x270x3 RGB images)
-- **Output**: Multi-hot encoded action vectors (29 classes)
+- **Input**: Screen captures (variable resolution, default 480x270x3 RGB)
+- **Output**: Multi-hot encoded action vectors (configurable 9-73 classes)
 - **Format**: `.npy` files with 500 samples each
 
 ---
@@ -464,6 +525,12 @@ The project supports cloud-based training on:
 
 ### Experimental Features
 
+- **Transformer Temporal Models**: EfficientNet backbone with Transformer encoder for better long-range dependencies than LSTM
+- **Multi-Head Action Output**: Separate prediction heads for movement/skills/combat/camera - enables simultaneous actions
+- **Spatial Attention Networks**: Learn to focus on important screen regions (HP bars, minimap, skill cooldowns)
+- **Variable Resolution Support**: Train and run models at different resolutions (480p to 720p)
+- **Extended Action Spaces**: Full MMORPG action support with 73 configurable actions
+- **Multi-Label Classification**: Predict multiple simultaneous actions (move + cast + dodge)
 - **Temporal LSTM Models**: EfficientNet and ResNet backbones with LSTM heads for temporal action prediction
 - **3D Convolutions**: SentNet architecture with 3D convolutions for multi-frame temporal learning
 - **Mixed Precision Training**: PyTorch AMP for faster training on modern GPUs

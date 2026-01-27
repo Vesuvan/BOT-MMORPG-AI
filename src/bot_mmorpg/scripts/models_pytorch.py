@@ -738,6 +738,318 @@ class SentNet2D(nn.Module):
 
 
 # =============================================================================
+# Advanced Architectures (Experimental - Better for MMORPG)
+# =============================================================================
+
+class EfficientNetTransformer(nn.Module):
+    """
+    EfficientNet backbone + Transformer encoder for temporal modeling.
+
+    Better than LSTM for:
+    - Capturing long-range dependencies in action sequences
+    - Parallel processing of frame sequences
+    - Attention to important frames
+
+    Input: (batch, seq_len, C, H, W) - sequence of frames
+    Output: (batch, num_actions) - action logits
+    """
+
+    def __init__(
+        self,
+        num_actions: int = 29,
+        temporal_frames: int = 8,
+        d_model: int = 512,
+        nhead: int = 8,
+        num_encoder_layers: int = 4,
+        dropout: float = 0.1,
+        pretrained: bool = True,
+    ):
+        super().__init__()
+
+        self.temporal_frames = temporal_frames
+        self.num_actions = num_actions
+        self.d_model = d_model
+
+        # EfficientNet-B0 backbone
+        if TORCHVISION_AVAILABLE and pretrained:
+            weights = tv_models.EfficientNet_B0_Weights.DEFAULT
+            self.backbone = tv_models.efficientnet_b0(weights=weights)
+        elif TORCHVISION_AVAILABLE:
+            self.backbone = tv_models.efficientnet_b0(weights=None)
+        else:
+            raise ImportError("torchvision required for EfficientNet")
+
+        # Remove classifier, get feature dimension
+        self.feature_dim = self.backbone.classifier[1].in_features
+        self.backbone.classifier = nn.Identity()
+
+        # Project features to transformer dimension
+        self.feature_proj = nn.Linear(self.feature_dim, d_model)
+
+        # Learnable positional encoding for temporal dimension
+        self.pos_encoding = nn.Parameter(torch.randn(1, temporal_frames, d_model) * 0.02)
+
+        # Transformer encoder for temporal modeling
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=d_model * 4,
+            dropout=dropout,
+            activation='gelu',
+            batch_first=True,
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
+
+        # Classification token (like BERT's [CLS])
+        self.cls_token = nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
+
+        # Action prediction head
+        self.action_head = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model // 2, num_actions),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Handle single frame input
+        if x.dim() == 4:
+            x = x.unsqueeze(1)
+
+        batch, seq_len, C, H, W = x.shape
+
+        # Extract features from each frame
+        x = x.view(batch * seq_len, C, H, W)
+        features = self.backbone(x)
+        features = features.view(batch, seq_len, -1)
+
+        # Project to transformer dimension
+        features = self.feature_proj(features)
+
+        # Add positional encoding (truncate or pad if needed)
+        if seq_len <= self.temporal_frames:
+            features = features + self.pos_encoding[:, :seq_len, :]
+        else:
+            features = features + self.pos_encoding[:, :seq_len % self.temporal_frames + 1, :].repeat(1, seq_len // self.temporal_frames + 1, 1)[:, :seq_len, :]
+
+        # Prepend classification token
+        cls_tokens = self.cls_token.expand(batch, -1, -1)
+        features = torch.cat([cls_tokens, features], dim=1)
+
+        # Apply transformer
+        encoded = self.transformer(features)
+
+        # Use CLS token output for classification
+        cls_output = encoded[:, 0, :]
+
+        # Predict actions
+        logits = self.action_head(cls_output)
+        return logits
+
+
+class MultiHeadActionModel(nn.Module):
+    """
+    Multi-head output model for simultaneous actions.
+
+    Separate prediction heads for different action categories:
+    - Movement (continuous): WASD, analog sticks
+    - Skills (discrete): Hotbar 1-9, F-keys
+    - Combat (discrete): Attack, dodge, block
+    - Camera (continuous): Look direction
+
+    This allows the model to predict multiple actions simultaneously,
+    which is essential for MMORPG combat (move while attacking).
+
+    Input: (batch, C, H, W) - single frame
+    Output: Dict with separate tensors for each action category
+    """
+
+    def __init__(
+        self,
+        num_actions: int = 52,    # Total actions (can be overridden)
+        num_movement: int = 16,   # Movement actions
+        num_skills: int = 20,     # Skill slots
+        num_combat: int = 12,     # Combat actions
+        num_camera: int = 4,      # Camera controls
+        dropout: float = 0.3,
+        pretrained: bool = True,
+    ):
+        super().__init__()
+
+        # If num_actions is specified, distribute across heads
+        if num_actions != 52:  # Custom action count
+            # Distribute proportionally
+            total_default = 16 + 20 + 12 + 4
+            num_movement = max(4, int(num_actions * 16 / total_default))
+            num_skills = max(4, int(num_actions * 20 / total_default))
+            num_combat = max(4, int(num_actions * 12 / total_default))
+            num_camera = max(1, num_actions - num_movement - num_skills - num_combat)
+
+        self.num_actions = num_movement + num_skills + num_combat + num_camera
+        self.num_movement = num_movement
+        self.num_skills = num_skills
+        self.num_combat = num_combat
+        self.num_camera = num_camera
+
+        # EfficientNet-B0 backbone (shared)
+        if TORCHVISION_AVAILABLE and pretrained:
+            weights = tv_models.EfficientNet_B0_Weights.DEFAULT
+            self.backbone = tv_models.efficientnet_b0(weights=weights)
+        elif TORCHVISION_AVAILABLE:
+            self.backbone = tv_models.efficientnet_b0(weights=None)
+        else:
+            raise ImportError("torchvision required")
+
+        self.feature_dim = self.backbone.classifier[1].in_features
+        self.backbone.classifier = nn.Identity()
+
+        # Separate heads for each action category
+        self.movement_head = nn.Sequential(
+            nn.Linear(self.feature_dim, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(256, num_movement),
+            nn.Tanh(),  # Continuous -1 to 1 for analog
+        )
+
+        self.skill_head = nn.Sequential(
+            nn.Linear(self.feature_dim, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(256, num_skills),
+            # Sigmoid applied in loss/inference for multi-label
+        )
+
+        self.combat_head = nn.Sequential(
+            nn.Linear(self.feature_dim, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(256, num_combat),
+        )
+
+        self.camera_head = nn.Sequential(
+            nn.Linear(self.feature_dim, 128),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(128, num_camera),
+            nn.Tanh(),  # Continuous for camera movement
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Extract features
+        features = self.backbone(x)
+
+        # Get predictions from each head
+        movement = self.movement_head(features)
+        skills = self.skill_head(features)
+        combat = self.combat_head(features)
+        camera = self.camera_head(features)
+
+        # Concatenate all outputs
+        return torch.cat([movement, skills, combat, camera], dim=-1)
+
+    def forward_dict(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass returning dictionary of action categories."""
+        features = self.backbone(x)
+        return {
+            "movement": self.movement_head(features),
+            "skills": self.skill_head(features),
+            "combat": self.combat_head(features),
+            "camera": self.camera_head(features),
+        }
+
+
+class GameAttentionNet(nn.Module):
+    """
+    Attention-based model that learns to focus on important screen regions.
+
+    Uses spatial attention to highlight:
+    - HP/MP bars
+    - Minimap
+    - Skill cooldowns
+    - Enemy positions
+
+    This is particularly useful for games with complex UIs where
+    different regions contain different types of information.
+
+    Input: (batch, C, H, W)
+    Output: (batch, num_actions)
+    """
+
+    def __init__(
+        self,
+        num_actions: int = 29,
+        dropout: float = 0.3,
+        pretrained: bool = True,
+    ):
+        super().__init__()
+
+        self.num_actions = num_actions
+
+        # EfficientNet backbone
+        if TORCHVISION_AVAILABLE and pretrained:
+            weights = tv_models.EfficientNet_B0_Weights.DEFAULT
+            self.backbone = tv_models.efficientnet_b0(weights=weights)
+        elif TORCHVISION_AVAILABLE:
+            self.backbone = tv_models.efficientnet_b0(weights=None)
+        else:
+            raise ImportError("torchvision required")
+
+        # Get feature dimension before classifier
+        self.feature_dim = self.backbone.classifier[1].in_features
+
+        # Remove the classifier and adaptive pool to get spatial features
+        self.backbone.classifier = nn.Identity()
+        self.backbone.avgpool = nn.Identity()
+
+        # Spatial attention module
+        self.attention = nn.Sequential(
+            nn.Conv2d(1280, 256, kernel_size=1),  # EfficientNet-B0 has 1280 channels
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 1, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
+        # Final pooling and classifier
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.classifier = nn.Sequential(
+            nn.Linear(1280, 512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(512, num_actions),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Get spatial features (before global pooling)
+        features = self.backbone.features(x)
+
+        # Compute spatial attention weights
+        attention_weights = self.attention(features)
+
+        # Apply attention
+        attended = features * attention_weights
+
+        # Global pooling
+        pooled = self.global_pool(attended)
+        pooled = pooled.view(pooled.size(0), -1)
+
+        # Classify
+        logits = self.classifier(pooled)
+        return logits
+
+    def get_attention_map(self, x: torch.Tensor) -> torch.Tensor:
+        """Get attention map for visualization."""
+        with torch.no_grad():
+            features = self.backbone.features(x)
+            attention = self.attention(features)
+            # Upsample to input resolution
+            attention = F.interpolate(attention, size=x.shape[-2:], mode='bilinear', align_corners=False)
+            return attention
+
+
+# =============================================================================
 # Model Factory
 # =============================================================================
 
@@ -748,6 +1060,10 @@ MODEL_REGISTRY: Dict[str, type] = {
     "efficientnet_simple": EfficientNetSimple,
     "mobilenet_v3": MobileNetV3Model,
     "resnet18_lstm": ResNet18LSTM,
+    # Advanced (experimental - better for MMORPG)
+    "efficientnet_transformer": EfficientNetTransformer,
+    "multihead_action": MultiHeadActionModel,
+    "game_attention": GameAttentionNet,
     # Legacy (backward compatibility)
     "inception_v3": InceptionV3Legacy,
     "alexnet": AlexNetLegacy,
@@ -788,6 +1104,35 @@ MODEL_INFO: Dict[str, Dict[str, Any]] = {
         "inference_ms": "~10ms (GPU)",
         "temporal": True,
         "recommended": False,
+    },
+    "efficientnet_transformer": {
+        "name": "EfficientNet + Transformer",
+        "description": "Advanced temporal model. Better long-range dependencies than LSTM.",
+        "params": "~12M",
+        "inference_ms": "~12ms (GPU)",
+        "temporal": True,
+        "recommended": False,
+        "experimental": True,
+    },
+    "multihead_action": {
+        "name": "Multi-Head Action Model",
+        "description": "Separate heads for movement/skills/combat/camera. Best for simultaneous actions.",
+        "params": "~6M",
+        "inference_ms": "~6ms (GPU)",
+        "temporal": False,
+        "recommended": False,
+        "experimental": True,
+        "multi_output": True,
+    },
+    "game_attention": {
+        "name": "Game Attention Network",
+        "description": "Spatial attention for UI elements (HP bars, minimap, cooldowns).",
+        "params": "~6M",
+        "inference_ms": "~7ms (GPU)",
+        "temporal": False,
+        "recommended": False,
+        "experimental": True,
+        "attention": True,
     },
     "inception_v3": {
         "name": "Inception V3 (Legacy)",

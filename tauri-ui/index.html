@@ -443,9 +443,34 @@
       <div class="hero-status">
         <div class="hero-text">
           <h2 style="color: var(--secondary)">System Ready</h2>
-          <p>Active Game: <strong id="active-game-pill">genshin_impact</strong></p>
+          <p>Active Game: <strong id="active-game-pill" style="transition: color 0.3s;">⚔️ Genshin Impact</strong></p>
         </div>
-        <button class="btn" type="button" onclick="window.showTab && window.showTab('run')">Quick Start</button>
+        <button class="btn" type="button" onclick="window.showTab && window.showTab('wizard')">⚡ Quick Start</button>
+      </div>
+
+      <!-- Game Preset Selector -->
+      <div class="card" style="cursor:default; margin-bottom:20px; background: linear-gradient(135deg, rgba(187,134,252,0.08), rgba(3,218,198,0.04));">
+        <h3 style="margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+          <span>🎮</span> Select Your Game
+          <span style="font-size:11px; color:var(--text-dim); font-weight:normal; margin-left:auto;">Auto-configures optimal settings</span>
+        </h3>
+        <div id="game-preset-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-bottom:14px;">
+          <!-- Game cards populated by JS -->
+        </div>
+        <div id="game-preset-info" style="padding:12px; background:rgba(0,0,0,0.2); border-radius:10px; min-height:60px;">
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <span style="font-size:32px;">⚔️</span>
+            <div>
+              <strong style="color:#FFD93D;">Genshin Impact</strong>
+              <p style="font-size:12px; color:var(--text-dim); margin:4px 0 0;">Action RPG with elemental combat. Mobile UI scales well.</p>
+              <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+                <strong>Resolution:</strong> 480x270 |
+                <strong>Actions:</strong> 48 |
+                <strong>Model:</strong> efficientnet_lstm
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <h3 style="margin-bottom: 15px; color: var(--text-dim);">Quick Actions</h3>
@@ -493,13 +518,45 @@
 
     <!-- TEACH -->
     <div id="tab-teach" class="tab-content">
-      <div class="game-placeholder">
-        <div style="font-size: 40px; margin-bottom: 10px;">🎮</div>
-        <p>Switch to game window and start recording</p>
-        <p style="color: #666; font-size: 12px;">(Overlay inactive)</p>
+      <!-- Screen Preview -->
+      <div class="card" style="cursor: default; margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">Screen Preview</h3>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <label class="form-label" style="margin:0;">Monitor:</label>
+            <select class="form-select" id="teach-monitor-select" style="width:150px;">
+              <option value="1">Monitor 1</option>
+            </select>
+            <button class="btn btn-small btn-secondary" id="btnRefreshTeachPreview">Refresh</button>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);">
+              <input type="checkbox" id="teach-live-preview-toggle">
+              Live (2fps)
+            </label>
+          </div>
+        </div>
+        <div id="teach-preview-container" style="background:#111; border:2px dashed var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; min-height:170px; overflow:hidden;">
+          <img id="teach-preview-img" style="max-width:100%; max-height:170px; display:none;" />
+          <div id="teach-preview-placeholder" style="color:var(--text-dim); text-align:center;">
+            <div style="font-size:40px; margin-bottom:10px;">🎮</div>
+            <p>Click "Refresh" to see screen preview</p>
+            <p style="font-size:11px; margin-top:6px;">Neural networks expect <strong>480x270</strong> (16:9)</p>
+          </div>
+        </div>
+        <!-- Resolution Settings -->
+        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <label class="form-label" style="margin:0; white-space:nowrap;">Capture Resolution:</label>
+          <select class="form-select" id="teach-capture-resolution" style="width:220px;">
+            <option value="480x270" data-recommended="true">480x270 (Best Performance) *</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540" data-experimental="true">960x540 (Slower Training)</option>
+            <option value="1280x720" data-experimental="true">1280x720 (HD - Experimental)</option>
+            <option value="native" data-experimental="true">Native (Experimental)</option>
+          </select>
+          <span id="teach-resolution-hint" style="font-size:11px; color:var(--text-dim);">* Recommended for best performance</span>
+        </div>
       </div>
 
-      <div class="card" style="cursor: default;">
+      <div class="card" style="cursor: default; margin-bottom: 14px;">
         <h3 style="margin-bottom: 10px;">Recording Session</h3>
 
         <label class="form-label">Game ID</label>
@@ -508,16 +565,30 @@
         <div style="height:10px;"></div>
 
         <label class="form-label">Dataset name</label>
-        <input class="form-input" id="teach-dataset-name" placeholder="e.g. bridge_route_01" />
+        <div style="display:flex; gap:10px;">
+          <input class="form-input" id="teach-dataset-name" placeholder="e.g. bridge_route_01" style="flex:1;" />
+          <button class="btn btn-small btn-secondary" id="btnAutoGenDataset">Auto</button>
+        </div>
 
         <div style="height:12px;"></div>
 
-        <button class="btn btn-danger btn-wide" id="btnRecord" onclick="window.toggleRecord && window.toggleRecord(this)">
+        <button class="btn btn-danger btn-wide" id="btnRecord">
           <span>●</span> Start Recording
         </button>
 
         <div style="margin-top:10px; color:var(--text-dim);" id="record-status">
           Press to start capturing data…
+        </div>
+      </div>
+
+      <!-- Dataset Management -->
+      <div class="card" style="cursor: default;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">Your Datasets</h3>
+          <button class="btn btn-small btn-secondary" id="btnRefreshDatasets">Refresh</button>
+        </div>
+        <div id="teach-dataset-list" style="max-height:180px; overflow-y:auto;">
+          <div style="color:var(--text-dim); font-size:12px;">Loading datasets...</div>
         </div>
       </div>
     </div>
@@ -559,12 +630,39 @@
         <div>
           <label class="form-label">Neural Network</label>
           <select class="form-select" id="train-arch">
-            <option value="efficientnet_lstm">EfficientNet-LSTM (Recommended)</option>
-            <option value="efficientnet_simple">EfficientNet (Balanced)</option>
-            <option value="mobilenetv3">MobileNetV3 (Fast)</option>
-            <option value="custom">custom</option>
-            <option value="inception_v3">inception_v3</option>
-            <option value="alexnet2">alexnet2</option>
+            <optgroup label="🌟 Modern (Recommended)">
+              <option value="efficientnet_lstm" selected>EfficientNet-LSTM (Best Accuracy)</option>
+              <option value="efficientnet_simple">EfficientNet (Balanced)</option>
+              <option value="mobilenetv3">MobileNetV3 (Fastest)</option>
+              <option value="resnet18_lstm">ResNet18-LSTM</option>
+            </optgroup>
+            <optgroup label="🚀 Advanced (Experimental)">
+              <option value="efficientnet_transformer">EfficientNet-Transformer (Long Sequences)</option>
+              <option value="multihead_action">Multi-Head Action (Simultaneous Actions)</option>
+              <option value="game_attention">Game Attention Network (UI Focus)</option>
+            </optgroup>
+            <optgroup label="📜 Legacy">
+              <option value="inception_v3">Inception V3</option>
+              <option value="alexnet">AlexNet</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Action Space</label>
+          <select class="form-select" id="train-action-space">
+            <option value="basic">Basic (9 actions) - WASD only</option>
+            <option value="standard">Standard (29 actions) - Keyboard + Gamepad</option>
+            <option value="combat" selected>Combat (48 actions) - Skills + Combat</option>
+            <option value="extended">Extended (73 actions) - Full MMORPG</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Training Resolution</label>
+          <select class="form-select" id="train-resolution">
+            <option value="480x270" selected>480x270 (Fastest)</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540">960x540 (Slower)</option>
+            <option value="1280x720">1280x720 (HD - Experimental)</option>
           </select>
         </div>
       </div>
@@ -584,17 +682,53 @@
         <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="bot-state">IDLE</div>
       </div>
 
-      <div class="card" style="cursor: default;">
+      <!-- Screen Preview for Run -->
+      <div class="card" style="cursor: default; margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">Bot Vision (What AI Sees)</h3>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <label class="form-label" style="margin:0;">Monitor:</label>
+            <select class="form-select" id="run-monitor-select" style="width:150px;">
+              <option value="1">Monitor 1</option>
+            </select>
+            <button class="btn btn-small btn-secondary" id="btnRefreshRunPreview">Refresh</button>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);">
+              <input type="checkbox" id="run-live-preview-toggle">
+              Live (2fps)
+            </label>
+          </div>
+        </div>
+        <div id="run-preview-container" style="background:#111; border:2px dashed var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; min-height:170px; overflow:hidden;">
+          <img id="run-preview-img" style="max-width:100%; max-height:170px; display:none;" />
+          <div id="run-preview-placeholder" style="color:var(--text-dim); text-align:center;">
+            <div style="font-size:40px; margin-bottom:10px;">👁️</div>
+            <p>Click "Refresh" or start bot to see AI vision</p>
+            <p style="font-size:11px; margin-top:6px;">AI processes at <strong>480x270</strong> resolution</p>
+          </div>
+        </div>
+        <!-- Resolution Settings -->
+        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <label class="form-label" style="margin:0; white-space:nowrap;">Inference Resolution:</label>
+          <select class="form-select" id="run-capture-resolution" style="width:220px;">
+            <option value="480x270" data-recommended="true">480x270 (Best Performance) *</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540" data-experimental="true">960x540 (Slower Inference)</option>
+            <option value="1280x720" data-experimental="true">1280x720 (HD - Experimental)</option>
+            <option value="native" data-experimental="true">Native (Experimental)</option>
+          </select>
+          <span id="run-resolution-hint" style="font-size:11px; color:var(--text-dim);">* Recommended for best performance</span>
+        </div>
+      </div>
+
+      <div class="card" style="cursor: default; margin-bottom:14px;">
         <h3 style="margin-bottom: 10px;">Start / Stop</h3>
-        <button class="btn btn-success btn-wide" style="height: 60px; font-size: 18px;" id="btnStartBot" onclick="window.toggleBot && window.toggleBot(this)">
+        <button class="btn btn-success btn-wide" style="height: 60px; font-size: 18px;" id="btnStartBot">
           ▶ START BOT
         </button>
         <div style="margin-top:10px; color: var(--text-dim); font-size: 12px;">
           Tip: set an active model in <b>ModelHub</b> before running.
         </div>
       </div>
-
-      <div style="height:14px;"></div>
 
       <div class="card" style="cursor: default;">
         <h3 style="margin-bottom: 10px;">Drivers</h3>
@@ -694,12 +828,10 @@
         </div>
 
         <div class="wizard-progress">
-          <div class="wizard-progress-step" data-step="0">Hardware</div>
-          <div class="wizard-progress-step" data-step="1">Game</div>
-          <div class="wizard-progress-step" data-step="2">Task</div>
-          <div class="wizard-progress-step" data-step="3">Model</div>
-          <div class="wizard-progress-step" data-step="4">Data</div>
-          <div class="wizard-progress-step" data-step="5">Review</div>
+          <div class="wizard-progress-step" data-step="0">Game</div>
+          <div class="wizard-progress-step" data-step="1">Task</div>
+          <div class="wizard-progress-step" data-step="2">Config</div>
+          <div class="wizard-progress-step" data-step="3">Ready</div>
         </div>
 
         <div id="wizard-content" class="wizard-body">
@@ -717,7 +849,7 @@
         </div>
 
         <div class="wizard-footer">
-          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 6</span>
+          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 4</span>
           <div style="display: flex; gap: 10px;">
             <button class="btn btn-secondary" id="btn-wizard-back" disabled>Back</button>
             <button class="btn" id="btn-wizard-next">Next</button>

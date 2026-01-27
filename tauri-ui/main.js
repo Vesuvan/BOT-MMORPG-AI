@@ -198,7 +198,7 @@ function getEl(id) {
   return document.getElementById(id);
 }
 
-function setSelectOptions(selectEl, items, getLabel, getValue, placeholder = "Select...") {
+function setSelectOptions(selectEl, items, getLabel, getValue, placeholder = "Select...", defaultValue = "") {
   if (!selectEl) return;
   selectEl.innerHTML = "";
   const opt0 = document.createElement("option");
@@ -210,8 +210,271 @@ function setSelectOptions(selectEl, items, getLabel, getValue, placeholder = "Se
     const opt = document.createElement("option");
     opt.value = getValue(it);
     opt.textContent = getLabel(it);
+    if (defaultValue && opt.value === defaultValue) {
+      opt.selected = true;
+    }
     selectEl.appendChild(opt);
   }
+}
+
+// =============================================================================
+// GAME PRESETS - Optimal Settings for Each Game
+// =============================================================================
+
+const GAME_PRESETS = {
+  genshin_impact: {
+    id: "genshin_impact",
+    name: "Genshin Impact",
+    icon: "⚔️",
+    color: "#FFD93D",
+    resolution: "480x270",
+    action_space: "combat",
+    architecture: "efficientnet_lstm",
+    description: "Action RPG with elemental combat. Mobile UI scales well.",
+    recommended_tasks: ["exploration", "farming", "combat", "domains"],
+    notes: "Smooth animations, clear UI indicators. 480p captures all elements."
+  },
+  world_of_warcraft: {
+    id: "world_of_warcraft",
+    name: "World of Warcraft",
+    icon: "🐉",
+    color: "#FF6B35",
+    resolution: "640x360",
+    action_space: "extended",
+    architecture: "multihead_action",
+    description: "Classic MMORPG with complex addon UI system.",
+    recommended_tasks: ["dungeons", "raids", "questing", "farming"],
+    notes: "Complex UI with addons. 640p recommended for addon text readability."
+  },
+  final_fantasy_xiv: {
+    id: "final_fantasy_xiv",
+    name: "Final Fantasy XIV",
+    icon: "🔮",
+    color: "#4169E1",
+    resolution: "640x360",
+    action_space: "extended",
+    architecture: "multihead_action",
+    description: "Story-rich MMORPG with detailed hotbar system.",
+    recommended_tasks: ["dungeons", "trials", "crafting", "gathering"],
+    notes: "Detailed HUD with many skills. 640p for hotbar visibility."
+  },
+  guild_wars_2: {
+    id: "guild_wars_2",
+    name: "Guild Wars 2",
+    icon: "🛡️",
+    color: "#DC143C",
+    resolution: "480x270",
+    action_space: "combat",
+    architecture: "efficientnet_lstm",
+    description: "Dynamic events with clean UI design.",
+    recommended_tasks: ["meta_events", "fractals", "pvp", "exploration"],
+    notes: "Clean UI design. 480p sufficient for core gameplay."
+  },
+  lost_ark: {
+    id: "lost_ark",
+    name: "Lost Ark",
+    icon: "⚡",
+    color: "#FFB347",
+    resolution: "640x360",
+    action_space: "combat",
+    architecture: "game_attention",
+    description: "Fast-paced ARPG with many skill indicators.",
+    recommended_tasks: ["chaos_dungeons", "guardian_raids", "abyss"],
+    notes: "Many skill indicators. 640p recommended for combat clarity."
+  },
+  elder_scrolls_online: {
+    id: "elder_scrolls_online",
+    name: "Elder Scrolls Online",
+    icon: "📜",
+    color: "#8B4513",
+    resolution: "480x270",
+    action_space: "combat",
+    architecture: "efficientnet_lstm",
+    description: "Action combat with minimal UI design.",
+    recommended_tasks: ["questing", "dungeons", "pvp", "crafting"],
+    notes: "Minimal UI design. 480p works well for action combat."
+  },
+  black_desert_online: {
+    id: "black_desert_online",
+    name: "Black Desert Online",
+    icon: "🌙",
+    color: "#191970",
+    resolution: "640x360",
+    action_space: "combat",
+    architecture: "game_attention",
+    description: "Fast action combat with detailed skill effects.",
+    recommended_tasks: ["grinding", "lifeskills", "node_wars"],
+    notes: "Action combat with many effects. 640p for skill visibility."
+  },
+  new_world: {
+    id: "new_world",
+    name: "New World",
+    icon: "🏝️",
+    color: "#228B22",
+    resolution: "480x270",
+    action_space: "combat",
+    architecture: "efficientnet_lstm",
+    description: "Survival MMORPG with clean modern UI.",
+    recommended_tasks: ["expeditions", "gathering", "pvp", "crafting"],
+    notes: "Clean modern UI. 480p captures gameplay well."
+  },
+  path_of_exile: {
+    id: "path_of_exile",
+    name: "Path of Exile",
+    icon: "💀",
+    color: "#8B0000",
+    resolution: "640x360",
+    action_space: "combat",
+    architecture: "game_attention",
+    description: "Complex ARPG with detailed loot and skills.",
+    recommended_tasks: ["mapping", "bossing", "delve", "heist"],
+    notes: "Complex UI with many indicators. 640p for item/skill visibility."
+  },
+  runescape: {
+    id: "runescape",
+    name: "RuneScape / OSRS",
+    icon: "🗡️",
+    color: "#D4AF37",
+    resolution: "480x270",
+    action_space: "standard",
+    architecture: "mobilenetv3",
+    description: "Classic MMO with low-res friendly design.",
+    recommended_tasks: ["skilling", "bossing", "questing", "minigames"],
+    notes: "Low-res friendly. 480p is ideal for classic gameplay."
+  },
+  albion_online: {
+    id: "albion_online",
+    name: "Albion Online",
+    icon: "🏰",
+    color: "#4682B4",
+    resolution: "480x270",
+    action_space: "combat",
+    architecture: "efficientnet_simple",
+    description: "Sandbox MMO with isometric view.",
+    recommended_tasks: ["dungeons", "gathering", "zvz", "ganking"],
+    notes: "Isometric view scales well. 480p recommended."
+  },
+  custom: {
+    id: "custom",
+    name: "Custom Game",
+    icon: "🎮",
+    color: "#9932CC",
+    resolution: "480x270",
+    action_space: "standard",
+    architecture: "efficientnet_lstm",
+    description: "Configure your own game settings.",
+    recommended_tasks: ["custom"],
+    notes: "Default configuration. Adjust settings as needed."
+  }
+};
+
+// Default data when sidecar is not available
+const DEFAULT_GAMES = Object.values(GAME_PRESETS).map(g => ({
+  id: g.id,
+  name: g.name,
+  icon: g.icon
+}));
+
+const DEFAULT_ARCHITECTURES = [
+  { id: "efficientnet_lstm", name: "EfficientNet-LSTM (Recommended)", recommended: true, tier: "modern" },
+  { id: "efficientnet_simple", name: "EfficientNet (Balanced)", tier: "modern" },
+  { id: "mobilenetv3", name: "MobileNetV3 (Fast)", tier: "modern" },
+  { id: "resnet18_lstm", name: "ResNet18-LSTM", tier: "modern" },
+  { id: "efficientnet_transformer", name: "EfficientNet-Transformer (Advanced)", tier: "advanced" },
+  { id: "multihead_action", name: "Multi-Head Action (Simultaneous)", tier: "advanced" },
+  { id: "game_attention", name: "Game Attention Network (UI Focus)", tier: "advanced" },
+  { id: "inception_v3", name: "Inception V3 (Legacy)", tier: "legacy" },
+  { id: "alexnet", name: "AlexNet (Legacy)", tier: "legacy" },
+];
+
+const DEFAULT_TASKS = [
+  { id: "combat", name: "Combat / Dungeons" },
+  { id: "farming", name: "Farming / Gathering" },
+  { id: "exploration", name: "Exploration / Questing" },
+  { id: "pvp", name: "PvP / Competitive" },
+  { id: "crafting", name: "Crafting / Lifeskills" },
+  { id: "custom", name: "Custom Task" },
+];
+
+// Action space configurations
+const ACTION_SPACES = {
+  basic: { id: "basic", name: "Basic (9 actions)", actions: 9, description: "WASD movement only" },
+  standard: { id: "standard", name: "Standard (29 actions)", actions: 29, description: "Keyboard + full gamepad" },
+  combat: { id: "combat", name: "Combat (48 actions)", actions: 48, description: "Movement + skills + combat" },
+  extended: { id: "extended", name: "Extended (73 actions)", actions: 73, description: "Full MMORPG action space" }
+};
+
+// =============================================================================
+// GAME PRESET AUTO-CONFIGURATION
+// =============================================================================
+
+function applyGamePreset(gameId) {
+  const preset = GAME_PRESETS[gameId] || GAME_PRESETS.custom;
+
+  // Update resolution selects
+  const teachRes = getEl("teach-capture-resolution");
+  const runRes = getEl("run-capture-resolution");
+  if (teachRes) teachRes.value = preset.resolution;
+  if (runRes) runRes.value = preset.resolution;
+
+  // Update resolution hints
+  const teachHint = getEl("teach-resolution-hint");
+  const runHint = getEl("run-resolution-hint");
+  const hintText = `Optimized for ${preset.name}`;
+  if (teachHint) teachHint.textContent = hintText;
+  if (runHint) runHint.textContent = hintText;
+
+  // Update architecture select
+  const archSelect = getEl("train-arch");
+  if (archSelect) archSelect.value = preset.architecture;
+
+  // Update action space select if exists
+  const actionSelect = getEl("train-action-space");
+  if (actionSelect) actionSelect.value = preset.action_space;
+
+  // Update game ID inputs
+  const teachGameId = getEl("teach-game-id");
+  const trainGameId = getEl("train-game-id");
+  if (teachGameId) teachGameId.value = gameId;
+  if (trainGameId) trainGameId.value = gameId;
+
+  // Update active game pill
+  const activeGamePill = getEl("active-game-pill");
+  if (activeGamePill) {
+    activeGamePill.innerHTML = `${preset.icon} ${preset.name}`;
+    activeGamePill.style.color = preset.color;
+  }
+
+  // Update game info display if exists
+  const gameInfo = getEl("game-preset-info");
+  if (gameInfo) {
+    gameInfo.innerHTML = `
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <span style="font-size:32px;">${preset.icon}</span>
+        <div>
+          <strong style="color:${preset.color};">${preset.name}</strong>
+          <p style="font-size:12px; color:var(--text-dim); margin:4px 0 0;">${preset.description}</p>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+            <strong>Resolution:</strong> ${preset.resolution} |
+            <strong>Actions:</strong> ${ACTION_SPACES[preset.action_space]?.actions || 29} |
+            <strong>Model:</strong> ${preset.architecture}
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Store selected game
+  selectedGameId = gameId;
+  localStorage.setItem('selected_game_preset', gameId);
+
+  logToTerminal(`Applied preset for ${preset.name}: ${preset.resolution}, ${preset.action_space}, ${preset.architecture}`, "success");
+
+  return preset;
+}
+
+function getGamePreset(gameId) {
+  return GAME_PRESETS[gameId] || GAME_PRESETS.custom;
 }
 
 function labelForGame(g) {
@@ -267,62 +530,123 @@ async function refreshModelhubAvailability() {
 }
 
 async function loadGamesIntoUI() {
-  if (!invoke) return;
+  const sel = getEl("game-select");
+  let games = DEFAULT_GAMES;
 
-  try {
-    const res = await invoke("modelhub_list_games");
-    const games = (res && res.games) ? res.games : (Array.isArray(res) ? res : []);
-    const sel = getEl("game-select");
-    setSelectOptions(sel, games, labelForGame, valueForGame, "Choose game...");
-    if (sel && !sel.value) {
-      sel.value = selectedGameId;
+  if (invoke && modelhubAvailable) {
+    try {
+      const res = await invoke("modelhub_list_games");
+      const fetchedGames = (res && res.games) ? res.games : (Array.isArray(res) ? res : []);
+      if (fetchedGames.length > 0) {
+        games = fetchedGames;
+      }
+    } catch (e) {
+      logToTerminal(`Using default games list`, "info");
     }
-  } catch (e) {
-    logToTerminal(`Failed to load games: ${e}`, "warning");
+  }
+
+  setSelectOptions(sel, games, labelForGame, valueForGame, "Choose game...", selectedGameId);
+
+  // Update dashboard stats
+  updateDashboardStats();
+}
+
+// Update dashboard statistics
+function updateDashboardStats() {
+  const statDatasets = getEl("stat-datasets");
+  const statModels = getEl("stat-models");
+  const statActive = getEl("stat-active");
+
+  if (statDatasets) {
+    statDatasets.textContent = currentCatalog.datasets.length || "0";
+  }
+  if (statModels) {
+    const totalModels = (currentCatalog.builtin_models.length || 0) +
+                        (currentCatalog.models.length || 0) +
+                        (currentCatalog.local_models.length || 0);
+    statModels.textContent = totalModels || DEFAULT_ARCHITECTURES.length.toString();
+  }
+  if (statActive) {
+    if (currentCatalog.active) {
+      statActive.textContent = currentCatalog.active.name || currentCatalog.active.path || "Set";
+    } else {
+      statActive.textContent = "Not Set";
+    }
+  }
+
+  // Update run tab active model display
+  const runActiveModel = getEl("run-active-model");
+  if (runActiveModel) {
+    runActiveModel.textContent = currentCatalog.active ?
+      (currentCatalog.active.name || currentCatalog.active.path || "Active") : "None selected";
   }
 }
 
 async function loadCatalog(gameId) {
-  if (!invoke) return;
   const gid = (gameId || "").trim() || DEFAULT_GAME_ID;
   selectedGameId = gid;
 
-  try {
-    const res = await invoke("mh_get_catalog_data", { game_id: gid });
-    const payload = res && res.ok === true ? res : res;
-    currentCatalog = {
-      builtin_models: payload.builtin_models || [],
-      datasets: payload.datasets || [],
-      models: payload.models || [],
-      local_models: payload.local_models || [],
-      active: payload.active || null,
-    };
+  // Default catalog with built-in architectures
+  currentCatalog = {
+    builtin_models: DEFAULT_ARCHITECTURES.map(a => ({ id: a.id, name: a.name, path: a.id })),
+    datasets: [],
+    models: [],
+    local_models: [],
+    active: null,
+  };
 
-    logToTerminal(`Catalog loaded for game: ${gid}`, "success");
-
-    const dsSel = getEl("dataset-select");
-    setSelectOptions(dsSel, currentCatalog.datasets, labelForDataset, valueForDataset, "Choose dataset...");
-    if (dsSel) dsSel.value = selectedDatasetId || "";
-
-    const builtinSel = getEl("builtin-model-select");
-    setSelectOptions(builtinSel, currentCatalog.builtin_models, labelForBuiltin, valueForBuiltin, "Choose builtin model...");
-    if (builtinSel) builtinSel.value = selectedBuiltinModelPath || "";
-
-    const regSel = getEl("registry-model-select");
-    setSelectOptions(regSel, currentCatalog.models, labelForModel, valueForModel, "Choose registry model...");
-    if (regSel) regSel.value = selectedModelRegistryId || "";
-
-    const localSel = getEl("local-model-select");
-    setSelectOptions(localSel, currentCatalog.local_models, labelForLocalModel, valueForLocalModel, "Choose local model...");
-    if (localSel) localSel.value = selectedLocalModelPath || "";
-
-    const activeBox = getEl("active-model");
-    if (activeBox) {
-      activeBox.textContent = currentCatalog.active ? JSON.stringify(currentCatalog.active) : "None";
+  if (invoke && modelhubAvailable) {
+    try {
+      const res = await invoke("mh_get_catalog_data", { game_id: gid });
+      const payload = res && res.ok === true ? res : res;
+      currentCatalog = {
+        builtin_models: payload.builtin_models?.length > 0 ? payload.builtin_models : currentCatalog.builtin_models,
+        datasets: payload.datasets || [],
+        models: payload.models || [],
+        local_models: payload.local_models || [],
+        active: payload.active || null,
+      };
+      logToTerminal(`Catalog loaded for game: ${gid}`, "success");
+    } catch (e) {
+      logToTerminal(`Using default catalog for: ${gid}`, "info");
     }
-  } catch (e) {
-    logToTerminal(`Failed to load catalog: ${e}`, "error");
+  } else {
+    logToTerminal(`ModelHub offline - using default architectures`, "info");
   }
+
+  // Populate UI dropdowns
+  const dsSel = getEl("dataset-select");
+  if (currentCatalog.datasets.length > 0) {
+    setSelectOptions(dsSel, currentCatalog.datasets, labelForDataset, valueForDataset, "Choose dataset...");
+  } else {
+    setSelectOptions(dsSel, [{ id: "no_datasets", name: "No datasets found - record some data first" }],
+      d => d.name, d => d.id, "Choose dataset...");
+  }
+
+  const builtinSel = getEl("builtin-model-select");
+  setSelectOptions(builtinSel, currentCatalog.builtin_models, labelForBuiltin, valueForBuiltin, "Choose architecture...");
+
+  const regSel = getEl("registry-model-select");
+  if (currentCatalog.models.length > 0) {
+    setSelectOptions(regSel, currentCatalog.models, labelForModel, valueForModel, "Choose registry model...");
+  } else {
+    setSelectOptions(regSel, [], labelForModel, valueForModel, "No registry models");
+  }
+
+  const localSel = getEl("local-model-select");
+  if (currentCatalog.local_models.length > 0) {
+    setSelectOptions(localSel, currentCatalog.local_models, labelForLocalModel, valueForLocalModel, "Choose local model...");
+  } else {
+    setSelectOptions(localSel, [], labelForLocalModel, valueForLocalModel, "No trained models yet");
+  }
+
+  const activeBox = getEl("active-model");
+  if (activeBox) {
+    activeBox.textContent = currentCatalog.active ?
+      (currentCatalog.active.name || JSON.stringify(currentCatalog.active)) : "None";
+  }
+
+  updateDashboardStats();
 }
 
 async function setActiveModelFromUI() {
@@ -437,6 +761,8 @@ window.toggleRecord = async function (btn) {
   if (!invoke) return alert("Tauri backend not found.");
   isRecording = !isRecording;
   const status = document.getElementById("record-status");
+  const monitorId = parseInt(getEl("teach-monitor-select")?.value) || 1;
+  const resolution = getEl("teach-capture-resolution")?.value || "480x270";
 
   if (isRecording) {
     try {
@@ -445,7 +771,7 @@ window.toggleRecord = async function (btn) {
       const game_id = (getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID).trim();
       const dataset_name = (getEl("teach-dataset-name")?.value || "Untitled").trim();
 
-      const res = await invoke("start_recording", { game_id, dataset_name });
+      const res = await invoke("start_recording", { game_id, dataset_name, monitor_id: monitorId, resolution });
       logToTerminal(res, "success");
       btn.innerHTML = "<span>■</span> Stop Recording";
       btn.style.background = "#333";
@@ -453,6 +779,8 @@ window.toggleRecord = async function (btn) {
         status.innerText = "🔴 Recording... Switch to game window!";
         status.style.color = "#FF5252";
       }
+      // Only start live preview if user has it enabled (default: disabled)
+      maybeStartLivePreviewTauri("teach");
     } catch (err) {
       logToTerminal(`Error starting recording: ${err}`, "error");
       isRecording = false;
@@ -461,6 +789,7 @@ window.toggleRecord = async function (btn) {
     }
   } else {
     try {
+      stopLivePreviewTauri();
       btn.disabled = true;
       const res = await invoke("stop_process");
       logToTerminal(res, "success");
@@ -470,6 +799,9 @@ window.toggleRecord = async function (btn) {
         status.innerText = "✓ Recording saved.";
         status.style.color = "var(--success)";
       }
+      // Refresh dataset list after recording
+      await refreshDatasetListTauri();
+      await loadCatalog(selectedGameId);
     } catch (err) {
       logToTerminal(`Error stopping recording: ${err}`, "error");
     } finally {
@@ -533,15 +865,22 @@ window.analyzeLogs = async function () {
 window.toggleBot = async function (btn) {
   if (!invoke) return alert("Tauri backend not found.");
   isBotRunning = !isBotRunning;
+  const monitorId = parseInt(getEl("run-monitor-select")?.value) || 1;
+  const botState = getEl("bot-state");
+  const resolution = getEl("run-capture-resolution")?.value || "480x270";
+
   if (isBotRunning) {
     try {
       logToTerminal("Initializing autonomous bot...", "info");
       btn.disabled = true;
-      const res = await invoke("start_bot");
+      const res = await invoke("start_bot", { monitor_id: monitorId, resolution });
       logToTerminal(res, "success");
       btn.innerText = "■ STOP BOT";
       btn.style.background = "var(--accent)";
       btn.style.color = "white";
+      if (botState) botState.innerText = "RUNNING";
+      // Only start live preview if user has it enabled (default: disabled)
+      maybeStartLivePreviewTauri("run");
     } catch (err) {
       logToTerminal(`Failed to start bot: ${err}`, "error");
       isBotRunning = false;
@@ -550,12 +889,14 @@ window.toggleBot = async function (btn) {
     }
   } else {
     try {
+      stopLivePreviewTauri();
       btn.disabled = true;
       const res = await invoke("stop_process");
       logToTerminal(res, "success");
       btn.innerText = "▶ START BOT";
       btn.style.background = "var(--success)";
       btn.style.color = "black";
+      if (botState) botState.innerText = "IDLE";
     } catch (err) {
       logToTerminal(`Failed to stop bot: ${err}`, "error");
     } finally {
@@ -665,17 +1006,83 @@ document.addEventListener("DOMContentLoaded", async () => {
     }).catch((err) => logToTerminal(`Config Load Warning: ${err}`, "warning"));
 
     await refreshModelhubAvailability();
-    if (modelhubAvailable) {
-      await loadGamesIntoUI();
-      await loadCatalog(selectedGameId);
-    }
   } else {
-    updateBackendStatus("Error", "Tauri Not Found");
-    logToTerminal("⚠ Tauri API not detected. Is this running in a browser?", "error");
+    updateBackendStatus("Offline", "Running in Offline Mode");
+    logToTerminal("Running in offline mode - using default configurations", "warning");
   }
 
+  // Always load games and catalog (uses defaults when sidecar unavailable)
+  await loadGamesIntoUI();
+  await loadCatalog(selectedGameId);
+
   wireEvents();
+  wireDashboardButtons();
 });
+
+// Wire Dashboard Quick Action cards to navigate to tabs
+function wireDashboardButtons() {
+  // Dashboard hero Quick Start button
+  const heroBtn = document.querySelector('.hero-status .btn');
+  if (heroBtn) {
+    heroBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.showTab('wizard');
+    });
+  }
+
+  // Quick Action cards
+  const cards = document.querySelectorAll('#tab-dashboard .card');
+  cards.forEach(card => {
+    // Get existing onclick attribute target
+    const onclickAttr = card.getAttribute('onclick');
+    if (onclickAttr) {
+      // Extract tab name from onclick="window.showTab && window.showTab('teach')"
+      const match = onclickAttr.match(/showTab\(['"](\w+)['"]\)/);
+      if (match) {
+        const tabName = match[1];
+        // Remove onclick and add event listener
+        card.removeAttribute('onclick');
+        card.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.showTab(tabName);
+        });
+      }
+    }
+  });
+
+  // Also bind inline onclick buttons in other tabs
+  document.querySelectorAll('[onclick*="showTab"]').forEach(el => {
+    const onclickAttr = el.getAttribute('onclick');
+    if (onclickAttr) {
+      const match = onclickAttr.match(/showTab\(['"](\w+)['"]\)/);
+      if (match) {
+        const tabName = match[1];
+        el.removeAttribute('onclick');
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.showTab(tabName);
+        });
+      }
+    }
+  });
+}
+
+// Generate dataset name based on game and timestamp
+function generateDatasetName(gameId) {
+  const gameName = gameId.replace(/_/g, '-');
+  const date = new Date();
+  const timestamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${gameName}_session_${timestamp}`;
+}
+
+// Update dataset name when game changes
+function updateDatasetName() {
+  const gameId = getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID;
+  const datasetInput = getEl("teach-dataset-name");
+  if (datasetInput && !datasetInput.value) {
+    datasetInput.value = generateDatasetName(gameId);
+  }
+}
 
 function wireEvents() {
   // Tabs
@@ -686,6 +1093,22 @@ function wireEvents() {
       if (tab) window.showTab(tab);
     });
   });
+
+  // Auto-populate dataset name when game changes
+  const teachGameId = getEl("teach-game-id");
+  if (teachGameId) {
+    teachGameId.addEventListener("change", () => {
+      const datasetInput = getEl("teach-dataset-name");
+      if (datasetInput) {
+        datasetInput.value = generateDatasetName(teachGameId.value);
+      }
+      // Also update train tab
+      const trainGameId = getEl("train-game-id");
+      if (trainGameId) trainGameId.value = teachGameId.value;
+    });
+    // Generate initial dataset name
+    updateDatasetName();
+  }
 
   // Buttons
   const bind = (id, func) => {
@@ -795,4 +1218,384 @@ function wireEvents() {
 
   const btnOfflineEval = getEl("btnOfflineEval");
   if (btnOfflineEval) btnOfflineEval.addEventListener("click", () => runOfflineEvaluation());
+
+  // Screen Preview buttons
+  const btnRefreshTeachPreview = getEl("btnRefreshTeachPreview");
+  if (btnRefreshTeachPreview) btnRefreshTeachPreview.addEventListener("click", () => refreshTeachPreview());
+
+  const btnRefreshRunPreview = getEl("btnRefreshRunPreview");
+  if (btnRefreshRunPreview) btnRefreshRunPreview.addEventListener("click", () => refreshRunPreview());
+
+  // Live Preview toggle checkboxes
+  const teachLiveToggle = getEl("teach-live-preview-toggle");
+  if (teachLiveToggle) {
+    teachLiveToggle.addEventListener("change", () => toggleTeachLivePreviewTauri(teachLiveToggle.checked));
+  }
+
+  const runLiveToggle = getEl("run-live-preview-toggle");
+  if (runLiveToggle) {
+    runLiveToggle.addEventListener("change", () => toggleRunLivePreviewTauri(runLiveToggle.checked));
+  }
+
+  // Auto-generate dataset name button
+  const btnAutoGenDataset = getEl("btnAutoGenDataset");
+  if (btnAutoGenDataset) btnAutoGenDataset.addEventListener("click", () => autoGenerateDatasetNameTauri());
+
+  // Refresh datasets list button
+  const btnRefreshDatasets = getEl("btnRefreshDatasets");
+  if (btnRefreshDatasets) btnRefreshDatasets.addEventListener("click", () => refreshDatasetListTauri());
+
+  // Load monitors on startup
+  loadMonitorsTauri();
+  refreshDatasetListTauri();
 }
+
+// ============================================================
+// SCREEN PREVIEW & MONITOR SELECTION (Tauri Version)
+// ============================================================
+
+let previewIntervalTauri = null;
+let selectedMonitorTeach = 1;
+let selectedMonitorRun = 1;
+let livePreviewEnabledTeach = false;
+let livePreviewEnabledRun = false;
+
+async function loadMonitorsTauri() {
+  if (!invoke) return;
+
+  try {
+    const monitors = await invoke("list_monitors");
+    const teachSelect = getEl("teach-monitor-select");
+    const runSelect = getEl("run-monitor-select");
+
+    if (monitors && monitors.length > 0) {
+      if (teachSelect) {
+        teachSelect.innerHTML = '';
+        monitors.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.name;
+          teachSelect.appendChild(opt);
+        });
+      }
+      if (runSelect) {
+        runSelect.innerHTML = '';
+        monitors.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.name;
+          runSelect.appendChild(opt);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load monitors:", e);
+    logToTerminal("Monitor detection not available", "info");
+  }
+}
+
+async function refreshTeachPreview() {
+  const monitorId = parseInt(getEl("teach-monitor-select")?.value) || 1;
+  selectedMonitorTeach = monitorId;
+  await updatePreviewImageTauri("teach", monitorId);
+}
+
+async function refreshRunPreview() {
+  const monitorId = parseInt(getEl("run-monitor-select")?.value) || 1;
+  selectedMonitorRun = monitorId;
+  await updatePreviewImageTauri("run", monitorId);
+}
+
+// Toggle functions for live preview checkboxes
+function toggleTeachLivePreviewTauri(enabled) {
+  livePreviewEnabledTeach = enabled;
+  if (enabled) {
+    startLivePreviewTauri("teach");
+  } else {
+    stopLivePreviewTauri();
+  }
+}
+
+function toggleRunLivePreviewTauri(enabled) {
+  livePreviewEnabledRun = enabled;
+  if (enabled) {
+    startLivePreviewTauri("run");
+  } else {
+    stopLivePreviewTauri();
+  }
+}
+
+async function updatePreviewImageTauri(tab, monitorId) {
+  if (!invoke) return;
+
+  const imgEl = getEl(tab + "-preview-img");
+  const placeholder = getEl(tab + "-preview-placeholder");
+
+  try {
+    const result = await invoke("get_screen_preview", { monitor_id: monitorId });
+    if (result && result.ok && result.image) {
+      if (imgEl) {
+        imgEl.src = "data:image/jpeg;base64," + result.image;
+        imgEl.style.display = "block";
+      }
+      if (placeholder) placeholder.style.display = "none";
+    }
+  } catch (e) {
+    console.warn("Preview error:", e);
+    logToTerminal("Screen preview not available (requires Python sidecar)", "info");
+  }
+}
+
+function startLivePreviewTauri(tab) {
+  stopLivePreviewTauri();
+  previewIntervalTauri = setInterval(async () => {
+    const monitorId = tab === "teach" ? selectedMonitorTeach : selectedMonitorRun;
+    await updatePreviewImageTauri(tab, monitorId);
+  }, 500); // 2 FPS
+}
+
+function stopLivePreviewTauri() {
+  if (previewIntervalTauri) {
+    clearInterval(previewIntervalTauri);
+    previewIntervalTauri = null;
+  }
+}
+
+// Start live preview only if toggle is enabled
+function maybeStartLivePreviewTauri(tab) {
+  const enabled = tab === "teach" ? livePreviewEnabledTeach : livePreviewEnabledRun;
+  if (enabled) {
+    startLivePreviewTauri(tab);
+  }
+}
+
+// ============================================================
+// DATASET MANAGEMENT (Tauri Version)
+// ============================================================
+
+async function autoGenerateDatasetNameTauri() {
+  const gameId = getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID;
+  const datasetInput = getEl("teach-dataset-name");
+
+  if (invoke) {
+    try {
+      const name = await invoke("generate_dataset_name", { game_id: gameId, task: "general" });
+      if (datasetInput && name) {
+        datasetInput.value = name;
+        logToTerminal(`Generated dataset name: ${name}`, "success");
+        return;
+      }
+    } catch (e) {
+      console.warn("Auto-generate via backend failed:", e);
+    }
+  }
+
+  // Fallback: client-side generation
+  if (datasetInput) {
+    datasetInput.value = generateDatasetName(gameId);
+    logToTerminal(`Generated dataset name: ${datasetInput.value}`, "success");
+  }
+}
+
+async function refreshDatasetListTauri() {
+  const listEl = getEl("teach-dataset-list");
+  if (!listEl) return;
+
+  listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">Loading...</div>';
+
+  if (!invoke) {
+    listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">Backend not available</div>';
+    return;
+  }
+
+  try {
+    const gameId = getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID;
+    const datasets = await invoke("list_datasets", { game_id: gameId });
+
+    if (!datasets || datasets.length === 0) {
+      listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">No datasets found. Start recording!</div>';
+      return;
+    }
+
+    listEl.innerHTML = "";
+    datasets.forEach(ds => {
+      const item = document.createElement("div");
+      item.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px;";
+      item.innerHTML = `
+        <div>
+          <div style="font-weight:600; color:#fff;">${escapeHtml(ds.name || ds.id)}</div>
+          <div style="font-size:11px; color:var(--text-dim);">${escapeHtml(ds.created_at || '')} • ${ds.sample_count || '?'} samples</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-small btn-secondary" data-action="use" data-id="${escapeHtml(ds.id)}">Use</button>
+          <button class="btn btn-small btn-danger" data-action="delete" data-id="${escapeHtml(ds.id)}" data-path="${escapeHtml(ds.path || '')}">Del</button>
+        </div>
+      `;
+      listEl.appendChild(item);
+    });
+
+    // Wire up buttons
+    listEl.querySelectorAll('button[data-action="use"]').forEach(btn => {
+      btn.addEventListener("click", () => selectDatasetForTrainingTauri(btn.dataset.id));
+    });
+    listEl.querySelectorAll('button[data-action="delete"]').forEach(btn => {
+      btn.addEventListener("click", () => deleteDatasetTauri(btn.dataset.id, btn.dataset.path));
+    });
+
+  } catch (e) {
+    console.warn("Failed to load datasets:", e);
+    listEl.innerHTML = '<div style="color:var(--accent); font-size:12px;">Datasets: ' + (currentCatalog.datasets.length || 0) + ' (refresh via ModelHub)</div>';
+  }
+}
+
+function selectDatasetForTrainingTauri(datasetId) {
+  const trainDataset = getEl("train-dataset-id");
+  if (trainDataset) trainDataset.value = datasetId;
+  selectedDatasetId = datasetId;
+  logToTerminal(`Selected dataset: ${datasetId}`, "success");
+  window.showTab("train");
+}
+
+async function deleteDatasetTauri(datasetId, path) {
+  if (!confirm(`Delete dataset "${datasetId}"?\n\nThis cannot be undone.`)) return;
+
+  if (!invoke) return;
+
+  try {
+    const gameId = getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID;
+    const result = await invoke("delete_dataset", { game_id: gameId, dataset_id: datasetId, path });
+    if (result && result.ok) {
+      logToTerminal(`Deleted dataset: ${datasetId}`, "success");
+      await refreshDatasetListTauri();
+      await loadCatalog(gameId);
+    } else {
+      logToTerminal(`Delete failed: ${result?.message || 'Unknown error'}`, "error");
+    }
+  } catch (e) {
+    console.warn("Delete failed:", e);
+    logToTerminal(`Delete error: ${e}`, "error");
+  }
+}
+
+function escapeHtml(str) {
+  return (str ?? "").toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// =============================================================================
+// GAME PRESET GRID UI
+// =============================================================================
+
+function populateGamePresetGrid() {
+  const grid = getEl("game-preset-grid");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  const savedGame = localStorage.getItem('selected_game_preset') || 'genshin_impact';
+
+  Object.values(GAME_PRESETS).forEach(preset => {
+    const card = document.createElement("div");
+    const isSelected = preset.id === savedGame;
+
+    card.className = "game-preset-card";
+    card.dataset.gameId = preset.id;
+    card.style.cssText = `
+      padding: 12px 10px;
+      border-radius: 10px;
+      border: 2px solid ${isSelected ? preset.color : 'var(--border)'};
+      background: ${isSelected ? `rgba(255,255,255,0.08)` : 'rgba(0,0,0,0.2)'};
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      ${isSelected ? `box-shadow: 0 0 15px ${preset.color}40;` : ''}
+    `;
+
+    card.innerHTML = `
+      <div style="font-size: 28px; margin-bottom: 6px;">${preset.icon}</div>
+      <div style="font-size: 12px; font-weight: 600; color: ${isSelected ? preset.color : 'var(--text-main)'}; line-height: 1.2;">
+        ${preset.name.split(' ').slice(0, 2).join(' ')}
+      </div>
+      <div style="font-size: 10px; color: var(--text-dim); margin-top: 3px;">${preset.resolution}</div>
+    `;
+
+    // Hover effects
+    card.addEventListener("mouseenter", () => {
+      if (card.dataset.gameId !== selectedGameId) {
+        card.style.borderColor = preset.color;
+        card.style.background = "rgba(255,255,255,0.05)";
+      }
+    });
+    card.addEventListener("mouseleave", () => {
+      if (card.dataset.gameId !== selectedGameId) {
+        card.style.borderColor = "var(--border)";
+        card.style.background = "rgba(0,0,0,0.2)";
+      }
+    });
+
+    // Click handler
+    card.addEventListener("click", () => {
+      // Remove selection from all cards
+      grid.querySelectorAll(".game-preset-card").forEach(c => {
+        const cPreset = GAME_PRESETS[c.dataset.gameId];
+        c.style.borderColor = "var(--border)";
+        c.style.background = "rgba(0,0,0,0.2)";
+        c.style.boxShadow = "none";
+        c.querySelector("div:nth-child(2)").style.color = "var(--text-main)";
+      });
+
+      // Select this card
+      card.style.borderColor = preset.color;
+      card.style.background = "rgba(255,255,255,0.08)";
+      card.style.boxShadow = `0 0 15px ${preset.color}40`;
+      card.querySelector("div:nth-child(2)").style.color = preset.color;
+
+      // Apply preset settings
+      applyGamePreset(preset.id);
+
+      // Load catalog for selected game
+      loadCatalog(preset.id);
+    });
+
+    grid.appendChild(card);
+  });
+
+  // Apply saved preset on load
+  if (savedGame) {
+    applyGamePreset(savedGame);
+  }
+}
+
+// Initialize game presets on page load
+document.addEventListener("DOMContentLoaded", () => {
+  // Populate game preset grid
+  populateGamePresetGrid();
+
+  // Sync game select changes in ModelHub
+  const gameSelect = getEl("game-select");
+  if (gameSelect) {
+    gameSelect.addEventListener("change", () => {
+      const gameId = gameSelect.value;
+      if (gameId && GAME_PRESETS[gameId]) {
+        applyGamePreset(gameId);
+        populateGamePresetGrid();
+      }
+    });
+  }
+
+  // Sync teach game-id input changes
+  const teachGameInput = getEl("teach-game-id");
+  if (teachGameInput) {
+    teachGameInput.addEventListener("change", () => {
+      const gameId = teachGameInput.value?.toLowerCase().replace(/\s+/g, '_');
+      if (GAME_PRESETS[gameId]) {
+        applyGamePreset(gameId);
+        populateGamePresetGrid();
+      }
+    });
+  }
+});

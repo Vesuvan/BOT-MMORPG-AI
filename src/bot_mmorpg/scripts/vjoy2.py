@@ -149,7 +149,13 @@ else:
 
 
 # Create global vJoy instance
-vj = vJoy()
+# On Windows, if vJoyInterface.dll is not installed, fall back to stub
+try:
+    vj = vJoy()
+except (OSError, FileNotFoundError):
+    # DLL not found at runtime (Windows without vJoy installed)
+    vj = vJoyStub()
+    _VJOY_AVAILABLE = False
 
 
 # valueX, valueY between -1.0 and 1.0

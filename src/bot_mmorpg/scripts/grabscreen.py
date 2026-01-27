@@ -4,6 +4,8 @@
 import cv2
 import numpy as np
 import platform
+import base64
+from io import BytesIO
 
 # Platform detection for cross-platform support
 IS_WINDOWS = platform.system() == 'Windows'
@@ -23,6 +25,125 @@ try:
     _MSS_AVAILABLE = True
 except ImportError:
     _MSS_AVAILABLE = False
+
+
+def list_monitors():
+    """
+    List all available monitors/screens.
+
+    Returns:
+        list: List of monitor dictionaries with id, name, and dimensions.
+              Example: [{"id": 0, "name": "Primary (1920x1080)", "width": 1920, "height": 1080, "left": 0, "top": 0}]
+    """
+    monitors = []
+
+    if _MSS_AVAILABLE:
+        with mss.mss() as sct:
+            # Skip monitor 0 (it's the combined virtual screen on Windows)
+            for i, mon in enumerate(sct.monitors[1:], start=1):
+                monitors.append({
+                    "id": i,
+                    "name": f"Monitor {i} ({mon['width']}x{mon['height']})",
+                    "width": mon['width'],
+                    "height": mon['height'],
+                    "left": mon['left'],
+                    "top": mon['top']
+                })
+    elif IS_WINDOWS and _WIN32_AVAILABLE:
+        # Fallback: just report primary monitor
+        width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+        height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+        monitors.append({
+            "id": 1,
+            "name": f"Primary ({width}x{height})",
+            "width": width,
+            "height": height,
+            "left": 0,
+            "top": 0
+        })
+    else:
+        # Default fallback
+        monitors.append({
+            "id": 1,
+            "name": "Primary (Unknown)",
+            "width": 1920,
+            "height": 1080,
+            "left": 0,
+            "top": 0
+        })
+
+    return monitors
+
+
+def grab_screen_monitor(monitor_id=1):
+    """
+    Capture a specific monitor by ID.
+
+    Args:
+        monitor_id: Monitor ID (1-based, from list_monitors())
+
+    Returns:
+        numpy.ndarray: RGB image array of the captured monitor.
+    """
+    if _MSS_AVAILABLE:
+        with mss.mss() as sct:
+            if monitor_id < 1 or monitor_id >= len(sct.monitors):
+                monitor_id = 1  # Default to primary
+            monitor = sct.monitors[monitor_id]
+            screenshot = sct.grab(monitor)
+            img = np.array(screenshot)
+            return cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+    # Fallback to full screen
+    return grab_screen()
+
+
+def grab_screen_thumbnail(monitor_id=1, max_width=320, max_height=180):
+    """
+    Capture a monitor and return a thumbnail-sized image.
+    Useful for preview displays.
+
+    Args:
+        monitor_id: Monitor ID to capture
+        max_width: Maximum thumbnail width
+        max_height: Maximum thumbnail height
+
+    Returns:
+        numpy.ndarray: Resized RGB image array
+    """
+    img = grab_screen_monitor(monitor_id)
+    h, w = img.shape[:2]
+
+    # Calculate scale to fit within max dimensions
+    scale = min(max_width / w, max_height / h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+
+def grab_screen_base64(monitor_id=1, max_width=640, max_height=360, quality=70):
+    """
+    Capture a monitor and return as base64 JPEG string.
+    Perfect for sending to web UI.
+
+    Args:
+        monitor_id: Monitor ID to capture
+        max_width: Maximum image width
+        max_height: Maximum image height
+        quality: JPEG quality (1-100)
+
+    Returns:
+        str: Base64-encoded JPEG image data
+    """
+    img = grab_screen_thumbnail(monitor_id, max_width, max_height)
+    # Convert RGB to BGR for OpenCV encoding
+    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    # Encode as JPEG
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+    _, buffer = cv2.imencode('.jpg', img_bgr, encode_param)
+    # Convert to base64
+    return base64.b64encode(buffer).decode('utf-8')
 
 
 def _grab_screen_win32(region=None):
