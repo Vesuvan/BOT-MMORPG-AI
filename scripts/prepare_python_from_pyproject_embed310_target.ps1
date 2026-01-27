@@ -241,7 +241,7 @@ Ok "Installation complete (All modules forced)."
 # 8. Final Sanity Check
 # -------------------------
 Info "Verifying environment..."
-& $pyExe -c "import numpy; import mss; import cv2; import eel; import tensorflow; print('SUCCESS: Portable environment is operational.')"
+& $pyExe -c "import numpy; import mss; import cv2; import eel; import torch; print('SUCCESS: Portable environment is operational.')"
 if ($LASTEXITCODE -ne 0) { Fail "Environment verification failed. Missing 'mss' or other modules." }
 
 Ok "========================================================="
