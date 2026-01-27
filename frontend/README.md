@@ -95,10 +95,10 @@ For the local enviroment we  need to install anaconda at this [link](https://www
 then in the command prompt terminal we type
 
 ```
-conda create -n game   python==3.7 findspark tensorflow pytorch jupyterlab
+conda create -n game python==3.10 findspark pytorch torchvision jupyterlab
 ```
 
-I will use **Tensorflow** + **Pytorch** + **Spark** as the  main frameworks for future work, and this time I will use JupyterLab 
+I will use **PyTorch** + **Spark** as the main frameworks for future work, and this time I will use JupyterLab 
 
 ```
 conda game activate

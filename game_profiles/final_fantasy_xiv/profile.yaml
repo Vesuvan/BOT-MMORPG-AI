@@ -1,0 +1,94 @@
+# Final Fantasy XIV Profile
+# Optimized for GCD-based combat with precise timing
+
+game:
+  id: "final_fantasy_xiv"
+  name: "Final Fantasy XIV"
+  publisher: "Square Enix"
+
+display:
+  typical_resolution: [1920, 1080]
+  ui_scale_range: [0.60, 1.40]
+  important_regions:
+    health_bar: [0.02, 0.90, 0.18, 0.04]
+    hotbar_1: [0.28, 0.92, 0.44, 0.06]
+    hotbar_2: [0.28, 0.86, 0.44, 0.06]
+    minimap: [0.84, 0.01, 0.15, 0.20]
+    cast_bar: [0.35, 0.75, 0.30, 0.03]
+
+input:
+  action_space: "discrete"
+  num_actions: 16
+  requires_mouse: true
+  mouse_precision: "low"
+  default_bindings:
+    - {key: "1", action: "hotbar_1"}
+    - {key: "2", action: "hotbar_2"}
+    - {key: "3", action: "hotbar_3"}
+    - {key: "4", action: "hotbar_4"}
+    - {key: "5", action: "hotbar_5"}
+    - {key: "6", action: "hotbar_6"}
+    - {key: "7", action: "hotbar_7"}
+    - {key: "8", action: "hotbar_8"}
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "move_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "move_right"}
+    - {key: "SPACE", action: "jump"}
+    - {key: "Q", action: "hotbar_9"}
+    - {key: "E", action: "hotbar_10"}
+    - {key: "TAB", action: "target_next"}
+
+training:
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [224, 224]
+  temporal_frames: 4
+  minimum_samples: 7000
+  class_balance_tolerance: 0.25
+  learning_rate:
+    initial: 0.0008
+    decay_factor: 0.1
+    decay_epochs: [25, 45]
+
+hardware_tiers:
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 8
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+  medium:
+    architecture: "efficientnet_simple"
+    batch_size: 16
+    input_size: [224, 224]
+    temporal_frames: 2
+    workers: 4
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 32
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 8
+
+tasks:
+  combat:
+    description: "GCD rotation with oGCD weaving"
+    priority: "precision"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation: [brightness, contrast]
+    fps_target: 30
+  crafting:
+    description: "Crafting rotations and macros"
+    priority: "precision"
+    temporal: false
+    recommended_architecture: "efficientnet_simple"
+    augmentation: [brightness]
+    fps_target: 10
+  gathering:
+    description: "Mining, botany, fishing"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "mobilenetv3"
+    augmentation: [rotation, brightness]
+    fps_target: 15

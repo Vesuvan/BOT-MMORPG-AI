@@ -10,6 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+  <!-- Quick Start Wizard Styles -->
+  <link rel="stylesheet" href="./styles/training-school.css">
+
   <style>
     :root {
       --bg-dark: #121212;
@@ -575,6 +578,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Dashboard
       </a>
+      <a onclick="showTab('wizard')" class="nav-btn" id="btn-wizard">
+        <svg viewBox="0 0 24 24"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
+        Quick Start
+      </a>
       <a onclick="showTab('teach')" class="nav-btn" id="btn-teach">
         <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
         Teach (Record)
@@ -652,6 +659,11 @@
           <div class="card-icon" style="color: #FFD700;">✨</div>
           <h3>Ask AI Strategist</h3>
           <p>Get instant advice on routes, builds, and bot configuration.</p>
+        </div>
+        <div class="card" onclick="showTab('wizard')">
+          <div class="card-icon" style="color: #BB86FC;">⚡</div>
+          <h3>Quick Start</h3>
+          <p>Zero-typing setup wizard. Configure game, task, and model automatically.</p>
         </div>
       </div>
 
@@ -827,6 +839,47 @@
               </div>
             </div>
             <pre id="mh-details-pre" style="margin-top:10px; white-space: pre-wrap; color:#d1d5db;">(none)</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK START / WIZARD -->
+    <div id="tab-wizard" class="tab-content">
+      <div class="wizard-container">
+        <div class="wizard-header">
+          <h2 class="wizard-title">⚡ Quick Start</h2>
+          <p class="wizard-subtitle">Zero-typing Setup - Configure and Go</p>
+        </div>
+
+        <div class="wizard-progress">
+          <div class="wizard-progress-step" data-step="0">Hardware</div>
+          <div class="wizard-progress-step" data-step="1">Game</div>
+          <div class="wizard-progress-step" data-step="2">Task</div>
+          <div class="wizard-progress-step" data-step="3">Model</div>
+          <div class="wizard-progress-step" data-step="4">Data</div>
+          <div class="wizard-progress-step" data-step="5">Review</div>
+        </div>
+
+        <div id="wizard-content" class="wizard-body">
+          <!-- Wizard steps render here -->
+          <div class="wizard-step-content" style="text-align: center; padding: 40px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎮</div>
+            <h2>Welcome to Quick Start</h2>
+            <p style="color: var(--text-dim); margin: 15px 0 25px;">
+              Configure your game, select a task, and the AI will auto-configure everything else.
+            </p>
+            <button class="btn btn-wide" id="btn-start-wizard" style="max-width: 300px;">
+              ⚡ Begin Setup
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 6</span>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-wizard-back" disabled>Back</button>
+            <button class="btn" id="btn-wizard-next">Next</button>
           </div>
         </div>
       </div>
@@ -1183,7 +1236,7 @@
     // -------------------------
     function showTab(tabId) {
       const titles = {
-        'dashboard': 'Dashboard', 'teach': 'Teach Mode', 'train': 'Neural Training',
+        'dashboard': 'Dashboard', 'wizard': 'Quick Start', 'teach': 'Teach Mode', 'train': 'Neural Training',
         'run': 'Run Bot', 'models': 'Model Catalog', 'strategist': 'AI Strategist'
       };
       document.getElementById('page-title').innerText = titles[tabId];
@@ -1720,6 +1773,76 @@
         await mhInit();
       } else {
         toast("Eel", "Backend not detected.", "err");
+      }
+
+      // Load saved Quick Start config
+      try {
+        const savedQsConfig = localStorage.getItem('quickstart_config');
+        if (savedQsConfig) {
+          const config = JSON.parse(savedQsConfig);
+          console.log('Loading saved Quick Start config:', config);
+          // Update active game
+          if (config.game_id) {
+            activeGameId = config.game_id;
+            document.getElementById("active-game-pill").innerText = config.game_name || config.game_id;
+            document.getElementById("teach-game").innerText = config.game_id;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load saved Quick Start config:', e);
+      }
+    });
+  </script>
+
+  <!-- Quick Start Setup Wizard -->
+  <script src="./js/wizard.js"></script>
+  <script>
+    // Initialize Quick Start wizard
+    document.addEventListener('DOMContentLoaded', () => {
+      const startBtn = document.getElementById('btn-start-wizard');
+      const backBtn = document.getElementById('btn-wizard-back');
+      const nextBtn = document.getElementById('btn-wizard-next');
+
+      let wizard = null;
+
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          wizard = new SetupWizard();
+          wizard.onComplete = (config) => {
+            console.log('Wizard completed:', config);
+            // Update active game
+            if (config.game_id) {
+              activeGameId = config.game_id;
+              document.getElementById("active-game-pill").innerText = config.game_name || config.game_id;
+              document.getElementById("teach-game").innerText = config.game_id;
+              // Also update train wizard game selector if present
+              const twGame = document.getElementById("tw-game");
+              if (twGame) twGame.value = config.game_id;
+              const mhGame = document.getElementById("mh-game");
+              if (mhGame) mhGame.value = config.game_id;
+            }
+          };
+          await wizard.start();
+          backBtn.disabled = true;
+        });
+      }
+
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          if (wizard) {
+            wizard.back();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', async () => {
+          if (wizard) {
+            await wizard.next();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
       }
     });
   </script>

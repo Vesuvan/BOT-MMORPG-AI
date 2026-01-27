@@ -22,6 +22,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+  <!-- Training School Styles -->
+  <link rel="stylesheet" href="./styles/training-school.css">
+
   <style>
     :root {
       --bg-dark: #121212;
@@ -381,6 +384,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Dashboard
       </a>
+      <a data-tab="wizard" class="nav-btn" id="btn-wizard" href="#">
+        <svg viewBox="0 0 24 24"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
+        Quick Start
+      </a>
       <a data-tab="teach" class="nav-btn" id="btn-teach" href="#">
         <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
         Teach (Record)
@@ -462,6 +469,11 @@
           <div class="card-icon" style="color: #FFD700;">✨</div>
           <h3>Ask AI Strategist</h3>
           <p>Optional cloud chat (Gemini/OpenAI) using your API key.</p>
+        </div>
+        <div class="card" onclick="window.showTab && window.showTab('wizard')">
+          <div class="card-icon" style="color: #BB86FC;">⚡</div>
+          <h3>Quick Start</h3>
+          <p>Zero-typing setup wizard. Configure game, task, and model automatically.</p>
         </div>
       </div>
 
@@ -545,9 +557,12 @@
           <input class="form-input" id="train-dataset-id" placeholder="Pick from ModelHub or paste id"/>
         </div>
         <div>
-          <label class="form-label">Arch label</label>
+          <label class="form-label">Neural Network</label>
           <select class="form-select" id="train-arch">
-            <option value="custom" selected>custom</option>
+            <option value="efficientnet_lstm">EfficientNet-LSTM (Recommended)</option>
+            <option value="efficientnet_simple">EfficientNet (Balanced)</option>
+            <option value="mobilenetv3">MobileNetV3 (Fast)</option>
+            <option value="custom">custom</option>
             <option value="inception_v3">inception_v3</option>
             <option value="alexnet2">alexnet2</option>
           </select>
@@ -670,6 +685,47 @@
       </div>
     </div>
 
+    <!-- QUICK START WIZARD -->
+    <div id="tab-wizard" class="tab-content">
+      <div class="wizard-container">
+        <div class="wizard-header">
+          <h2 class="wizard-title">⚡ Quick Start</h2>
+          <p class="wizard-subtitle">Zero-typing Setup - Configure and Go</p>
+        </div>
+
+        <div class="wizard-progress">
+          <div class="wizard-progress-step" data-step="0">Hardware</div>
+          <div class="wizard-progress-step" data-step="1">Game</div>
+          <div class="wizard-progress-step" data-step="2">Task</div>
+          <div class="wizard-progress-step" data-step="3">Model</div>
+          <div class="wizard-progress-step" data-step="4">Data</div>
+          <div class="wizard-progress-step" data-step="5">Review</div>
+        </div>
+
+        <div id="wizard-content" class="wizard-body">
+          <!-- Wizard steps render here -->
+          <div class="wizard-step-content" style="text-align: center; padding: 40px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎮</div>
+            <h2>Welcome to Quick Start</h2>
+            <p style="color: var(--text-dim); margin: 15px 0 25px;">
+              Configure your game, select a task, and the AI will auto-configure everything else.
+            </p>
+            <button class="btn btn-wide" id="btn-start-wizard" style="max-width: 300px;">
+              ⚡ Begin Setup
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 6</span>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-wizard-back" disabled>Back</button>
+            <button class="btn" id="btn-wizard-next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- STRATEGIST -->
     <div id="tab-strategist" class="tab-content">
       <div class="chat-container">
@@ -779,6 +835,7 @@
     window.showTab = window.showTab || function(tabId) {
       const titles = {
         dashboard: "Dashboard",
+        wizard: "Quick Start",
         teach: "Teach Mode",
         train: "Neural Training",
         run: "Run Bot",
@@ -817,7 +874,81 @@
     });
   </script>
 
+  <!-- Training School Wizard -->
+  <script src="./js/wizard.js"></script>
+
   <!-- IMPORTANT: load your Tauri JS last -->
   <script src="./main.js"></script>
+
+  <!-- Wizard initialization -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load saved Quick Start config and populate forms
+      try {
+        const savedConfig = localStorage.getItem('quickstart_config');
+        if (savedConfig) {
+          const config = JSON.parse(savedConfig);
+          console.log('Loading saved Quick Start config:', config);
+
+          // Populate Teach tab
+          const teachGameId = document.getElementById('teach-game-id');
+          if (teachGameId && config.game_id) teachGameId.value = config.game_id;
+
+          // Populate Train tab
+          const trainGameId = document.getElementById('train-game-id');
+          if (trainGameId && config.game_id) trainGameId.value = config.game_id;
+
+          const trainArch = document.getElementById('train-arch');
+          if (trainArch && config.architecture) {
+            trainArch.value = config.architecture;
+          }
+
+          // Update active game pill
+          const activeGamePill = document.getElementById('active-game-pill');
+          if (activeGamePill && config.game_name) {
+            activeGamePill.textContent = config.game_name;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load saved config:', e);
+      }
+
+      // Initialize wizard when start button is clicked
+      const startBtn = document.getElementById('btn-start-wizard');
+      const backBtn = document.getElementById('btn-wizard-back');
+      const nextBtn = document.getElementById('btn-wizard-next');
+
+      let wizard = null;
+
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          wizard = new SetupWizard();
+          wizard.onComplete = (config) => {
+            console.log('Wizard completed:', config);
+          };
+          await wizard.start();
+          backBtn.disabled = true;
+        });
+      }
+
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          if (wizard) {
+            wizard.back();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', async () => {
+          if (wizard) {
+            await wizard.next();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

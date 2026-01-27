@@ -47,9 +47,6 @@
         "drivers/**",
         "../versions/**",
         "../pyproject.toml"
-   
-
-
       ],
       "windows": {
         "nsis": {
