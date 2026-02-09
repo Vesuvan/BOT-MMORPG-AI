@@ -36,11 +36,9 @@ jobs:
 
       - name: Run Ruff (lint)
         run: uv run ruff check src/ tests/ --output-format=github
-        continue-on-error: true
 
       - name: Run Ruff (format check)
         run: uv run ruff format --check src/ tests/
-        continue-on-error: true
 
   # ============================================
   # Unit Tests
@@ -108,7 +106,6 @@ jobs:
 
       - name: Check for security vulnerabilities
         run: safety check --full-report
-        continue-on-error: true
 
   # ============================================
   # Build Check

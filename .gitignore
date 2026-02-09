@@ -114,6 +114,10 @@ binaries/
 *.rpm
 *.AppImage
 
+# Whitelist specific .exe files needed for Tauri build
+!frontend/input_record/install-interception.exe
+!src-tauri/drivers/**/*.exe
+
 # ==========================================
 # Project Specific (Data & Recordings)
 # ==========================================
@@ -173,6 +177,23 @@ versions/0.01/data_reduced/x_training_data.csv
 versions/0.01/data_reduced/y_training_data.csv
 versions/0.01/data_reduced/undersampling/x_training_data.csv
 versions/0.01/data_reduced/undersampling/y_training_data.csv
+versions/0.01/clean_reduced/
+
+# ML model data files (large, generated)
+versions/0.01/model/
+versions/0.01/model_mmo0/
+versions/0.01/model_mmo1/
+
+# Large binary / media files
+versions/0.01/img/video.mp4
+versions/0.01/pyvjoy/vJoySetup.exe
+frontend/assets/backup/
+
+# Large media formats
+*.avi
+*.mp4
+*.gif
+*.data-00000-of-00001
 
 # ==========================================
 # Safety: DO NOT ignore docs images globally
@@ -187,21 +208,20 @@ versions/0.01/data_reduced/undersampling/y_training_data.csv
 *.old
 *.swp
 *.swo
-!*.exe
 * copy*
-src-tauri/resources/sidecar/main-backend/main-backend.exe
 /src-tauri/resources/sidecar
 /src-tauri/resources/python
+/src-tauri/resources/wheelhouse
 /third_party/python
 /third_party/wheelhouse
-/src-tauri/resources/wheelhouse
-/src-tauri/resources
 
 # User session data
 settings/session/
-modelhub_registry.json
-active_model.json
-active_model.json
-trained_models/genshin_impact/genshin_impact_combat_v1/profile.json
 *.json
-*.json
+
+# Whitelist Tauri/app config JSON files that must be tracked
+!src-tauri/tauri.conf.json
+!src-tauri/catalog/**/*.json
+!package.json
+!package-lock.json
+!tsconfig.json

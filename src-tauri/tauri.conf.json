@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "BOT-MMORPG-AI",
-    "version": "0.1.5"
+    "version": "1.0.0"
   },
   "tauri": {
     "allowlist": {
@@ -20,12 +20,17 @@
         "sidecar": false
       },
       "fs": {
-        "all": true,
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "exists": true,
         "scope": [
-          "$APP/*",
-          "$APPDATA/*",
-          "$CONFIG/*",
-          "$LOCALDATA/*"
+          "$APP/**",
+          "$APPDATA/**",
+          "$CONFIG/**",
+          "$LOCALDATA/**"
         ]
       }
     },
