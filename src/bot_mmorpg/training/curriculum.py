@@ -16,8 +16,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from torch.optim import AdamW, SGD
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data import DataLoader
 
 logger = logging.getLogger(__name__)

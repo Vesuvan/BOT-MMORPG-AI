@@ -184,8 +184,6 @@ class TestResolutionConfig:
         """Test that game configurations are properly defined."""
         from bot_mmorpg.config.game_resolutions import (
             get_game_config,
-            get_recommended_resolution,
-            GAME_CONFIGS,
         )
 
         # Test known games

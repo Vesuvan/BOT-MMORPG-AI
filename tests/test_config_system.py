@@ -5,7 +5,6 @@ Tests hardware detection, profile loading, settings management, and model select
 """
 
 import pytest
-from pathlib import Path
 
 
 class TestHardwareDetector:

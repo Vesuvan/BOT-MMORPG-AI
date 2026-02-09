@@ -14,7 +14,7 @@ from typing import List
 
 # Version utilities
 try:
-    from .version import (
+    from .version import (  # noqa: F401
         check_for_updates,
         check_for_updates_async,
         get_current_version,
@@ -28,7 +28,7 @@ except ImportError:
 
 # Secure loader utilities
 try:
-    from .secure_loader import (
+    from .secure_loader import (  # noqa: F401
         load_training_data_secure,
         validate_training_data_structure,
         DataValidationError,

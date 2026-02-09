@@ -483,7 +483,7 @@ def main(argv=None) -> int:
     print(f"Parameters: {count_parameters(model):,}")
 
     # Train
-    print(f"\nStarting training...")
+    print("\nStarting training...")
     model = train_model(
         model=model, train_loader=train_loader, val_loader=val_loader,
         device=device, epochs=args.epochs, learning_rate=args.lr,
@@ -491,7 +491,7 @@ def main(argv=None) -> int:
     )
 
     print(f"\n{'='*60}")
-    print(f"Training Complete!")
+    print("Training Complete!")
     print(f"{'='*60}")
 
     return 0
