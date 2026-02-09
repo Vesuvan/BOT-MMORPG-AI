@@ -86,13 +86,14 @@ Section "BOT MMORPG AI (UI + Backend)" SecCore
 
   ; App files packaged by Tauri (resources, sidecars, etc.)
   {{#each resources}}
-  File /r "{{this}}"
+  CreateDirectory "$INSTDIR\\{{this.[0]}}"
+  File /a /oname={{this.[1]}} "{{@key}}"
   {{/each}}
 
-  ; Explicitly install bundled resources
+  ; Create resource subdirectories
   {{#if resources_dirs}}
   {{#each resources_dirs}}
-  File /r "{{this}}\*.*"
+  CreateDirectory "$INSTDIR\\{{this}}"
   {{/each}}
   {{/if}}
 

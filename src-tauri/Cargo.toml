@@ -1,7 +1,7 @@
 # src-tauri/Cargo.toml
 [package]
 name = "bot-mmorpg-ai"
-version = "0.1.5"
+version = "1.0.0"
 description = "BOT MMORPG AI"
 edition = "2021"
 
@@ -9,7 +9,7 @@ edition = "2021"
 tauri-build = { version = "1", features = [] }
 
 [dependencies]
-tauri = { version = "1", features = [ "shell-open", "fs-all", "shell-execute"] }
+tauri = { version = "1", features = [ "shell-open", "shell-execute", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-create-dir", "fs-exists"] }
 urlencoding = "2"
 
 # JSON + (de)serialization
