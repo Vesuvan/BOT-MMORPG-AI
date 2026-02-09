@@ -27,6 +27,7 @@ import cv2
 # PyTorch imports
 try:
     import torch
+
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
@@ -36,10 +37,12 @@ except ImportError:
 # Local imports - screen capture
 try:
     from .grabscreen import grab_screen
+
     GRABSCREEN_AVAILABLE = True
 except ImportError:
     try:
         from grabscreen import grab_screen
+
         GRABSCREEN_AVAILABLE = True
     except ImportError:
         GRABSCREEN_AVAILABLE = False
@@ -47,10 +50,12 @@ except ImportError:
 # Local imports - keyboard control
 try:
     from .directkeys import PressKey, ReleaseKey, W, A, S, D
+
     DIRECTKEYS_AVAILABLE = True
 except ImportError:
     try:
         from directkeys import PressKey, ReleaseKey, W, A, S, D
+
         DIRECTKEYS_AVAILABLE = True
     except ImportError:
         DIRECTKEYS_AVAILABLE = False
@@ -58,10 +63,12 @@ except ImportError:
 # Local imports - key checking
 try:
     from .getkeys import key_check
+
     GETKEYS_AVAILABLE = True
 except ImportError:
     try:
         from getkeys import key_check
+
         GETKEYS_AVAILABLE = True
     except ImportError:
         GETKEYS_AVAILABLE = False
@@ -69,55 +76,89 @@ except ImportError:
 # Local imports - motion detection
 try:
     from .motion import motion_detection
+
     MOTION_AVAILABLE = True
 except ImportError:
     try:
         from motion import motion_detection
+
         MOTION_AVAILABLE = True
     except ImportError:
         MOTION_AVAILABLE = False
+
         def motion_detection(t_minus, t_now, t_plus, screen):
             """Stub motion detection."""
             return 1000  # Default high motion
 
+
 # Local imports - gamepad (vJoy)
 try:
     from .vjoy2 import (
-        gamepad_lt, gamepad_rt, game_lx_left, game_lx_right,
-        game_ly_down, game_ly_up, look_rx_left, look_rx_right,
-        look_ry_down, look_ry_up, button_A, button_B, button_X, button_Y,
-        ultimate_release
+        gamepad_lt,
+        gamepad_rt,
+        game_lx_left,
+        game_lx_right,
+        game_ly_down,
+        game_ly_up,
+        look_rx_left,
+        look_rx_right,
+        look_ry_down,
+        look_ry_up,
+        button_A,
+        button_B,
+        button_X,
+        button_Y,
+        ultimate_release,
     )
+
     VJOY_AVAILABLE = True
 except ImportError:
     try:
         from vjoy2 import (
-            gamepad_lt, gamepad_rt, game_lx_left, game_lx_right,
-            game_ly_down, game_ly_up, look_rx_left, look_rx_right,
-            look_ry_down, look_ry_up, button_A, button_B, button_X, button_Y,
-            ultimate_release
+            gamepad_lt,
+            gamepad_rt,
+            game_lx_left,
+            game_lx_right,
+            game_ly_down,
+            game_ly_up,
+            look_rx_left,
+            look_rx_right,
+            look_ry_down,
+            look_ry_up,
+            button_A,
+            button_B,
+            button_X,
+            button_Y,
+            ultimate_release,
         )
+
         VJOY_AVAILABLE = True
     except ImportError:
         VJOY_AVAILABLE = False
-        def ultimate_release(): pass
+
+        def ultimate_release():
+            pass
+
 
 # Local imports - PyTorch models
 try:
     from .models_pytorch import load_model, get_device
+
     MODELS_AVAILABLE = True
 except ImportError:
     try:
         from models_pytorch import load_model, get_device  # noqa: F401
+
         MODELS_AVAILABLE = True
     except ImportError:
         MODELS_AVAILABLE = False
 
 # Platform-specific imports
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 if IS_WINDOWS:
     try:
         import msvcrt  # noqa: F401
+
         MSVCRT_AVAILABLE = True
     except ImportError:
         MSVCRT_AVAILABLE = False
@@ -140,26 +181,78 @@ MOTION_REQ = 800
 
 # Action weights for prediction adjustment
 # Format: [keyboard(9), gamepad(20)] = 29 total
-ACTION_WEIGHTS = np.array([
-    4.5, 0.1, 0.1, 0.1, 1.8, 1.8, 0.5, 0.5, 0.2,  # Keyboard: W, S, A, D, WA, WD, SA, SD, NK
-    1, 1, 1, 1, 1, 1,  # Gamepad: LT, RT, Lx, Ly, Rx, Ry
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  # Gamepad: UP, DOWN, LEFT, RIGHT, START, SELECT, L3, R3, LB, RB
-    1, 1, 1, 1  # Gamepad: A, B, X, Y
-])
+ACTION_WEIGHTS = np.array(
+    [
+        4.5,
+        0.1,
+        0.1,
+        0.1,
+        1.8,
+        1.8,
+        0.5,
+        0.5,
+        0.2,  # Keyboard: W, S, A, D, WA, WD, SA, SD, NK
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,  # Gamepad: LT, RT, Lx, Ly, Rx, Ry
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,  # Gamepad: UP, DOWN, LEFT, RIGHT, START, SELECT, L3, R3, LB, RB
+        1,
+        1,
+        1,
+        1,  # Gamepad: A, B, X, Y
+    ]
+)
 
 # Action names for logging
 ACTION_NAMES = [
-    'straight', 'reverse', 'left', 'right', 'forward+left', 'forward+right',
-    'reverse+left', 'reverse+right', 'nokeys',
-    'LT', 'RT', 'Lx', 'Ly', 'Rx', 'Ry',
-    'UP', 'DOWN', 'LEFT', 'RIGHT', 'START', 'SELECT', 'L3', 'R3', 'LB', 'RB',
-    'A', 'B', 'X', 'Y'
+    "straight",
+    "reverse",
+    "left",
+    "right",
+    "forward+left",
+    "forward+right",
+    "reverse+left",
+    "reverse+right",
+    "nokeys",
+    "LT",
+    "RT",
+    "Lx",
+    "Ly",
+    "Rx",
+    "Ry",
+    "UP",
+    "DOWN",
+    "LEFT",
+    "RIGHT",
+    "START",
+    "SELECT",
+    "L3",
+    "R3",
+    "LB",
+    "RB",
+    "A",
+    "B",
+    "X",
+    "Y",
 ]
 
 
 # =============================================================================
 # Keyboard Actions
 # =============================================================================
+
 
 def straight():
     """Move forward."""
@@ -168,6 +261,7 @@ def straight():
         ReleaseKey(A)
         ReleaseKey(D)
         ReleaseKey(S)
+
 
 def left():
     """Turn left (occasionally move forward)."""
@@ -180,6 +274,7 @@ def left():
         ReleaseKey(S)
         ReleaseKey(D)
 
+
 def right():
     """Turn right (occasionally move forward)."""
     if DIRECTKEYS_AVAILABLE:
@@ -191,6 +286,7 @@ def right():
         ReleaseKey(A)
         ReleaseKey(S)
 
+
 def reverse():
     """Move backward."""
     if DIRECTKEYS_AVAILABLE:
@@ -198,6 +294,7 @@ def reverse():
         ReleaseKey(A)
         ReleaseKey(W)
         ReleaseKey(D)
+
 
 def forward_left():
     """Move forward and left."""
@@ -207,6 +304,7 @@ def forward_left():
         ReleaseKey(D)
         ReleaseKey(S)
 
+
 def forward_right():
     """Move forward and right."""
     if DIRECTKEYS_AVAILABLE:
@@ -214,6 +312,7 @@ def forward_right():
         PressKey(D)
         ReleaseKey(A)
         ReleaseKey(S)
+
 
 def reverse_left():
     """Move backward and left."""
@@ -223,6 +322,7 @@ def reverse_left():
         ReleaseKey(W)
         ReleaseKey(D)
 
+
 def reverse_right():
     """Move backward and right."""
     if DIRECTKEYS_AVAILABLE:
@@ -230,6 +330,7 @@ def reverse_right():
         PressKey(D)
         ReleaseKey(W)
         ReleaseKey(A)
+
 
 def no_keys():
     """Release all keys (occasionally move forward)."""
@@ -241,6 +342,7 @@ def no_keys():
         ReleaseKey(A)
         ReleaseKey(S)
         ReleaseKey(D)
+
 
 def release_all_keys():
     """Release all keyboard keys."""
@@ -271,6 +373,7 @@ KEYBOARD_ACTIONS = {
 # =============================================================================
 # Inference Engine
 # =============================================================================
+
 
 class InferenceEngine:
     """
@@ -305,9 +408,9 @@ class InferenceEngine:
         self.model.eval()
 
         # Check if model is temporal
-        self.is_temporal = self.metadata.get('temporal_frames', 1) > 1
+        self.is_temporal = self.metadata.get("temporal_frames", 1) > 1
         if self.is_temporal:
-            self.temporal_frames = self.metadata.get('temporal_frames', temporal_frames)
+            self.temporal_frames = self.metadata.get("temporal_frames", temporal_frames)
 
         # Frame buffer for temporal models
         self.frame_buffer = deque(maxlen=self.temporal_frames)
@@ -318,15 +421,15 @@ class InferenceEngine:
         self.t_now = None
         self.t_plus = None
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Inference Engine Initialized")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  Model: {self.model_path.name}")
         print(f"  Architecture: {self.metadata.get('model_name', 'Unknown')}")
         print(f"  Device: {self.device}")
         print(f"  Temporal: {self.is_temporal} (frames={self.temporal_frames})")
         print(f"  Gamepad: {'Enabled' if self.enable_gamepad else 'Disabled'}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
     def _load_model(self) -> Tuple[torch.nn.Module, dict]:
         """Load model from checkpoint."""
@@ -382,7 +485,9 @@ class InferenceEngine:
 
             # Stack frames: (seq, C, H, W)
             input_tensor = torch.stack(list(self.frame_buffer), dim=0)
-            input_tensor = input_tensor.unsqueeze(0).to(self.device)  # (1, seq, C, H, W)
+            input_tensor = input_tensor.unsqueeze(0).to(
+                self.device
+            )  # (1, seq, C, H, W)
         else:
             input_tensor = tensor.unsqueeze(0).to(self.device)  # (1, C, H, W)
 
@@ -513,10 +618,12 @@ class InferenceEngine:
 # Main Loop
 # =============================================================================
 
+
 def check_escape() -> bool:
     """Check if escape key was pressed (Windows only)."""
     if MSVCRT_AVAILABLE:
         import msvcrt
+
         if msvcrt.kbhit() and ord(msvcrt.getch()) == 27:
             return True
     return False
@@ -528,19 +635,31 @@ def main(argv=None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument("--model", required=True, help="Path to model checkpoint (.pth)")
-    parser.add_argument("--no-gamepad", action="store_true", help="Disable gamepad output")
+    parser.add_argument(
+        "--model", required=True, help="Path to model checkpoint (.pth)"
+    )
+    parser.add_argument(
+        "--no-gamepad", action="store_true", help="Disable gamepad output"
+    )
     parser.add_argument("--cpu", action="store_true", help="Force CPU inference")
-    parser.add_argument("--width", type=int, default=GAME_WIDTH, help="Game window width")
-    parser.add_argument("--height", type=int, default=GAME_HEIGHT, help="Game window height")
-    parser.add_argument("--delay", type=float, default=0, help="Delay between frames (seconds)")
+    parser.add_argument(
+        "--width", type=int, default=GAME_WIDTH, help="Game window width"
+    )
+    parser.add_argument(
+        "--height", type=int, default=GAME_HEIGHT, help="Game window height"
+    )
+    parser.add_argument(
+        "--delay", type=float, default=0, help="Delay between frames (seconds)"
+    )
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
 
     args = parser.parse_args(argv)
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
+        print(
+            "[Error] PyTorch not available. Install with: pip install torch torchvision"
+        )
         return 1
 
     if not MODELS_AVAILABLE:
@@ -606,7 +725,9 @@ def main(argv=None) -> int:
 
                 # Motion detection
                 if MOTION_AVAILABLE:
-                    delta_count = motion_detection(t_minus, t_now, t_plus, screen_resized)
+                    delta_count = motion_detection(
+                        t_minus, t_now, t_plus, screen_resized
+                    )
                 else:
                     delta_count = 1000  # Default high motion
 
@@ -622,7 +743,11 @@ def main(argv=None) -> int:
                 engine.execute_action(action_idx, action_val)
 
                 # Get action name
-                action_name = ACTION_NAMES[action_idx] if action_idx < len(ACTION_NAMES) else f"action_{action_idx}"
+                action_name = (
+                    ACTION_NAMES[action_idx]
+                    if action_idx < len(ACTION_NAMES)
+                    else f"action_{action_idx}"
+                )
 
                 # Check if stuck
                 if engine.check_stuck(delta_count):
@@ -633,9 +758,13 @@ def main(argv=None) -> int:
                 motion_avg = mean(engine.motion_log) if engine.motion_log else 0
 
                 if args.verbose:
-                    print(f"Time: {loop_time:.3f}s | Motion: {motion_avg:.0f} | Action: {action_name} ({action_val:.2f})")
+                    print(
+                        f"Time: {loop_time:.3f}s | Motion: {motion_avg:.0f} | Action: {action_name} ({action_val:.2f})"
+                    )
                 else:
-                    print(f"Action: {action_name:15} | Motion: {motion_avg:6.0f} | FPS: {1/max(loop_time, 0.001):.1f}")
+                    print(
+                        f"Action: {action_name:15} | Motion: {motion_avg:6.0f} | FPS: {1 / max(loop_time, 0.001):.1f}"
+                    )
 
                 # Optional delay
                 if args.delay > 0:
@@ -648,7 +777,7 @@ def main(argv=None) -> int:
 
             if GETKEYS_AVAILABLE:
                 keys = key_check()
-                if 'T' in keys:
+                if "T" in keys:
                     if paused:
                         paused = False
                         print("RESUMED")

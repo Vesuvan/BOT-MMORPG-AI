@@ -22,6 +22,7 @@ try:
         UpdateInfo,
         VersionInfo,
     )
+
     _version_available = True
 except ImportError:
     _version_available = False
@@ -33,6 +34,7 @@ try:
         validate_training_data_structure,
         DataValidationError,
     )
+
     _secure_loader_available = True
 except ImportError:
     _secure_loader_available = False
@@ -40,18 +42,22 @@ except ImportError:
 __all__: List[str] = []
 
 if _version_available:
-    __all__.extend([
-        "check_for_updates",
-        "check_for_updates_async",
-        "get_current_version",
-        "compare_versions",
-        "UpdateInfo",
-        "VersionInfo",
-    ])
+    __all__.extend(
+        [
+            "check_for_updates",
+            "check_for_updates_async",
+            "get_current_version",
+            "compare_versions",
+            "UpdateInfo",
+            "VersionInfo",
+        ]
+    )
 
 if _secure_loader_available:
-    __all__.extend([
-        "load_training_data_secure",
-        "validate_training_data_structure",
-        "DataValidationError",
-    ])
+    __all__.extend(
+        [
+            "load_training_data_secure",
+            "validate_training_data_structure",
+            "DataValidationError",
+        ]
+    )

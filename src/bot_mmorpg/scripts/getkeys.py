@@ -5,7 +5,7 @@ import time
 import platform
 
 # Platform detection
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 
 # Key list to monitor
 keyList = ["\b"]
@@ -16,6 +16,7 @@ if IS_WINDOWS:
     # Windows-specific implementation using win32api
     try:
         import win32api as wapi
+
         _WIN32_AVAILABLE = True
 
         def key_check():
@@ -37,6 +38,7 @@ else:
 if not IS_WINDOWS or not _WIN32_AVAILABLE:
     try:
         from pynput import keyboard
+
         _PYNPUT_AVAILABLE = True
 
         # Track currently pressed keys
@@ -75,7 +77,7 @@ if not IS_WINDOWS or not _WIN32_AVAILABLE:
             return []
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(f"Platform: {platform.system()}")
     print(f"Windows mode: {IS_WINDOWS}")
     print("Press keys to see them detected (Ctrl+C to exit)...")

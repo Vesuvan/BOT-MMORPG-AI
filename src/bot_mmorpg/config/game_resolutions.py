@@ -24,16 +24,18 @@ from enum import Enum
 
 class ResolutionTier(Enum):
     """Resolution quality tiers."""
-    MINIMUM = "minimum"      # 480x270 - Best performance, recommended
-    LOW = "low"              # 640x360 - Good performance
-    MEDIUM = "medium"        # 960x540 - Moderate performance
-    HD = "hd"                # 1280x720 - Experimental, not recommended
-    NATIVE = "native"        # Full screen capture
+
+    MINIMUM = "minimum"  # 480x270 - Best performance, recommended
+    LOW = "low"  # 640x360 - Good performance
+    MEDIUM = "medium"  # 960x540 - Moderate performance
+    HD = "hd"  # 1280x720 - Experimental, not recommended
+    NATIVE = "native"  # Full screen capture
 
 
 @dataclass
 class Resolution:
     """Screen resolution configuration."""
+
     width: int
     height: int
     name: str
@@ -45,6 +47,7 @@ class Resolution:
     def aspect_ratio(self) -> str:
         """Calculate aspect ratio string."""
         from math import gcd
+
         divisor = gcd(self.width, self.height)
         return f"{self.width // divisor}:{self.height // divisor}"
 
@@ -60,6 +63,7 @@ class Resolution:
 @dataclass
 class GameResolutionConfig:
     """Resolution configuration for a specific game."""
+
     game_id: str
     game_name: str
     min_resolution: Resolution
@@ -75,40 +79,45 @@ class GameResolutionConfig:
 # =============================================================================
 
 RESOLUTION_480P = Resolution(
-    width=480, height=270,
+    width=480,
+    height=270,
     name="480x270 (NN Default)",
     recommended=True,
-    description="Best performance, fastest training. Default for neural networks."
+    description="Best performance, fastest training. Default for neural networks.",
 )
 
 RESOLUTION_640P = Resolution(
-    width=640, height=360,
+    width=640,
+    height=360,
     name="640x360 (Low)",
     recommended=False,
-    description="Good balance of speed and detail."
+    description="Good balance of speed and detail.",
 )
 
 RESOLUTION_960P = Resolution(
-    width=960, height=540,
+    width=960,
+    height=540,
     name="960x540 (Medium)",
     recommended=False,
-    description="More detail, slower training. Good for complex UIs."
+    description="More detail, slower training. Good for complex UIs.",
 )
 
 RESOLUTION_720P = Resolution(
-    width=1280, height=720,
+    width=1280,
+    height=720,
     name="1280x720 (HD)",
     recommended=False,
     experimental=True,
-    description="EXPERIMENTAL: Maximum supported. Large datasets, slow training."
+    description="EXPERIMENTAL: Maximum supported. Large datasets, slow training.",
 )
 
 RESOLUTION_NATIVE = Resolution(
-    width=0, height=0,  # Determined at runtime
+    width=0,
+    height=0,  # Determined at runtime
     name="Native (Full Screen)",
     recommended=False,
     experimental=True,
-    description="EXPERIMENTAL: Uses full screen resolution. Not recommended."
+    description="EXPERIMENTAL: Uses full screen resolution. Not recommended.",
 )
 
 # Standard resolutions list (16:9 aspect ratio)
@@ -131,11 +140,9 @@ STANDARD_RESOLUTIONS = [
 # - For 16:9 games, 480x270 captures enough detail for gameplay patterns
 
 GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
-
     # =========================================================================
     # Popular MMORPGs - Resolution Analysis
     # =========================================================================
-
     "genshin_impact": GameResolutionConfig(
         game_id="genshin_impact",
         game_name="Genshin Impact",
@@ -144,9 +151,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=640,
-        notes="Mobile-optimized UI scales well. 480x270 captures all essential elements."
+        notes="Mobile-optimized UI scales well. 480x270 captures all essential elements.",
     ),
-
     "world_of_warcraft": GameResolutionConfig(
         game_id="world_of_warcraft",
         game_name="World of Warcraft",
@@ -155,9 +161,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=800,
-        notes="Complex UI with many addons. 640x360 recommended for addon text."
+        notes="Complex UI with many addons. 640x360 recommended for addon text.",
     ),
-
     "final_fantasy_xiv": GameResolutionConfig(
         game_id="final_fantasy_xiv",
         game_name="Final Fantasy XIV",
@@ -166,9 +171,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=800,
-        notes="Detailed HUD with many skills. 640x360 for better hotbar visibility."
+        notes="Detailed HUD with many skills. 640x360 for better hotbar visibility.",
     ),
-
     "guild_wars_2": GameResolutionConfig(
         game_id="guild_wars_2",
         game_name="Guild Wars 2",
@@ -177,9 +181,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=640,
-        notes="Clean UI design. 480x270 sufficient for core gameplay."
+        notes="Clean UI design. 480x270 sufficient for core gameplay.",
     ),
-
     "lost_ark": GameResolutionConfig(
         game_id="lost_ark",
         game_name="Lost Ark",
@@ -188,9 +191,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=720,
-        notes="Many skill indicators. 640x360 recommended for combat clarity."
+        notes="Many skill indicators. 640x360 recommended for combat clarity.",
     ),
-
     "elder_scrolls_online": GameResolutionConfig(
         game_id="elder_scrolls_online",
         game_name="Elder Scrolls Online",
@@ -199,9 +201,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=640,
-        notes="Minimal UI design. 480x270 works well for action combat."
+        notes="Minimal UI design. 480x270 works well for action combat.",
     ),
-
     "black_desert_online": GameResolutionConfig(
         game_id="black_desert_online",
         game_name="Black Desert Online",
@@ -210,9 +211,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=720,
-        notes="Action combat with many effects. 640x360 for skill visibility."
+        notes="Action combat with many effects. 640x360 for skill visibility.",
     ),
-
     "new_world": GameResolutionConfig(
         game_id="new_world",
         game_name="New World",
@@ -221,9 +221,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=640,
-        notes="Clean modern UI. 480x270 captures gameplay well."
+        notes="Clean modern UI. 480x270 captures gameplay well.",
     ),
-
     "path_of_exile": GameResolutionConfig(
         game_id="path_of_exile",
         game_name="Path of Exile",
@@ -232,9 +231,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=800,
-        notes="Complex UI with many indicators. 640x360 for item/skill visibility."
+        notes="Complex UI with many indicators. 640x360 for item/skill visibility.",
     ),
-
     "runescape": GameResolutionConfig(
         game_id="runescape",
         game_name="RuneScape / OSRS",
@@ -243,9 +241,8 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=480,
-        notes="Low-res friendly. 480x270 is ideal for classic gameplay."
+        notes="Low-res friendly. 480x270 is ideal for classic gameplay.",
     ),
-
     "albion_online": GameResolutionConfig(
         game_id="albion_online",
         game_name="Albion Online",
@@ -254,13 +251,11 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=480,
-        notes="Isometric view scales well. 480x270 recommended."
+        notes="Isometric view scales well. 480x270 recommended.",
     ),
-
     # =========================================================================
     # Default / Custom Games
     # =========================================================================
-
     "custom": GameResolutionConfig(
         game_id="custom",
         game_name="Custom Game",
@@ -269,7 +264,7 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         max_resolution=RESOLUTION_720P,
         supported_resolutions=STANDARD_RESOLUTIONS,
         min_ui_width=480,
-        notes="Default configuration. Use 480x270 for best performance."
+        notes="Default configuration. Use 480x270 for best performance.",
     ),
 }
 
@@ -277,6 +272,7 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def get_game_config(game_id: str) -> GameResolutionConfig:
     """Get resolution configuration for a game."""
@@ -314,9 +310,7 @@ def parse_resolution(resolution_str: str) -> Tuple[int, int]:
 
 
 def get_resolution_for_model(
-    resolution_str: str,
-    native_width: int = 1920,
-    native_height: int = 1080
+    resolution_str: str, native_width: int = 1920, native_height: int = 1080
 ) -> Tuple[int, int]:
     """
     Get actual resolution dimensions for model input.
@@ -352,22 +346,26 @@ def get_resolution_options_for_ui() -> List[Dict[str, str]]:
         if res.experimental:
             label += " [Experimental]"
 
-        options.append({
-            "value": str(res),
-            "label": label,
-            "recommended": res.recommended,
-            "experimental": res.experimental,
-            "description": res.description,
-        })
+        options.append(
+            {
+                "value": str(res),
+                "label": label,
+                "recommended": res.recommended,
+                "experimental": res.experimental,
+                "description": res.description,
+            }
+        )
 
     # Add native option
-    options.append({
-        "value": "native",
-        "label": "Native (Full Screen) [Experimental]",
-        "recommended": False,
-        "experimental": True,
-        "description": "Uses full screen resolution. Not recommended for training.",
-    })
+    options.append(
+        {
+            "value": "native",
+            "label": "Native (Full Screen) [Experimental]",
+            "recommended": False,
+            "experimental": True,
+            "description": "Uses full screen resolution. Not recommended for training.",
+        }
+    )
 
     return options
 

@@ -223,7 +223,13 @@ class ModelSelector:
             return False
 
         # Check task requirements
-        temporal_tasks = {"combat", "dungeon", "guardian_raid", "world_boss", "expedition"}
+        temporal_tasks = {
+            "combat",
+            "dungeon",
+            "guardian_raid",
+            "world_boss",
+            "expedition",
+        }
         if task and task.lower() in temporal_tasks:
             return True
 
@@ -259,7 +265,9 @@ class ModelSelector:
             vram = hw_info.gpu.vram_mb if hw_info.gpu else 0
             if vram < specs["min_vram"]:
                 score -= 50
-                warnings.append(f"May exceed available VRAM ({vram}MB < {specs['min_vram']}MB)")
+                warnings.append(
+                    f"May exceed available VRAM ({vram}MB < {specs['min_vram']}MB)"
+                )
 
             # Temporal matching
             if needs_temporal:

@@ -26,6 +26,7 @@ def _get_version_utils():
     if _version_utils is None:
         try:
             from bot_mmorpg.utils import version as version_module
+
             _version_utils = version_module
         except ImportError:
             _version_utils = False  # Mark as unavailable
@@ -284,9 +285,7 @@ class CommandHandler:
             )
 
             # Create curriculum config
-            curriculum = CurriculumConfig.default(
-                total_epochs=config.get("epochs", 50)
-            )
+            curriculum = CurriculumConfig.default(total_epochs=config.get("epochs", 50))
 
             # Create trainer
             trainer = CurriculumTrainer(model, curriculum)
@@ -439,9 +438,7 @@ class CommandHandler:
     # VISUALIZATION COMMANDS
     # =========================================================================
 
-    def handle_visual_get_attention_map(
-        self, frame_base64: str
-    ) -> Dict[str, Any]:
+    def handle_visual_get_attention_map(self, frame_base64: str) -> Dict[str, Any]:
         """Generate attention map for a frame."""
         from bot_mmorpg.visualization import generate_attention_map
 
@@ -463,9 +460,7 @@ class CommandHandler:
 
         return {"attention_map": attention_base64}
 
-    def handle_visual_get_prediction_overlay(
-        self, frame_base64: str
-    ) -> Dict[str, Any]:
+    def handle_visual_get_prediction_overlay(self, frame_base64: str) -> Dict[str, Any]:
         """Generate prediction overlay for a frame."""
         if not self._inference_engine:
             return {"error": "No model loaded"}

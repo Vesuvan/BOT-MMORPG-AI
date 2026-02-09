@@ -7,7 +7,7 @@ import platform
 import base64
 
 # Platform detection for cross-platform support
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 
 if IS_WINDOWS:
     try:
@@ -15,6 +15,7 @@ if IS_WINDOWS:
         import win32ui
         import win32con
         import win32api
+
         _WIN32_AVAILABLE = True
     except ImportError:
         _WIN32_AVAILABLE = False
@@ -24,6 +25,7 @@ else:
 # Cross-platform fallback using mss (works on all platforms)
 try:
     import mss
+
     _MSS_AVAILABLE = True
 except ImportError:
     _MSS_AVAILABLE = False
@@ -43,36 +45,42 @@ def list_monitors():
         with mss.mss() as sct:
             # Skip monitor 0 (it's the combined virtual screen on Windows)
             for i, mon in enumerate(sct.monitors[1:], start=1):
-                monitors.append({
-                    "id": i,
-                    "name": f"Monitor {i} ({mon['width']}x{mon['height']})",
-                    "width": mon['width'],
-                    "height": mon['height'],
-                    "left": mon['left'],
-                    "top": mon['top']
-                })
+                monitors.append(
+                    {
+                        "id": i,
+                        "name": f"Monitor {i} ({mon['width']}x{mon['height']})",
+                        "width": mon["width"],
+                        "height": mon["height"],
+                        "left": mon["left"],
+                        "top": mon["top"],
+                    }
+                )
     elif IS_WINDOWS and _WIN32_AVAILABLE:
         # Fallback: just report primary monitor
         width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
         height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
-        monitors.append({
-            "id": 1,
-            "name": f"Primary ({width}x{height})",
-            "width": width,
-            "height": height,
-            "left": 0,
-            "top": 0
-        })
+        monitors.append(
+            {
+                "id": 1,
+                "name": f"Primary ({width}x{height})",
+                "width": width,
+                "height": height,
+                "left": 0,
+                "top": 0,
+            }
+        )
     else:
         # Default fallback
-        monitors.append({
-            "id": 1,
-            "name": "Primary (Unknown)",
-            "width": 1920,
-            "height": 1080,
-            "left": 0,
-            "top": 0
-        })
+        monitors.append(
+            {
+                "id": 1,
+                "name": "Primary (Unknown)",
+                "width": 1920,
+                "height": 1080,
+                "left": 0,
+                "top": 0,
+            }
+        )
 
     return monitors
 
@@ -143,9 +151,9 @@ def grab_screen_base64(monitor_id=1, max_width=640, max_height=360, quality=70):
     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     # Encode as JPEG
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-    _, buffer = cv2.imencode('.jpg', img_bgr, encode_param)
+    _, buffer = cv2.imencode(".jpg", img_bgr, encode_param)
     # Convert to base64
-    return base64.b64encode(buffer).decode('utf-8')
+    return base64.b64encode(buffer).decode("utf-8")
 
 
 def _grab_screen_win32(region=None):
@@ -172,7 +180,7 @@ def _grab_screen_win32(region=None):
 
     signedIntsArray = bmp.GetBitmapBits(True)
     # Fix: Use np.frombuffer instead of deprecated np.fromstring
-    img = np.frombuffer(signedIntsArray, dtype='uint8')
+    img = np.frombuffer(signedIntsArray, dtype="uint8")
     img.shape = (height, width, 4)
 
     srcdc.DeleteDC()
@@ -192,7 +200,7 @@ def _grab_screen_mss(region=None):
                 "left": left,
                 "top": top,
                 "width": x2 - left + 1,
-                "height": y2 - top + 1
+                "height": y2 - top + 1,
             }
         else:
             # Capture full screen (primary monitor)

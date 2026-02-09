@@ -246,9 +246,7 @@ def _generate_placeholder_heatmap(
     return Image.blend(image, heatmap_pil, alpha)
 
 
-def _apply_colormap(
-    heatmap: np.ndarray, colormap: str = "jet"
-) -> np.ndarray:
+def _apply_colormap(heatmap: np.ndarray, colormap: str = "jet") -> np.ndarray:
     """Apply a colormap to a heatmap array."""
     try:
         import matplotlib.cm as cm

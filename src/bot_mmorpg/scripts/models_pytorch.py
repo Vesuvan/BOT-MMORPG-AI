@@ -29,6 +29,7 @@ try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
+
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
@@ -38,10 +39,12 @@ except ImportError:
     # Stub nn module for class definitions when PyTorch not installed
     class _StubModule:
         """Stub base class for nn.Module when PyTorch not installed."""
+
         pass
 
     class _StubNN:
         """Stub nn module when PyTorch not installed."""
+
         Module = _StubModule
         Sequential = _StubModule
         Conv2d = _StubModule
@@ -70,6 +73,7 @@ except ImportError:
 # Check for torchvision availability
 try:
     import torchvision.models as tv_models
+
     TORCHVISION_AVAILABLE = True
 except ImportError:
     TORCHVISION_AVAILABLE = False
@@ -80,9 +84,11 @@ except ImportError:
 # Model Configuration
 # =============================================================================
 
+
 @dataclass
 class ModelConfig:
     """Configuration for model architecture."""
+
     name: str
     input_height: int = 270
     input_width: int = 480
@@ -95,6 +101,7 @@ class ModelConfig:
 
 class ModelType(Enum):
     """Available model architectures."""
+
     # Modern architectures (recommended)
     EFFICIENTNET_LSTM = "efficientnet_lstm"
     EFFICIENTNET_SIMPLE = "efficientnet_simple"
@@ -111,6 +118,7 @@ class ModelType(Enum):
 # =============================================================================
 # Modern Architectures (Recommended)
 # =============================================================================
+
 
 class EfficientNetLSTM(nn.Module):
     """
@@ -371,6 +379,7 @@ class ResNet18LSTM(nn.Module):
 # Legacy Architectures (Ported from TFLearn)
 # =============================================================================
 
+
 class InceptionModule(nn.Module):
     """Inception module with parallel convolutions at different scales."""
 
@@ -416,12 +425,15 @@ class InceptionModule(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.cat([
-            self.branch1(x),
-            self.branch2(x),
-            self.branch3(x),
-            self.branch4(x),
-        ], dim=1)
+        return torch.cat(
+            [
+                self.branch1(x),
+                self.branch2(x),
+                self.branch3(x),
+                self.branch4(x),
+            ],
+            dim=1,
+        )
 
 
 class InceptionV3Legacy(nn.Module):
@@ -530,12 +542,10 @@ class AlexNetLegacy(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(96, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(384, 384, 3, padding=1),
@@ -543,12 +553,10 @@ class AlexNetLegacy(nn.Module):
             nn.Conv2d(384, 256, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
-
             nn.Conv2d(256, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(384, 384, 3, padding=1),
@@ -605,11 +613,9 @@ class SentNetLegacy(nn.Module):
             nn.Conv3d(3, 96, 11, stride=4, padding=2),
             nn.ReLU(inplace=True),
             nn.AvgPool3d(3, stride=2),
-
             nn.Conv3d(96, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.AvgPool3d(3, stride=2),
-
             nn.Conv3d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv3d(384, 384, 3, padding=1),
@@ -617,11 +623,9 @@ class SentNetLegacy(nn.Module):
             nn.Conv3d(384, 256, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool3d(3, stride=2),
-
             nn.Conv3d(256, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.AvgPool3d(3, stride=2),
-
             nn.Conv3d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv3d(384, 384, 3, padding=1),
@@ -682,12 +686,10 @@ class SentNet2D(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(96, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(384, 384, 3, padding=1),
@@ -695,12 +697,10 @@ class SentNet2D(nn.Module):
             nn.Conv2d(384, 256, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
-
             nn.Conv2d(256, 256, 5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, stride=2),
             nn.LocalResponseNorm(5),
-
             nn.Conv2d(256, 384, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(384, 384, 3, padding=1),
@@ -740,6 +740,7 @@ class SentNet2D(nn.Module):
 # =============================================================================
 # Advanced Architectures (Experimental - Better for MMORPG)
 # =============================================================================
+
 
 class EfficientNetTransformer(nn.Module):
     """
@@ -787,7 +788,9 @@ class EfficientNetTransformer(nn.Module):
         self.feature_proj = nn.Linear(self.feature_dim, d_model)
 
         # Learnable positional encoding for temporal dimension
-        self.pos_encoding = nn.Parameter(torch.randn(1, temporal_frames, d_model) * 0.02)
+        self.pos_encoding = nn.Parameter(
+            torch.randn(1, temporal_frames, d_model) * 0.02
+        )
 
         # Transformer encoder for temporal modeling
         encoder_layer = nn.TransformerEncoderLayer(
@@ -795,10 +798,12 @@ class EfficientNetTransformer(nn.Module):
             nhead=nhead,
             dim_feedforward=d_model * 4,
             dropout=dropout,
-            activation='gelu',
+            activation="gelu",
             batch_first=True,
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_encoder_layers
+        )
 
         # Classification token (like BERT's [CLS])
         self.cls_token = nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
@@ -831,7 +836,12 @@ class EfficientNetTransformer(nn.Module):
         if seq_len <= self.temporal_frames:
             features = features + self.pos_encoding[:, :seq_len, :]
         else:
-            features = features + self.pos_encoding[:, :seq_len % self.temporal_frames + 1, :].repeat(1, seq_len // self.temporal_frames + 1, 1)[:, :seq_len, :]
+            features = (
+                features
+                + self.pos_encoding[:, : seq_len % self.temporal_frames + 1, :].repeat(
+                    1, seq_len // self.temporal_frames + 1, 1
+                )[:, :seq_len, :]
+            )
 
         # Prepend classification token
         cls_tokens = self.cls_token.expand(batch, -1, -1)
@@ -867,11 +877,11 @@ class MultiHeadActionModel(nn.Module):
 
     def __init__(
         self,
-        num_actions: int = 52,    # Total actions (can be overridden)
-        num_movement: int = 16,   # Movement actions
-        num_skills: int = 20,     # Skill slots
-        num_combat: int = 12,     # Combat actions
-        num_camera: int = 4,      # Camera controls
+        num_actions: int = 52,  # Total actions (can be overridden)
+        num_movement: int = 16,  # Movement actions
+        num_skills: int = 20,  # Skill slots
+        num_combat: int = 12,  # Combat actions
+        num_camera: int = 4,  # Camera controls
         dropout: float = 0.3,
         pretrained: bool = True,
     ):
@@ -1045,7 +1055,9 @@ class GameAttentionNet(nn.Module):
             features = self.backbone.features(x)
             attention = self.attention(features)
             # Upsample to input resolution
-            attention = F.interpolate(attention, size=x.shape[-2:], mode='bilinear', align_corners=False)
+            attention = F.interpolate(
+                attention, size=x.shape[-2:], mode="bilinear", align_corners=False
+            )
             return attention
 
 
@@ -1218,7 +1230,12 @@ def get_model(
         model_kwargs["temporal_frames"] = temporal_frames
 
     # Add pretrained for modern models
-    if model_name in ["efficientnet_lstm", "efficientnet_simple", "mobilenet_v3", "resnet18_lstm"]:
+    if model_name in [
+        "efficientnet_lstm",
+        "efficientnet_simple",
+        "mobilenet_v3",
+        "resnet18_lstm",
+    ]:
         model_kwargs["pretrained"] = pretrained
 
     # Merge with user kwargs
@@ -1231,6 +1248,7 @@ def get_model(
 # Utility Functions
 # =============================================================================
 
+
 def count_parameters(model: nn.Module) -> int:
     """Count trainable parameters in a model."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -1240,7 +1258,11 @@ def get_device(prefer_gpu: bool = True) -> torch.device:
     """Get the best available device."""
     if prefer_gpu and torch.cuda.is_available():
         return torch.device("cuda")
-    elif prefer_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    elif (
+        prefer_gpu
+        and hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+    ):
         return torch.device("mps")  # Apple Silicon
     return torch.device("cpu")
 
@@ -1275,35 +1297,46 @@ def load_model(
     # Extract metadata
     metadata = {}
     if isinstance(checkpoint, dict):
-        metadata = {k: v for k, v in checkpoint.items() if k not in ['model_state_dict', 'state_dict', 'optimizer_state_dict']}
+        metadata = {
+            k: v
+            for k, v in checkpoint.items()
+            if k not in ["model_state_dict", "state_dict", "optimizer_state_dict"]
+        }
 
         # Auto-detect model name from checkpoint
         if model_name is None:
-            model_name = checkpoint.get('model_name')
+            model_name = checkpoint.get("model_name")
             # Handle class name format
             if model_name and model_name not in MODEL_REGISTRY:
                 # Try to map class names to registry names
                 name_mapping = {
-                    'EfficientNetLSTM': 'efficientnet_lstm',
-                    'EfficientNetSimple': 'efficientnet_simple',
-                    'MobileNetV3Model': 'mobilenet_v3',
-                    'ResNet18LSTM': 'resnet18_lstm',
-                    'InceptionV3Legacy': 'inception_v3',
-                    'AlexNetLegacy': 'alexnet',
-                    'SentNetLegacy': 'sentnet',
-                    'SentNet2D': 'sentnet_2d',
+                    "EfficientNetLSTM": "efficientnet_lstm",
+                    "EfficientNetSimple": "efficientnet_simple",
+                    "MobileNetV3Model": "mobilenet_v3",
+                    "ResNet18LSTM": "resnet18_lstm",
+                    "InceptionV3Legacy": "inception_v3",
+                    "AlexNetLegacy": "alexnet",
+                    "SentNetLegacy": "sentnet",
+                    "SentNet2D": "sentnet_2d",
                 }
                 model_name = name_mapping.get(model_name, model_name)
 
     if model_name is None:
-        raise ValueError("model_name not found in checkpoint and not provided. "
-                         "Please specify model_name parameter.")
+        raise ValueError(
+            "model_name not found in checkpoint and not provided. "
+            "Please specify model_name parameter."
+        )
 
     # Get temporal frames from metadata
-    temporal_frames = metadata.get('temporal_frames', 4)
+    temporal_frames = metadata.get("temporal_frames", 4)
 
     # Create model
-    model = get_model(model_name, num_actions=num_actions, temporal_frames=temporal_frames, pretrained=False)
+    model = get_model(
+        model_name,
+        num_actions=num_actions,
+        temporal_frames=temporal_frames,
+        pretrained=False,
+    )
 
     # Load state dict
     if isinstance(checkpoint, dict):
@@ -1313,8 +1346,11 @@ def load_model(
             model.load_state_dict(checkpoint["state_dict"])
         else:
             # Checkpoint is the state dict itself (wrapped in dict)
-            state_dict = {k: v for k, v in checkpoint.items()
-                          if not isinstance(v, (int, float, str, bool, type(None)))}
+            state_dict = {
+                k: v
+                for k, v in checkpoint.items()
+                if not isinstance(v, (int, float, str, bool, type(None)))
+            }
             if state_dict:
                 model.load_state_dict(state_dict)
     else:
@@ -1363,7 +1399,7 @@ def save_model(
         checkpoint["loss"] = loss
 
     # Try to get temporal_frames from model if not provided
-    if temporal_frames is None and hasattr(model, 'temporal_frames'):
+    if temporal_frames is None and hasattr(model, "temporal_frames"):
         temporal_frames = model.temporal_frames
     if temporal_frames is not None:
         checkpoint["temporal_frames"] = temporal_frames
@@ -1377,31 +1413,34 @@ def save_model(
 # Backward Compatibility Aliases
 # =============================================================================
 
+
 # These match the original TFLearn function names for drop-in replacement
-def inception_v3(width, height, frame_count, lr, output=29, model_name='model', **kwargs):
+def inception_v3(
+    width, height, frame_count, lr, output=29, model_name="model", **kwargs
+):
     """Legacy API compatibility wrapper."""
-    return get_model('inception_v3', num_actions=output)
+    return get_model("inception_v3", num_actions=output)
 
 
 def alexnet(width, height, lr, output=29, **kwargs):
     """Legacy API compatibility wrapper."""
-    return get_model('alexnet', num_actions=output)
+    return get_model("alexnet", num_actions=output)
 
 
 def sentnet(width, height, frame_count, lr, output=29, **kwargs):
     """Legacy API compatibility wrapper."""
-    return get_model('sentnet', num_actions=output)
+    return get_model("sentnet", num_actions=output)
 
 
 def sentnet_color_2d(width, height, frame_count, lr, output=29, **kwargs):
     """Legacy API compatibility wrapper."""
-    return get_model('sentnet_2d', num_actions=output)
+    return get_model("sentnet_2d", num_actions=output)
 
 
 # Alias for the recommended model
 def googlenet(width, height, frame_count, lr, output=29, **kwargs):
     """Alias for inception_v3 (commonly called GoogLeNet)."""
-    return get_model('inception_v3', num_actions=output)
+    return get_model("inception_v3", num_actions=output)
 
 
 # =============================================================================

@@ -119,7 +119,10 @@ class BridgeServer:
 
             if handler_func is None:
                 return RPCResponse(
-                    error={"code": -32601, "message": f"Method not found: {request.method}"},
+                    error={
+                        "code": -32601,
+                        "message": f"Method not found: {request.method}",
+                    },
                     id=request.id,
                 )
 

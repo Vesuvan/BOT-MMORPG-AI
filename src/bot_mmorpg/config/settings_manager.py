@@ -48,9 +48,7 @@ class TrainingConfig:
 
     # Augmentation
     augmentation_enabled: bool = True
-    augmentations: List[str] = field(
-        default_factory=lambda: ["brightness", "contrast"]
-    )
+    augmentations: List[str] = field(default_factory=lambda: ["brightness", "contrast"])
 
     # Checkpoints
     save_best: bool = True
@@ -174,7 +172,11 @@ class SettingsManager:
         result = deepcopy(base)
 
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = deepcopy(value)
@@ -292,9 +294,7 @@ class SettingsManager:
 
         return result
 
-    def _build_training_config(
-        self, merged: Dict, hw_info: Any
-    ) -> TrainingConfig:
+    def _build_training_config(self, merged: Dict, hw_info: Any) -> TrainingConfig:
         """Build TrainingConfig from merged settings."""
         training = merged.get("training", {})
         model = training.get("model", {})
@@ -404,9 +404,7 @@ class SettingsManager:
 
         return path
 
-    def get_quick_config(
-        self, game_id: str, task: str = "combat"
-    ) -> Dict[str, Any]:
+    def get_quick_config(self, game_id: str, task: str = "combat") -> Dict[str, Any]:
         """
         Get a simple dictionary config for quick use.
 

@@ -71,7 +71,9 @@ def draw_confidence_bars(
 
     # Try to load font
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+        font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size
+        )
     except (IOError, OSError):
         font = ImageFont.load_default()
 
@@ -245,8 +247,12 @@ def draw_action_indicator(
 
     # Draw action text
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
-        small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+        font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24
+        )
+        small_font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16
+        )
     except (IOError, OSError):
         font = ImageFont.load_default()
         small_font = font
@@ -310,7 +316,9 @@ def generate_prediction_overlay(
         # No prediction - return original with "WAITING" indicator
         draw = ImageDraw.Draw(result)
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20
+            )
         except (IOError, OSError):
             font = ImageFont.load_default()
 
@@ -391,7 +399,9 @@ def create_training_visualization(
 
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
-        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        title_font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20
+        )
     except (IOError, OSError):
         font = ImageFont.load_default()
         title_font = font
@@ -401,7 +411,9 @@ def create_training_visualization(
     draw.text((10, 80), f"Loss: {loss:.4f}", fill=(200, 200, 200), font=font)
 
     if ground_truth:
-        draw.text((10, 120), f"Ground Truth: {ground_truth}", fill=(100, 255, 100), font=font)
+        draw.text(
+            (10, 120), f"Ground Truth: {ground_truth}", fill=(100, 255, 100), font=font
+        )
 
     # Combine into 2x2 grid
     combined = Image.new("RGB", (panel_size[0] * 2, panel_size[1] * 2))
