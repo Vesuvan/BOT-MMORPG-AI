@@ -4,8 +4,7 @@ Game Profile Loader
 Loads and manages game-specific configuration profiles.
 """
 
-import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -167,7 +166,11 @@ class GameProfileLoader:
 
         for game_id, info in index.get("profiles", {}).items():
             games.append(
-                {"id": game_id, "name": info.get("name", game_id), "status": info.get("status", "unknown")}
+                {
+                    "id": game_id,
+                    "name": info.get("name", game_id),
+                    "status": info.get("status", "unknown"),
+                }
             )
 
         return games
@@ -263,7 +266,8 @@ class GameProfileLoader:
                     "class_balance_tolerance", 0.3
                 ),
                 learning_rate=training_data.get(
-                    "learning_rate", {"initial": 0.001, "decay_factor": 0.1, "decay_epochs": [20, 40]}
+                    "learning_rate",
+                    {"initial": 0.001, "decay_factor": 0.1, "decay_epochs": [20, 40]},
                 ),
                 hardware_tiers=hardware_tiers,
                 tasks=tasks,

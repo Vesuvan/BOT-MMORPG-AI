@@ -91,8 +91,7 @@ class TestRPCResponse:
         from bot_mmorpg.bridge.server import RPCResponse
 
         response = RPCResponse(
-            error={"code": -32601, "message": "Method not found"},
-            id=1
+            error={"code": -32601, "message": "Method not found"}, id=1
         )
         json_str = response.to_json()
         data = json.loads(json_str)
@@ -201,12 +200,7 @@ class TestBridgeServerHandling:
         from bot_mmorpg.bridge.server import BridgeServer, RPCRequest
 
         server = BridgeServer()
-        request = RPCRequest(
-            jsonrpc="2.0",
-            method="unknown.method",
-            params={},
-            id=1
-        )
+        request = RPCRequest(jsonrpc="2.0", method="unknown.method", params={}, id=1)
 
         response = server.handle_request(request)
 
@@ -219,12 +213,7 @@ class TestBridgeServerHandling:
         from bot_mmorpg.bridge.server import BridgeServer, RPCRequest
 
         server = BridgeServer()
-        request = RPCRequest(
-            jsonrpc="2.0",
-            method="system.ping",
-            params={},
-            id=1
-        )
+        request = RPCRequest(jsonrpc="2.0", method="system.ping", params={}, id=1)
 
         response = server.handle_request(request)
 

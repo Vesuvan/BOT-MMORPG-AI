@@ -9,13 +9,14 @@ import numpy as np
 # Cross-platform support added for Linux/macOS (stub functions)
 
 # Platform detection
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 
 CONST_DLL_VJOY = "vJoyInterface.dll"
 
 
 class vJoyStub:
     """Stub class for non-Windows platforms."""
+
     def __init__(self, reference=1):
         self.reference = reference
         self.acquired = False
@@ -36,7 +37,7 @@ class vJoyStub:
         return True
 
     def generateJoystickPosition(self, **kwargs):
-        return b'\x00' * 100  # Dummy data
+        return b"\x00" * 100  # Dummy data
 
     def update(self, joystickPosition):
         return True
@@ -50,6 +51,7 @@ class vJoyStub:
 
 if IS_WINDOWS:
     try:
+
         class vJoy(object):
             def __init__(self, reference=1):
                 self.handle = None
@@ -69,23 +71,41 @@ if IS_WINDOWS:
                     return True
                 return False
 
-            def generateJoystickPosition(self,
-                wThrottle=0, wRudder=0, wAileron=0,
+            def generateJoystickPosition(
+                self,
+                wThrottle=0,
+                wRudder=0,
+                wAileron=0,
                 # left thb x        left thb y     left trigger
-                wAxisX=16393, wAxisY=16393, wAxisZ=16393,
+                wAxisX=16393,
+                wAxisY=16393,
+                wAxisZ=16393,
                 # right thb x       right thb y        right trigger
-                wAxisXRot=16393, wAxisYRot=16393, wAxisZRot=16393,
+                wAxisXRot=16393,
+                wAxisYRot=16393,
+                wAxisZRot=16393,
                 # ???         ???        ???
-                wSlider=0, wDial=0, wWheel=0,
+                wSlider=0,
+                wDial=0,
+                wWheel=0,
                 # ???         ???        ???
-                wAxisVX=0, wAxisVY=0, wAxisVZ=0,
+                wAxisVX=0,
+                wAxisVY=0,
+                wAxisVZ=0,
                 # ???         ???                ???
-                wAxisVBRX=0, wAxisVBRY=0, wAxisVBRZ=0,
+                wAxisVBRX=0,
+                wAxisVBRY=0,
+                wAxisVBRZ=0,
                 # 1 = a
                 # 2 = b  3 = a+b ??
                 # 4 = x  5 = x+a ?? 6 = x+b
                 # 8 = y
-                lButtons=0, bHats=0, bHatsEx1=0, bHatsEx2=0, bHatsEx3=0):
+                lButtons=0,
+                bHats=0,
+                bHatsEx1=0,
+                bHatsEx2=0,
+                bHatsEx3=0,
+            ):
                 """
                 typedef struct _JOYSTICK_POSITION
                 {
@@ -116,10 +136,33 @@ if IS_WINDOWS:
                 } JOYSTICK_POSITION, *PJOYSTICK_POSITION;
                 """
                 joyPosFormat = "BlllllllllllllllllllIIII"
-                pos = struct.pack(joyPosFormat, self.reference, wThrottle, wRudder,
-                                  wAileron, wAxisX, wAxisY, wAxisZ, wAxisXRot, wAxisYRot,
-                                  wAxisZRot, wSlider, wDial, wWheel, wAxisVX, wAxisVY, wAxisVZ,
-                                  wAxisVBRX, wAxisVBRY, wAxisVBRZ, lButtons, bHats, bHatsEx1, bHatsEx2, bHatsEx3)
+                pos = struct.pack(
+                    joyPosFormat,
+                    self.reference,
+                    wThrottle,
+                    wRudder,
+                    wAileron,
+                    wAxisX,
+                    wAxisY,
+                    wAxisZ,
+                    wAxisXRot,
+                    wAxisYRot,
+                    wAxisZRot,
+                    wSlider,
+                    wDial,
+                    wWheel,
+                    wAxisVX,
+                    wAxisVY,
+                    wAxisVZ,
+                    wAxisVBRX,
+                    wAxisVBRY,
+                    wAxisVBRZ,
+                    lButtons,
+                    bHats,
+                    bHatsEx1,
+                    bHatsEx2,
+                    bHatsEx3,
+                )
                 return pos
 
             def update(self, joystickPosition):
@@ -163,21 +206,24 @@ except (OSError, FileNotFoundError):
 def setJoy(valueX, valueY, scale):
     xPos = int(valueX * scale)
     yPos = int(valueY * scale)
-    joystickPosition = vj.generateJoystickPosition(wAxisX=16000 + xPos, wAxisY=16000 + yPos)
+    joystickPosition = vj.generateJoystickPosition(
+        wAxisX=16000 + xPos, wAxisY=16000 + yPos
+    )
     vj.update(joystickPosition)
 
 
 def test():
     vj.open()
     print("vj opening", flush=True)
-    btn = 1
     time.sleep(2)
     print("sending axes", flush=True)
     for i in range(0, 1000, 1):
         xPos = int(10000.0 * np.sin(2.0 * np.pi * i / 1000))
         yPos = int(10000.0 * np.sin(2.0 * np.pi * i / 100))
         print(xPos, flush=True)
-        joystickPosition = vj.generateJoystickPosition(wAxisX=16000 + xPos, wAxisY=16000 + yPos)
+        joystickPosition = vj.generateJoystickPosition(
+            wAxisX=16000 + xPos, wAxisY=16000 + yPos
+        )
         vj.update(joystickPosition)
         time.sleep(0.01)
     joystickPosition = vj.generateJoystickPosition(wAxisX=16000, wAxisY=16000)
@@ -219,7 +265,6 @@ def test2():
 
     print("vj closing", flush=True)
 
-    reset = vj.generateJoystickPosition()
     setJoy(0, 0, scale)
     vj.close()
 
@@ -230,7 +275,9 @@ def test3():
     print("vj opening", flush=True)
     time.sleep(2)
     print("sending axes", flush=True)
-    joystickPosition = vj.generateJoystickPosition(wThrottle=32000, wAxisX=16000, wAxisY=16000)
+    joystickPosition = vj.generateJoystickPosition(
+        wThrottle=32000, wAxisX=16000, wAxisY=16000
+    )
     vj.update(joystickPosition)
     time.sleep(5)
     joystickPosition = vj.generateJoystickPosition()
@@ -267,6 +314,7 @@ def ultimate_release():
 
 # LT and RT  (corresponds to Z in Joystic Test)
 
+
 def gamepad_lt():
     vj.open()
     joystickPosition = vj.generateJoystickPosition(wAxisZ=32786)
@@ -282,6 +330,7 @@ def gamepad_rt():
 
 
 # Left Thumbstick
+
 
 def game_lx_left():
     vj.open()
@@ -313,6 +362,7 @@ def game_ly_down():
 
 #   Right Thumbstick
 
+
 def look_rx_left():
     vj.open()
     joystickPosition = vj.generateJoystickPosition(wAxisXRot=0)
@@ -343,6 +393,7 @@ def look_ry_down():
 
 # RZ
 
+
 def throttle_max():
     vj.open()
     joystickPosition = vj.generateJoystickPosition(wAxisZRot=32786)
@@ -358,6 +409,7 @@ def throttle_min():
 
 
 # Buttons A, B, X, Y,
+
 
 # Button 1 = A
 def button_A():
@@ -509,7 +561,7 @@ def button_ABXY():
     vj.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(f"Platform: {platform.system()}")
     print(f"vJoy available: {_VJOY_AVAILABLE}")
     ultimate_release()

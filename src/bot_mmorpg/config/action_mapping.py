@@ -18,40 +18,43 @@ Output Design:
 - Discrete: Button presses for skills
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 from enum import Enum, auto
 
 
 class ActionCategory(Enum):
     """Categories of game actions."""
-    MOVEMENT = auto()       # WASD, run, jump
-    SKILLS = auto()         # Hotbar skills 1-9
-    COMBAT = auto()         # Attack, dodge, block
-    TARGETING = auto()      # Tab-target, click-target
-    CAMERA = auto()         # Mouse look, zoom
-    UI = auto()             # Inventory, map, menu
+
+    MOVEMENT = auto()  # WASD, run, jump
+    SKILLS = auto()  # Hotbar skills 1-9
+    COMBAT = auto()  # Attack, dodge, block
+    TARGETING = auto()  # Tab-target, click-target
+    CAMERA = auto()  # Mouse look, zoom
+    UI = auto()  # Inventory, map, menu
     COMMUNICATION = auto()  # Chat, emotes
-    MODIFIER = auto()       # Shift, Ctrl, Alt
+    MODIFIER = auto()  # Shift, Ctrl, Alt
 
 
 @dataclass
 class ActionDefinition:
     """Definition of a single action."""
+
     id: int
     name: str
     category: ActionCategory
     key_binding: Optional[str] = None
     gamepad_binding: Optional[str] = None
     is_continuous: bool = False  # True for analog (movement, camera)
-    is_toggle: bool = False      # True for toggle states (autorun)
-    cooldown_ms: int = 0         # Minimum time between activations
+    is_toggle: bool = False  # True for toggle states (autorun)
+    cooldown_ms: int = 0  # Minimum time between activations
     description: str = ""
 
 
 @dataclass
 class ActionGroup:
     """Group of related actions (e.g., movement directions)."""
+
     name: str
     actions: List[ActionDefinition]
     mutually_exclusive: bool = True  # Can only one be active?
@@ -63,113 +66,610 @@ class ActionGroup:
 
 # Movement Actions (0-15)
 MOVEMENT_ACTIONS = [
-    ActionDefinition(0, "move_forward", ActionCategory.MOVEMENT, "W", "Ly+", True, description="Move forward"),
-    ActionDefinition(1, "move_backward", ActionCategory.MOVEMENT, "S", "Ly-", True, description="Move backward"),
-    ActionDefinition(2, "move_left", ActionCategory.MOVEMENT, "A", "Lx-", True, description="Strafe left"),
-    ActionDefinition(3, "move_right", ActionCategory.MOVEMENT, "D", "Lx+", True, description="Strafe right"),
-    ActionDefinition(4, "move_forward_left", ActionCategory.MOVEMENT, "W+A", None, True, description="Move diagonally"),
-    ActionDefinition(5, "move_forward_right", ActionCategory.MOVEMENT, "W+D", None, True, description="Move diagonally"),
-    ActionDefinition(6, "move_backward_left", ActionCategory.MOVEMENT, "S+A", None, True, description="Move diagonally"),
-    ActionDefinition(7, "move_backward_right", ActionCategory.MOVEMENT, "S+D", None, True, description="Move diagonally"),
-    ActionDefinition(8, "jump", ActionCategory.MOVEMENT, "Space", "A", cooldown_ms=500, description="Jump"),
-    ActionDefinition(9, "sprint", ActionCategory.MOVEMENT, "Shift", "L3", description="Sprint/Run"),
-    ActionDefinition(10, "crouch", ActionCategory.MOVEMENT, "Ctrl", "R3", is_toggle=True, description="Crouch/Sneak"),
-    ActionDefinition(11, "dodge", ActionCategory.MOVEMENT, "Alt", "B", cooldown_ms=1000, description="Dodge roll"),
-    ActionDefinition(12, "mount", ActionCategory.MOVEMENT, "Z", "DOWN", cooldown_ms=2000, description="Mount/Dismount"),
-    ActionDefinition(13, "autorun", ActionCategory.MOVEMENT, "NumLock", "L3+R3", is_toggle=True, description="Auto-run toggle"),
-    ActionDefinition(14, "swim_up", ActionCategory.MOVEMENT, "Space", "A", description="Swim up"),
-    ActionDefinition(15, "swim_down", ActionCategory.MOVEMENT, "Ctrl", "B", description="Swim down"),
+    ActionDefinition(
+        0,
+        "move_forward",
+        ActionCategory.MOVEMENT,
+        "W",
+        "Ly+",
+        True,
+        description="Move forward",
+    ),
+    ActionDefinition(
+        1,
+        "move_backward",
+        ActionCategory.MOVEMENT,
+        "S",
+        "Ly-",
+        True,
+        description="Move backward",
+    ),
+    ActionDefinition(
+        2,
+        "move_left",
+        ActionCategory.MOVEMENT,
+        "A",
+        "Lx-",
+        True,
+        description="Strafe left",
+    ),
+    ActionDefinition(
+        3,
+        "move_right",
+        ActionCategory.MOVEMENT,
+        "D",
+        "Lx+",
+        True,
+        description="Strafe right",
+    ),
+    ActionDefinition(
+        4,
+        "move_forward_left",
+        ActionCategory.MOVEMENT,
+        "W+A",
+        None,
+        True,
+        description="Move diagonally",
+    ),
+    ActionDefinition(
+        5,
+        "move_forward_right",
+        ActionCategory.MOVEMENT,
+        "W+D",
+        None,
+        True,
+        description="Move diagonally",
+    ),
+    ActionDefinition(
+        6,
+        "move_backward_left",
+        ActionCategory.MOVEMENT,
+        "S+A",
+        None,
+        True,
+        description="Move diagonally",
+    ),
+    ActionDefinition(
+        7,
+        "move_backward_right",
+        ActionCategory.MOVEMENT,
+        "S+D",
+        None,
+        True,
+        description="Move diagonally",
+    ),
+    ActionDefinition(
+        8,
+        "jump",
+        ActionCategory.MOVEMENT,
+        "Space",
+        "A",
+        cooldown_ms=500,
+        description="Jump",
+    ),
+    ActionDefinition(
+        9, "sprint", ActionCategory.MOVEMENT, "Shift", "L3", description="Sprint/Run"
+    ),
+    ActionDefinition(
+        10,
+        "crouch",
+        ActionCategory.MOVEMENT,
+        "Ctrl",
+        "R3",
+        is_toggle=True,
+        description="Crouch/Sneak",
+    ),
+    ActionDefinition(
+        11,
+        "dodge",
+        ActionCategory.MOVEMENT,
+        "Alt",
+        "B",
+        cooldown_ms=1000,
+        description="Dodge roll",
+    ),
+    ActionDefinition(
+        12,
+        "mount",
+        ActionCategory.MOVEMENT,
+        "Z",
+        "DOWN",
+        cooldown_ms=2000,
+        description="Mount/Dismount",
+    ),
+    ActionDefinition(
+        13,
+        "autorun",
+        ActionCategory.MOVEMENT,
+        "NumLock",
+        "L3+R3",
+        is_toggle=True,
+        description="Auto-run toggle",
+    ),
+    ActionDefinition(
+        14, "swim_up", ActionCategory.MOVEMENT, "Space", "A", description="Swim up"
+    ),
+    ActionDefinition(
+        15, "swim_down", ActionCategory.MOVEMENT, "Ctrl", "B", description="Swim down"
+    ),
 ]
 
 # Skill Actions (16-35) - Hotbar slots
 SKILL_ACTIONS = [
-    ActionDefinition(16, "skill_1", ActionCategory.SKILLS, "1", "X", cooldown_ms=100, description="Skill slot 1"),
-    ActionDefinition(17, "skill_2", ActionCategory.SKILLS, "2", "Y", cooldown_ms=100, description="Skill slot 2"),
-    ActionDefinition(18, "skill_3", ActionCategory.SKILLS, "3", "RB", cooldown_ms=100, description="Skill slot 3"),
-    ActionDefinition(19, "skill_4", ActionCategory.SKILLS, "4", "LB", cooldown_ms=100, description="Skill slot 4"),
-    ActionDefinition(20, "skill_5", ActionCategory.SKILLS, "5", "RT+X", cooldown_ms=100, description="Skill slot 5"),
-    ActionDefinition(21, "skill_6", ActionCategory.SKILLS, "6", "RT+Y", cooldown_ms=100, description="Skill slot 6"),
-    ActionDefinition(22, "skill_7", ActionCategory.SKILLS, "7", "RT+RB", cooldown_ms=100, description="Skill slot 7"),
-    ActionDefinition(23, "skill_8", ActionCategory.SKILLS, "8", "RT+LB", cooldown_ms=100, description="Skill slot 8"),
-    ActionDefinition(24, "skill_9", ActionCategory.SKILLS, "9", "LT+X", cooldown_ms=100, description="Skill slot 9"),
-    ActionDefinition(25, "skill_0", ActionCategory.SKILLS, "0", "LT+Y", cooldown_ms=100, description="Skill slot 10"),
-    ActionDefinition(26, "skill_minus", ActionCategory.SKILLS, "-", "LT+RB", cooldown_ms=100, description="Skill slot 11"),
-    ActionDefinition(27, "skill_equals", ActionCategory.SKILLS, "=", "LT+LB", cooldown_ms=100, description="Skill slot 12"),
+    ActionDefinition(
+        16,
+        "skill_1",
+        ActionCategory.SKILLS,
+        "1",
+        "X",
+        cooldown_ms=100,
+        description="Skill slot 1",
+    ),
+    ActionDefinition(
+        17,
+        "skill_2",
+        ActionCategory.SKILLS,
+        "2",
+        "Y",
+        cooldown_ms=100,
+        description="Skill slot 2",
+    ),
+    ActionDefinition(
+        18,
+        "skill_3",
+        ActionCategory.SKILLS,
+        "3",
+        "RB",
+        cooldown_ms=100,
+        description="Skill slot 3",
+    ),
+    ActionDefinition(
+        19,
+        "skill_4",
+        ActionCategory.SKILLS,
+        "4",
+        "LB",
+        cooldown_ms=100,
+        description="Skill slot 4",
+    ),
+    ActionDefinition(
+        20,
+        "skill_5",
+        ActionCategory.SKILLS,
+        "5",
+        "RT+X",
+        cooldown_ms=100,
+        description="Skill slot 5",
+    ),
+    ActionDefinition(
+        21,
+        "skill_6",
+        ActionCategory.SKILLS,
+        "6",
+        "RT+Y",
+        cooldown_ms=100,
+        description="Skill slot 6",
+    ),
+    ActionDefinition(
+        22,
+        "skill_7",
+        ActionCategory.SKILLS,
+        "7",
+        "RT+RB",
+        cooldown_ms=100,
+        description="Skill slot 7",
+    ),
+    ActionDefinition(
+        23,
+        "skill_8",
+        ActionCategory.SKILLS,
+        "8",
+        "RT+LB",
+        cooldown_ms=100,
+        description="Skill slot 8",
+    ),
+    ActionDefinition(
+        24,
+        "skill_9",
+        ActionCategory.SKILLS,
+        "9",
+        "LT+X",
+        cooldown_ms=100,
+        description="Skill slot 9",
+    ),
+    ActionDefinition(
+        25,
+        "skill_0",
+        ActionCategory.SKILLS,
+        "0",
+        "LT+Y",
+        cooldown_ms=100,
+        description="Skill slot 10",
+    ),
+    ActionDefinition(
+        26,
+        "skill_minus",
+        ActionCategory.SKILLS,
+        "-",
+        "LT+RB",
+        cooldown_ms=100,
+        description="Skill slot 11",
+    ),
+    ActionDefinition(
+        27,
+        "skill_equals",
+        ActionCategory.SKILLS,
+        "=",
+        "LT+LB",
+        cooldown_ms=100,
+        description="Skill slot 12",
+    ),
     # F-key skills (common in WoW, FFXIV)
-    ActionDefinition(28, "skill_f1", ActionCategory.SKILLS, "F1", None, cooldown_ms=100, description="F1 action"),
-    ActionDefinition(29, "skill_f2", ActionCategory.SKILLS, "F2", None, cooldown_ms=100, description="F2 action"),
-    ActionDefinition(30, "skill_f3", ActionCategory.SKILLS, "F3", None, cooldown_ms=100, description="F3 action"),
-    ActionDefinition(31, "skill_f4", ActionCategory.SKILLS, "F4", None, cooldown_ms=100, description="F4 action"),
+    ActionDefinition(
+        28,
+        "skill_f1",
+        ActionCategory.SKILLS,
+        "F1",
+        None,
+        cooldown_ms=100,
+        description="F1 action",
+    ),
+    ActionDefinition(
+        29,
+        "skill_f2",
+        ActionCategory.SKILLS,
+        "F2",
+        None,
+        cooldown_ms=100,
+        description="F2 action",
+    ),
+    ActionDefinition(
+        30,
+        "skill_f3",
+        ActionCategory.SKILLS,
+        "F3",
+        None,
+        cooldown_ms=100,
+        description="F3 action",
+    ),
+    ActionDefinition(
+        31,
+        "skill_f4",
+        ActionCategory.SKILLS,
+        "F4",
+        None,
+        cooldown_ms=100,
+        description="F4 action",
+    ),
     # Quick slot skills (Shift+number)
-    ActionDefinition(32, "skill_shift_1", ActionCategory.SKILLS, "Shift+1", None, cooldown_ms=100, description="Shift+1"),
-    ActionDefinition(33, "skill_shift_2", ActionCategory.SKILLS, "Shift+2", None, cooldown_ms=100, description="Shift+2"),
-    ActionDefinition(34, "skill_shift_3", ActionCategory.SKILLS, "Shift+3", None, cooldown_ms=100, description="Shift+3"),
-    ActionDefinition(35, "skill_shift_4", ActionCategory.SKILLS, "Shift+4", None, cooldown_ms=100, description="Shift+4"),
+    ActionDefinition(
+        32,
+        "skill_shift_1",
+        ActionCategory.SKILLS,
+        "Shift+1",
+        None,
+        cooldown_ms=100,
+        description="Shift+1",
+    ),
+    ActionDefinition(
+        33,
+        "skill_shift_2",
+        ActionCategory.SKILLS,
+        "Shift+2",
+        None,
+        cooldown_ms=100,
+        description="Shift+2",
+    ),
+    ActionDefinition(
+        34,
+        "skill_shift_3",
+        ActionCategory.SKILLS,
+        "Shift+3",
+        None,
+        cooldown_ms=100,
+        description="Shift+3",
+    ),
+    ActionDefinition(
+        35,
+        "skill_shift_4",
+        ActionCategory.SKILLS,
+        "Shift+4",
+        None,
+        cooldown_ms=100,
+        description="Shift+4",
+    ),
 ]
 
 # Combat Actions (36-47)
 COMBAT_ACTIONS = [
-    ActionDefinition(36, "attack_basic", ActionCategory.COMBAT, "LMB", "RT", description="Basic attack"),
-    ActionDefinition(37, "attack_heavy", ActionCategory.COMBAT, "RMB", "LT", cooldown_ms=500, description="Heavy attack"),
-    ActionDefinition(38, "block", ActionCategory.COMBAT, "RMB_hold", "LT_hold", description="Block/Parry"),
-    ActionDefinition(39, "interact", ActionCategory.COMBAT, "E", "A", description="Interact/Pickup"),
-    ActionDefinition(40, "use_item", ActionCategory.COMBAT, "Q", "UP", cooldown_ms=1000, description="Use quick item"),
-    ActionDefinition(41, "ultimate", ActionCategory.COMBAT, "R", "LB+RB", cooldown_ms=30000, description="Ultimate ability"),
-    ActionDefinition(42, "heal", ActionCategory.COMBAT, "H", "DOWN", cooldown_ms=10000, description="Heal/Potion"),
-    ActionDefinition(43, "buff_self", ActionCategory.COMBAT, "B", "LEFT", cooldown_ms=60000, description="Self buff"),
-    ActionDefinition(44, "combo_1", ActionCategory.COMBAT, "Shift+LMB", "RT+A", description="Combo attack 1"),
-    ActionDefinition(45, "combo_2", ActionCategory.COMBAT, "Shift+RMB", "LT+A", description="Combo attack 2"),
-    ActionDefinition(46, "weapon_swap", ActionCategory.COMBAT, "`", "SELECT", cooldown_ms=1000, description="Swap weapon"),
-    ActionDefinition(47, "special", ActionCategory.COMBAT, "V", "R3", cooldown_ms=5000, description="Special action"),
+    ActionDefinition(
+        36,
+        "attack_basic",
+        ActionCategory.COMBAT,
+        "LMB",
+        "RT",
+        description="Basic attack",
+    ),
+    ActionDefinition(
+        37,
+        "attack_heavy",
+        ActionCategory.COMBAT,
+        "RMB",
+        "LT",
+        cooldown_ms=500,
+        description="Heavy attack",
+    ),
+    ActionDefinition(
+        38,
+        "block",
+        ActionCategory.COMBAT,
+        "RMB_hold",
+        "LT_hold",
+        description="Block/Parry",
+    ),
+    ActionDefinition(
+        39, "interact", ActionCategory.COMBAT, "E", "A", description="Interact/Pickup"
+    ),
+    ActionDefinition(
+        40,
+        "use_item",
+        ActionCategory.COMBAT,
+        "Q",
+        "UP",
+        cooldown_ms=1000,
+        description="Use quick item",
+    ),
+    ActionDefinition(
+        41,
+        "ultimate",
+        ActionCategory.COMBAT,
+        "R",
+        "LB+RB",
+        cooldown_ms=30000,
+        description="Ultimate ability",
+    ),
+    ActionDefinition(
+        42,
+        "heal",
+        ActionCategory.COMBAT,
+        "H",
+        "DOWN",
+        cooldown_ms=10000,
+        description="Heal/Potion",
+    ),
+    ActionDefinition(
+        43,
+        "buff_self",
+        ActionCategory.COMBAT,
+        "B",
+        "LEFT",
+        cooldown_ms=60000,
+        description="Self buff",
+    ),
+    ActionDefinition(
+        44,
+        "combo_1",
+        ActionCategory.COMBAT,
+        "Shift+LMB",
+        "RT+A",
+        description="Combo attack 1",
+    ),
+    ActionDefinition(
+        45,
+        "combo_2",
+        ActionCategory.COMBAT,
+        "Shift+RMB",
+        "LT+A",
+        description="Combo attack 2",
+    ),
+    ActionDefinition(
+        46,
+        "weapon_swap",
+        ActionCategory.COMBAT,
+        "`",
+        "SELECT",
+        cooldown_ms=1000,
+        description="Swap weapon",
+    ),
+    ActionDefinition(
+        47,
+        "special",
+        ActionCategory.COMBAT,
+        "V",
+        "R3",
+        cooldown_ms=5000,
+        description="Special action",
+    ),
 ]
 
 # Targeting Actions (48-55)
 TARGETING_ACTIONS = [
-    ActionDefinition(48, "target_nearest", ActionCategory.TARGETING, "Tab", "RB", description="Target nearest enemy"),
-    ActionDefinition(49, "target_prev", ActionCategory.TARGETING, "Shift+Tab", "LB", description="Target previous"),
-    ActionDefinition(50, "target_self", ActionCategory.TARGETING, "F1", None, description="Target self"),
-    ActionDefinition(51, "target_party_1", ActionCategory.TARGETING, "F2", None, description="Target party member 1"),
-    ActionDefinition(52, "target_party_2", ActionCategory.TARGETING, "F3", None, description="Target party member 2"),
-    ActionDefinition(53, "target_party_3", ActionCategory.TARGETING, "F4", None, description="Target party member 3"),
-    ActionDefinition(54, "clear_target", ActionCategory.TARGETING, "Escape", "B", description="Clear target"),
-    ActionDefinition(55, "focus_target", ActionCategory.TARGETING, "Shift+F", None, description="Set focus target"),
+    ActionDefinition(
+        48,
+        "target_nearest",
+        ActionCategory.TARGETING,
+        "Tab",
+        "RB",
+        description="Target nearest enemy",
+    ),
+    ActionDefinition(
+        49,
+        "target_prev",
+        ActionCategory.TARGETING,
+        "Shift+Tab",
+        "LB",
+        description="Target previous",
+    ),
+    ActionDefinition(
+        50,
+        "target_self",
+        ActionCategory.TARGETING,
+        "F1",
+        None,
+        description="Target self",
+    ),
+    ActionDefinition(
+        51,
+        "target_party_1",
+        ActionCategory.TARGETING,
+        "F2",
+        None,
+        description="Target party member 1",
+    ),
+    ActionDefinition(
+        52,
+        "target_party_2",
+        ActionCategory.TARGETING,
+        "F3",
+        None,
+        description="Target party member 2",
+    ),
+    ActionDefinition(
+        53,
+        "target_party_3",
+        ActionCategory.TARGETING,
+        "F4",
+        None,
+        description="Target party member 3",
+    ),
+    ActionDefinition(
+        54,
+        "clear_target",
+        ActionCategory.TARGETING,
+        "Escape",
+        "B",
+        description="Clear target",
+    ),
+    ActionDefinition(
+        55,
+        "focus_target",
+        ActionCategory.TARGETING,
+        "Shift+F",
+        None,
+        description="Set focus target",
+    ),
 ]
 
 # Camera Actions (56-63) - Continuous values
 CAMERA_ACTIONS = [
-    ActionDefinition(56, "camera_left", ActionCategory.CAMERA, "MouseX-", "Rx-", True, description="Rotate camera left"),
-    ActionDefinition(57, "camera_right", ActionCategory.CAMERA, "MouseX+", "Rx+", True, description="Rotate camera right"),
-    ActionDefinition(58, "camera_up", ActionCategory.CAMERA, "MouseY-", "Ry-", True, description="Tilt camera up"),
-    ActionDefinition(59, "camera_down", ActionCategory.CAMERA, "MouseY+", "Ry+", True, description="Tilt camera down"),
-    ActionDefinition(60, "zoom_in", ActionCategory.CAMERA, "ScrollUp", "UP", description="Zoom in"),
-    ActionDefinition(61, "zoom_out", ActionCategory.CAMERA, "ScrollDown", "DOWN", description="Zoom out"),
-    ActionDefinition(62, "first_person", ActionCategory.CAMERA, "Home", None, description="First person view"),
-    ActionDefinition(63, "reset_camera", ActionCategory.CAMERA, "End", "R3", description="Reset camera"),
+    ActionDefinition(
+        56,
+        "camera_left",
+        ActionCategory.CAMERA,
+        "MouseX-",
+        "Rx-",
+        True,
+        description="Rotate camera left",
+    ),
+    ActionDefinition(
+        57,
+        "camera_right",
+        ActionCategory.CAMERA,
+        "MouseX+",
+        "Rx+",
+        True,
+        description="Rotate camera right",
+    ),
+    ActionDefinition(
+        58,
+        "camera_up",
+        ActionCategory.CAMERA,
+        "MouseY-",
+        "Ry-",
+        True,
+        description="Tilt camera up",
+    ),
+    ActionDefinition(
+        59,
+        "camera_down",
+        ActionCategory.CAMERA,
+        "MouseY+",
+        "Ry+",
+        True,
+        description="Tilt camera down",
+    ),
+    ActionDefinition(
+        60, "zoom_in", ActionCategory.CAMERA, "ScrollUp", "UP", description="Zoom in"
+    ),
+    ActionDefinition(
+        61,
+        "zoom_out",
+        ActionCategory.CAMERA,
+        "ScrollDown",
+        "DOWN",
+        description="Zoom out",
+    ),
+    ActionDefinition(
+        62,
+        "first_person",
+        ActionCategory.CAMERA,
+        "Home",
+        None,
+        description="First person view",
+    ),
+    ActionDefinition(
+        63,
+        "reset_camera",
+        ActionCategory.CAMERA,
+        "End",
+        "R3",
+        description="Reset camera",
+    ),
 ]
 
 # UI Actions (64-71)
 UI_ACTIONS = [
-    ActionDefinition(64, "inventory", ActionCategory.UI, "I", "START", description="Open inventory"),
-    ActionDefinition(65, "map", ActionCategory.UI, "M", "SELECT", description="Open map"),
-    ActionDefinition(66, "character", ActionCategory.UI, "C", None, description="Character screen"),
-    ActionDefinition(67, "skills_menu", ActionCategory.UI, "K", None, description="Skills menu"),
-    ActionDefinition(68, "quest_log", ActionCategory.UI, "J", None, description="Quest log"),
-    ActionDefinition(69, "social", ActionCategory.UI, "O", None, description="Social/Friends"),
-    ActionDefinition(70, "escape_menu", ActionCategory.UI, "Escape", "START", description="Escape/Pause menu"),
-    ActionDefinition(71, "screenshot", ActionCategory.UI, "PrintScreen", None, description="Take screenshot"),
+    ActionDefinition(
+        64, "inventory", ActionCategory.UI, "I", "START", description="Open inventory"
+    ),
+    ActionDefinition(
+        65, "map", ActionCategory.UI, "M", "SELECT", description="Open map"
+    ),
+    ActionDefinition(
+        66, "character", ActionCategory.UI, "C", None, description="Character screen"
+    ),
+    ActionDefinition(
+        67, "skills_menu", ActionCategory.UI, "K", None, description="Skills menu"
+    ),
+    ActionDefinition(
+        68, "quest_log", ActionCategory.UI, "J", None, description="Quest log"
+    ),
+    ActionDefinition(
+        69, "social", ActionCategory.UI, "O", None, description="Social/Friends"
+    ),
+    ActionDefinition(
+        70,
+        "escape_menu",
+        ActionCategory.UI,
+        "Escape",
+        "START",
+        description="Escape/Pause menu",
+    ),
+    ActionDefinition(
+        71,
+        "screenshot",
+        ActionCategory.UI,
+        "PrintScreen",
+        None,
+        description="Take screenshot",
+    ),
 ]
 
 # Special state: No action
-NO_ACTION = ActionDefinition(72, "idle", ActionCategory.MOVEMENT, None, None, description="No action/Idle")
+NO_ACTION = ActionDefinition(
+    72, "idle", ActionCategory.MOVEMENT, None, None, description="No action/Idle"
+)
 
 
 # =============================================================================
 # Action Space Configurations
 # =============================================================================
 
+
 @dataclass
 class ActionSpaceConfig:
     """Configuration for model action space."""
+
     name: str
     description: str
     actions: List[ActionDefinition]
@@ -212,7 +712,8 @@ ACTION_SPACE_BASIC = ActionSpaceConfig(
 ACTION_SPACE_STANDARD = ActionSpaceConfig(
     name="standard",
     description="Standard keyboard + gamepad (29 actions)",
-    actions=MOVEMENT_ACTIONS[:9] + [  # Basic movement
+    actions=MOVEMENT_ACTIONS[:9]
+    + [  # Basic movement
         ActionDefinition(9, "gamepad_lt", ActionCategory.COMBAT, None, "LT", True),
         ActionDefinition(10, "gamepad_rt", ActionCategory.COMBAT, None, "RT", True),
         ActionDefinition(11, "gamepad_lx", ActionCategory.MOVEMENT, None, "Lx", True),
@@ -242,13 +743,13 @@ ACTION_SPACE_EXTENDED = ActionSpaceConfig(
     name="extended",
     description="Full MMORPG action space with skills (73 actions)",
     actions=(
-        MOVEMENT_ACTIONS +      # 0-15
-        SKILL_ACTIONS +         # 16-35
-        COMBAT_ACTIONS +        # 36-47
-        TARGETING_ACTIONS +     # 48-55
-        CAMERA_ACTIONS +        # 56-63
-        UI_ACTIONS +            # 64-71
-        [NO_ACTION]             # 72
+        MOVEMENT_ACTIONS  # 0-15
+        + SKILL_ACTIONS  # 16-35
+        + COMBAT_ACTIONS  # 36-47
+        + TARGETING_ACTIONS  # 48-55
+        + CAMERA_ACTIONS  # 56-63
+        + UI_ACTIONS  # 64-71
+        + [NO_ACTION]  # 72
     ),
     output_type="multi",  # Allow simultaneous actions
 )
@@ -258,9 +759,9 @@ ACTION_SPACE_COMBAT = ActionSpaceConfig(
     name="combat",
     description="Combat-focused with movement + skills (48 actions)",
     actions=(
-        MOVEMENT_ACTIONS +      # 0-15
-        SKILL_ACTIONS +         # 16-35
-        COMBAT_ACTIONS          # 36-47
+        MOVEMENT_ACTIONS  # 0-15
+        + SKILL_ACTIONS  # 16-35
+        + COMBAT_ACTIONS  # 36-47
     ),
     output_type="multi",
 )
@@ -292,9 +793,9 @@ def list_action_spaces() -> List[str]:
 # Multi-Label Output Encoding
 # =============================================================================
 
+
 def encode_actions_multi_label(
-    active_actions: List[str],
-    action_space: ActionSpaceConfig
+    active_actions: List[str], action_space: ActionSpaceConfig
 ) -> List[int]:
     """
     Encode multiple simultaneous actions as multi-label vector.
@@ -318,9 +819,7 @@ def encode_actions_multi_label(
 
 
 def decode_actions_multi_label(
-    output_vector: List[float],
-    action_space: ActionSpaceConfig,
-    threshold: float = 0.5
+    output_vector: List[float], action_space: ActionSpaceConfig, threshold: float = 0.5
 ) -> List[ActionDefinition]:
     """
     Decode multi-label output to list of active actions.
@@ -352,18 +851,15 @@ GAME_ACTION_PRESETS: Dict[str, str] = {
     "lost_ark": "combat",
     "black_desert_online": "combat",
     "new_world": "combat",
-
     # Tab-target MMORPGs - standard is fine
     "world_of_warcraft": "extended",
     "final_fantasy_xiv": "extended",
     "guild_wars_2": "combat",
     "elder_scrolls_online": "combat",
-
     # Simpler games
     "runescape": "standard",
     "albion_online": "standard",
     "path_of_exile": "combat",
-
     # Default
     "custom": "standard",
 }

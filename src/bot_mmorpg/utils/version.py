@@ -12,7 +12,7 @@ import re
 import threading
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
@@ -46,8 +46,16 @@ class VersionInfo:
         return version
 
     def __lt__(self, other: "VersionInfo") -> bool:
-        if (self.major, self.minor, self.patch) != (other.major, other.minor, other.patch):
-            return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
+        if (self.major, self.minor, self.patch) != (
+            other.major,
+            other.minor,
+            other.patch,
+        ):
+            return (self.major, self.minor, self.patch) < (
+                other.major,
+                other.minor,
+                other.patch,
+            )
         # Prerelease versions are lower than release versions
         if self.prerelease and not other.prerelease:
             return True

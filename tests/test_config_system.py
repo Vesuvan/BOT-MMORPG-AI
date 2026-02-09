@@ -5,7 +5,6 @@ Tests hardware detection, profile loading, settings management, and model select
 """
 
 import pytest
-from pathlib import Path
 
 
 class TestHardwareDetector:
@@ -171,10 +170,7 @@ class TestSettingsManager:
         from bot_mmorpg.config import SettingsManager
 
         manager = SettingsManager()
-        config = manager.get_quick_config(
-            game_id="world_of_warcraft",
-            task="combat"
-        )
+        config = manager.get_quick_config(game_id="world_of_warcraft", task="combat")
 
         assert config is not None
         assert isinstance(config, dict)
@@ -192,7 +188,7 @@ class TestSettingsManager:
         config = manager.create_session_config(
             game_id="world_of_warcraft",
             task="combat",
-            overrides={"training": {"model": {"architecture": "mobilenetv3"}}}
+            overrides={"training": {"model": {"architecture": "mobilenetv3"}}},
         )
 
         assert config is not None
@@ -207,8 +203,7 @@ class TestSettingsManager:
         manager.settings_dir = tmp_path
 
         config = manager.create_session_config(
-            game_id="world_of_warcraft",
-            task="combat"
+            game_id="world_of_warcraft", task="combat"
         )
 
         path = manager.save_session_config(config)

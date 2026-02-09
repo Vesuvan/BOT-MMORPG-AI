@@ -8,7 +8,7 @@ import hashlib
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -17,11 +17,13 @@ logger = logging.getLogger(__name__)
 
 class DataValidationError(Exception):
     """Raised when data validation fails."""
+
     pass
 
 
 class UntrustedDataWarning(UserWarning):
     """Warning for loading data with pickle enabled."""
+
     pass
 
 
@@ -41,8 +43,8 @@ def compute_file_hash(filepath: Union[str, Path], algorithm: str = "sha256") -> 
         Hex digest of file hash
     """
     hasher = hashlib.new(algorithm)
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(8192), b''):
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
 
@@ -136,9 +138,7 @@ def validate_training_data_structure(data: np.ndarray) -> bool:
 
 
 def load_training_data_secure(
-    filepath: Union[str, Path],
-    validate: bool = True,
-    allow_untrusted: bool = True
+    filepath: Union[str, Path], validate: bool = True, allow_untrusted: bool = True
 ) -> np.ndarray:
     """
     Securely load training data from numpy file.
@@ -179,7 +179,7 @@ def load_training_data_secure(
                 "Only load .npy files that you created or from trusted sources. "
                 "Malicious .npy files can execute arbitrary code.",
                 UntrustedDataWarning,
-                stacklevel=2
+                stacklevel=2,
             )
 
     # Load data
@@ -209,7 +209,7 @@ def load_training_data_secure(
 def save_training_data_secure(
     data: List[Tuple[np.ndarray, np.ndarray]],
     filepath: Union[str, Path],
-    register_hash: bool = False
+    register_hash: bool = False,
 ) -> Path:
     """
     Securely save training data.
@@ -245,8 +245,7 @@ def save_training_data_secure(
 
 
 def create_trusted_manifest(
-    data_dir: Union[str, Path],
-    output_file: Optional[Union[str, Path]] = None
+    data_dir: Union[str, Path], output_file: Optional[Union[str, Path]] = None
 ) -> Dict[str, str]:
     """
     Create a manifest of trusted data file hashes.
@@ -267,7 +266,8 @@ def create_trusted_manifest(
 
     if output_file:
         import json
-        with open(output_file, 'w') as f:
+
+        with open(output_file, "w") as f:
             json.dump(manifest, f, indent=2)
         logger.info(f"Saved manifest with {len(manifest)} entries to {output_file}")
 

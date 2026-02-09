@@ -4,20 +4,24 @@
 import platform
 
 # Platform detection
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
+
 
 # Normalization functions
 def normalize(x):
     """Normalize axis values from -32768 to 32767 to -1.0 to 1.0"""
     return round(x / 32768, 1)
 
+
 def normalizet(x):
     """Normalize trigger values from 0-255 to 0.0-1.0"""
     return round(x / 255, 1)
 
+
 if IS_WINDOWS:
     try:
         from readPad import rPad
+
         _XINPUT_AVAILABLE = True
 
         def gamepad_check():
@@ -47,6 +51,7 @@ else:
 
 # Cross-platform fallback (stub implementation)
 if not _XINPUT_AVAILABLE:
+
     def gamepad_check():
         """
         Stub gamepad check for non-Windows platforms or when XInput unavailable.
@@ -58,7 +63,7 @@ if not _XINPUT_AVAILABLE:
         return [0] * 20
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(f"Platform: {platform.system()}")
     print(f"XInput available: {_XINPUT_AVAILABLE}")
     print(f"Gamepad state: {gamepad_check()}")

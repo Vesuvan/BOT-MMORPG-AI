@@ -11,11 +11,10 @@ import json
 import shutil
 import pytest
 import numpy as np
-from pathlib import Path
 from PIL import Image
 
 torch = pytest.importorskip("torch", reason="PyTorch required for e2e test")
-import torch.nn as nn
+import torch.nn as nn  # noqa: E402
 
 
 class TinyModel(nn.Module):
@@ -123,11 +122,14 @@ class TestE2EWorkflow:
 
         # Save model
         model_path = workspace / "models" / "test_model.pt"
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "num_classes": num_classes,
-            "input_size": img_size,
-        }, model_path)
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "num_classes": num_classes,
+                "input_size": img_size,
+            },
+            model_path,
+        )
 
         assert model_path.exists(), "Training: model saved"
 
@@ -150,10 +152,12 @@ class TestE2EWorkflow:
 
         # Verify inference worked
         assert 0 <= action < num_classes, f"Inference: valid action ({action})"
-        assert probs.sum().item() == pytest.approx(1.0, abs=0.01), "Inference: valid probs"
+        assert probs.sum().item() == pytest.approx(1.0, abs=0.01), (
+            "Inference: valid probs"
+        )
 
         # === SUMMARY ===
-        print(f"\n✅ E2E Test Passed:")
+        print("\n✅ E2E Test Passed:")
         print(f"   Recording: {num_samples} samples")
         print(f"   Training: {epochs} epochs, loss={final_loss:.4f}")
         print(f"   Inference: action={action}, confidence={probs.max().item():.2%}")
@@ -221,7 +225,7 @@ class TestInferenceEngine:
             temporal_frames=0,
             normalize="imagenet",
             pytorch_version=torch.__version__,
-            extra={}
+            extra={},
         )
 
         engine = InferenceEngine(model=model, metadata=metadata)
@@ -243,7 +247,7 @@ class TestInferenceEngine:
             temporal_frames=0,
             normalize="imagenet",
             pytorch_version=torch.__version__,
-            extra={}
+            extra={},
         )
 
         engine = InferenceEngine(model=model, metadata=metadata)

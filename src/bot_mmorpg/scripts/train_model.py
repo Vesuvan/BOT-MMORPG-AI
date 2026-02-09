@@ -14,14 +14,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import os
 import time
 from pathlib import Path
-from typing import Optional, Tuple, List
-from random import shuffle
+from typing import Optional, Tuple
 
 import numpy as np
-import cv2
 
 # PyTorch imports
 try:
@@ -29,23 +26,34 @@ try:
     import torch.nn as nn
     import torch.optim as optim
     from torch.utils.data import Dataset, DataLoader
+
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
+
     # Stub classes for when PyTorch is not installed
     class Dataset:
         """Stub Dataset class when PyTorch is not installed."""
+
         pass
+
     class DataLoader:
         """Stub DataLoader class when PyTorch is not installed."""
+
         pass
+
 
 # Local imports
 try:
     from .models_pytorch import (
-        get_model, list_models, get_model_info,
-        save_model, count_parameters, get_device
+        get_model,
+        list_models,
+        get_model_info,
+        save_model,
+        count_parameters,
+        get_device,
     )
+
     MODELS_AVAILABLE = True
 except ImportError as e:
     print(f"[Warning] Could not import models_pytorch: {e}")
@@ -55,9 +63,14 @@ except ImportError as e:
 if not MODELS_AVAILABLE:
     try:
         from models_pytorch import (
-            get_model, list_models, get_model_info,
-            save_model, count_parameters, get_device
+            get_model,
+            list_models,
+            get_model_info,
+            save_model,
+            count_parameters,
+            get_device,
         )
+
         MODELS_AVAILABLE = True
     except ImportError:
         MODELS_AVAILABLE = False
@@ -67,8 +80,9 @@ try:
     from ..utils.secure_loader import (
         load_training_data_secure,
         DataValidationError,
-        UntrustedDataWarning
+        UntrustedDataWarning,
     )
+
     SECURE_LOADER_AVAILABLE = True
 except ImportError:
     SECURE_LOADER_AVAILABLE = False
@@ -85,12 +99,13 @@ WIDTH = 480
 HEIGHT = 270
 LR = 1e-3
 EPOCHS = 1
-MODEL_NAME = 'model/mmorpg_bot'
+MODEL_NAME = "model/mmorpg_bot"
 
 
 # =============================================================================
 # Dataset
 # =============================================================================
+
 
 class GameplayDataset(Dataset):
     """
@@ -155,7 +170,7 @@ class GameplayDataset(Dataset):
                         )
                     except DataValidationError as e:
                         print(f"[Dataset] Security warning for {f}: {e}")
-                        print(f"[Dataset] Skipping untrusted file")
+                        print("[Dataset] Skipping untrusted file")
                         continue
                 else:
                     # Fallback to standard loading with pickle (legacy support)
@@ -187,9 +202,9 @@ class GameplayDataset(Dataset):
         """Get a training sample."""
         # Get sequence of frames
         if self.seq_len > 1:
-            frames = self.frames[idx:idx + self.seq_len]
+            frames = self.frames[idx : idx + self.seq_len]
         else:
-            frames = self.frames[idx:idx + 1]
+            frames = self.frames[idx : idx + 1]
 
         # Get action for last frame in sequence
         action = self.actions[idx + self.seq_len - 1]
@@ -211,6 +226,7 @@ class GameplayDataset(Dataset):
 # =============================================================================
 # Training Functions
 # =============================================================================
+
 
 def train_epoch(
     model: nn.Module,
@@ -304,11 +320,11 @@ def train_model(
     criterion = nn.BCEWithLogitsLoss()
 
     # Training history
-    best_val_loss = float('inf')
+    best_val_loss = float("inf")
 
-    print(f"\n{'='*60}")
-    print(f"Training Configuration")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("Training Configuration")
+    print(f"{'=' * 60}")
     print(f"  Model: {model.__class__.__name__}")
     print(f"  Parameters: {count_parameters(model):,}")
     print(f"  Device: {device}")
@@ -317,7 +333,7 @@ def train_model(
     print(f"  Train Batches: {len(train_loader)}")
     if val_loader:
         print(f"  Val Batches: {len(val_loader)}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for epoch in range(epochs):
         epoch_start = time.time()
@@ -325,7 +341,9 @@ def train_model(
         print("-" * 40)
 
         # Train
-        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, epoch)
+        train_loss = train_epoch(
+            model, train_loader, optimizer, criterion, device, epoch
+        )
 
         # Validate
         if val_loader:
@@ -338,7 +356,8 @@ def train_model(
                 best_val_loss = val_loss
                 save_path = save_dir / f"{model_name}_best.pth"
                 save_model(
-                    model, str(save_path),
+                    model,
+                    str(save_path),
                     optimizer=optimizer,
                     epoch=epoch,
                     loss=val_loss,
@@ -354,7 +373,9 @@ def train_model(
         # Checkpoint every 5 epochs
         if (epoch + 1) % 5 == 0:
             save_path = save_dir / f"{model_name}_epoch{epoch + 1}.pth"
-            save_model(model, str(save_path), optimizer=optimizer, epoch=epoch, loss=train_loss)
+            save_model(
+                model, str(save_path), optimizer=optimizer, epoch=epoch, loss=train_loss
+            )
             print(f"  Checkpoint saved to {save_path}")
 
         epoch_time = time.time() - epoch_start
@@ -372,6 +393,7 @@ def train_model(
 # Main
 # =============================================================================
 
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="BOT-MMORPG-AI Model Training (PyTorch)",
@@ -380,17 +402,31 @@ def main(argv=None) -> int:
 
     parser.add_argument("--data", default="data/raw", help="Folder with .npy files")
     parser.add_argument("--out", default="artifacts/model", help="Folder to save model")
-    parser.add_argument("--model", default="efficientnet_lstm", help="Model architecture")
+    parser.add_argument(
+        "--model", default="efficientnet_lstm", help="Model architecture"
+    )
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--seq-len", type=int, default=4, help="Sequence length for temporal models")
-    parser.add_argument("--num-actions", type=int, default=29, help="Number of output actions")
-    parser.add_argument("--val-split", type=float, default=0.1, help="Validation split ratio")
-    parser.add_argument("--no-pretrained", action="store_true", help="Don't use pretrained weights")
+    parser.add_argument(
+        "--seq-len", type=int, default=4, help="Sequence length for temporal models"
+    )
+    parser.add_argument(
+        "--num-actions", type=int, default=29, help="Number of output actions"
+    )
+    parser.add_argument(
+        "--val-split", type=float, default=0.1, help="Validation split ratio"
+    )
+    parser.add_argument(
+        "--no-pretrained", action="store_true", help="Don't use pretrained weights"
+    )
     parser.add_argument("--cpu", action="store_true", help="Force CPU training")
-    parser.add_argument("--list-models", action="store_true", help="List available models")
-    parser.add_argument("--limit-files", type=int, help="Limit number of data files (for testing)")
+    parser.add_argument(
+        "--list-models", action="store_true", help="List available models"
+    )
+    parser.add_argument(
+        "--limit-files", type=int, help="Limit number of data files (for testing)"
+    )
 
     args = parser.parse_args(argv)
 
@@ -411,7 +447,9 @@ def main(argv=None) -> int:
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
+        print(
+            "[Error] PyTorch not available. Install with: pip install torch torchvision"
+        )
         return 1
 
     if not MODELS_AVAILABLE:
@@ -430,9 +468,9 @@ def main(argv=None) -> int:
     # Device
     device = torch.device("cpu") if args.cpu else get_device()
 
-    print(f"\n{'='*60}")
-    print(f"BOT-MMORPG-AI Training")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("BOT-MMORPG-AI Training")
+    print(f"{'=' * 60}")
     print(f"Data: {data_dir}")
     print(f"Output: {out_dir}")
     print(f"Model: {args.model}")
@@ -446,9 +484,11 @@ def main(argv=None) -> int:
     print(f"Temporal: {is_temporal} (seq_len={seq_len})")
 
     # Create dataset
-    print(f"\nLoading data...")
+    print("\nLoading data...")
     try:
-        dataset = GameplayDataset(data_dir, seq_len=seq_len, limit_files=args.limit_files)
+        dataset = GameplayDataset(
+            data_dir, seq_len=seq_len, limit_files=args.limit_files
+        )
     except ValueError as e:
         print(f"[Error] {e}")
         return 1
@@ -458,41 +498,60 @@ def main(argv=None) -> int:
     val_size = int(total_size * args.val_split)
     train_size = total_size - val_size
 
-    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    train_dataset, val_dataset = torch.utils.data.random_split(
+        dataset, [train_size, val_size]
+    )
 
     print(f"Train samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")
 
     # Create dataloaders
     train_loader = DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
-        num_workers=0, pin_memory=device.type == "cuda",
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=device.type == "cuda",
     )
 
-    val_loader = DataLoader(
-        val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0,
-    ) if val_size > 0 else None
+    val_loader = (
+        DataLoader(
+            val_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=0,
+        )
+        if val_size > 0
+        else None
+    )
 
     # Create model
     print(f"\nCreating model: {args.model}")
     model = get_model(
-        args.model, num_actions=args.num_actions,
-        temporal_frames=seq_len, pretrained=not args.no_pretrained,
+        args.model,
+        num_actions=args.num_actions,
+        temporal_frames=seq_len,
+        pretrained=not args.no_pretrained,
     )
 
     print(f"Parameters: {count_parameters(model):,}")
 
     # Train
-    print(f"\nStarting training...")
+    print("\nStarting training...")
     model = train_model(
-        model=model, train_loader=train_loader, val_loader=val_loader,
-        device=device, epochs=args.epochs, learning_rate=args.lr,
-        save_dir=out_dir, model_name=args.model,
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        device=device,
+        epochs=args.epochs,
+        learning_rate=args.lr,
+        save_dir=out_dir,
+        model_name=args.model,
     )
 
-    print(f"\n{'='*60}")
-    print(f"Training Complete!")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("Training Complete!")
+    print(f"{'=' * 60}")
 
     return 0
 

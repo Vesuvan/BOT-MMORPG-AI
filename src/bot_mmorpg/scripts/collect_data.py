@@ -7,8 +7,6 @@ Includes comprehensive error handling for production use.
 
 import argparse
 import logging
-import sys
-import os
 import time
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -19,8 +17,8 @@ import numpy as np
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
+    format="[%(asctime)s] %(levelname)s - %(message)s",
+    datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,9 @@ except ImportError:
         from getgamepad import gamepad_check
     except ImportError as e:
         logger.error(f"Failed to import required modules: {e}")
-        logger.error("Please ensure grabscreen.py, getkeys.py, and getgamepad.py are available")
+        logger.error(
+            "Please ensure grabscreen.py, getkeys.py, and getgamepad.py are available"
+        )
         grab_screen = None
         key_check = None
         gamepad_check = None
@@ -44,16 +44,19 @@ except ImportError:
 
 class DataCollectionError(Exception):
     """Custom exception for data collection errors."""
+
     pass
 
 
 class ScreenCaptureError(DataCollectionError):
     """Raised when screen capture fails."""
+
     pass
 
 
 class InputCaptureError(DataCollectionError):
     """Raised when input capture fails."""
+
     pass
 
 
@@ -69,21 +72,21 @@ def keys_to_output(keys: List[str]) -> List[int]:
     """
     output = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    if 'W' in keys and 'A' in keys:
+    if "W" in keys and "A" in keys:
         output[4] = 1
-    elif 'W' in keys and 'D' in keys:
+    elif "W" in keys and "D" in keys:
         output[5] = 1
-    elif 'S' in keys and 'A' in keys:
+    elif "S" in keys and "A" in keys:
         output[6] = 1
-    elif 'S' in keys and 'D' in keys:
+    elif "S" in keys and "D" in keys:
         output[7] = 1
-    elif 'W' in keys:
+    elif "W" in keys:
         output[0] = 1
-    elif 'S' in keys:
+    elif "S" in keys:
         output[1] = 1
-    elif 'A' in keys:
+    elif "A" in keys:
         output[2] = 1
-    elif 'D' in keys:
+    elif "D" in keys:
         output[3] = 1
     else:
         output[8] = 1
@@ -124,8 +127,9 @@ def validate_dependencies() -> bool:
     return True
 
 
-def capture_screen(region: Tuple[int, int, int, int],
-                   target_size: Tuple[int, int] = (480, 270)) -> np.ndarray:
+def capture_screen(
+    region: Tuple[int, int, int, int], target_size: Tuple[int, int] = (480, 270)
+) -> np.ndarray:
     """
     Capture and process screen region.
 
@@ -177,7 +181,9 @@ def capture_input() -> Tuple[List[int], List[int]]:
         # Capture gamepad (with fallback for missing gamepad)
         try:
             gamepad_keys = gamepad_check() if gamepad_check else []
-            gamepad_output = gamepad_keys_to_output(gamepad_keys) if gamepad_keys else []
+            gamepad_output = (
+                gamepad_keys_to_output(gamepad_keys) if gamepad_keys else []
+            )
         except Exception:
             # Gamepad not available - use empty output
             gamepad_output = []
@@ -202,7 +208,7 @@ def save_training_data(data: List, path: Path) -> bool:
     try:
         # Create backup if file exists
         if path.exists():
-            backup_path = path.with_suffix('.npy.bak')
+            backup_path = path.with_suffix(".npy.bak")
             path.rename(backup_path)
             logger.info(f"Created backup: {backup_path}")
 
@@ -221,7 +227,7 @@ def save_training_data(data: List, path: Path) -> bool:
         return False
 
 
-def show_preview(screen: np.ndarray, window_name: str = 'Recorder Preview') -> bool:
+def show_preview(screen: np.ndarray, window_name: str = "Recorder Preview") -> bool:
     """
     Show preview window if display is available.
 
@@ -236,7 +242,7 @@ def show_preview(screen: np.ndarray, window_name: str = 'Recorder Preview') -> b
         preview = cv2.resize(screen, (640, 360))
         cv2.imshow(window_name, preview)
 
-        if cv2.waitKey(25) & 0xFF == ord('q'):
+        if cv2.waitKey(25) & 0xFF == ord("q"):
             return False
         return True
 
@@ -273,20 +279,28 @@ Controls:
 
 Example:
   python collect_data.py --out data/my_session
-        """
+        """,
     )
-    parser.add_argument("--out", default="data/raw", help="Output folder for training data")
-    parser.add_argument("--region", default="0,40,1920,1120",
-                        help="Screen capture region (x1,y1,x2,y2)")
-    parser.add_argument("--chunk-size", type=int, default=500,
-                        help="Frames per chunk file (default: 500)")
-    parser.add_argument("--no-preview", action="store_true",
-                        help="Disable preview window")
+    parser.add_argument(
+        "--out", default="data/raw", help="Output folder for training data"
+    )
+    parser.add_argument(
+        "--region", default="0,40,1920,1120", help="Screen capture region (x1,y1,x2,y2)"
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=500,
+        help="Frames per chunk file (default: 500)",
+    )
+    parser.add_argument(
+        "--no-preview", action="store_true", help="Disable preview window"
+    )
     args = parser.parse_args(argv)
 
     # Parse region
     try:
-        region = tuple(map(int, args.region.split(',')))
+        region = tuple(map(int, args.region.split(",")))
         if len(region) != 4:
             raise ValueError("Region must have 4 values")
     except ValueError as e:
@@ -313,7 +327,7 @@ Example:
     # Find starting file index
     starting_value = 1
     while True:
-        file_name = out_dir / f'training_data-{starting_value}.npy'
+        file_name = out_dir / f"training_data-{starting_value}.npy"
         if file_name.exists():
             starting_value += 1
         else:
@@ -345,10 +359,11 @@ Example:
                     keyboard_output, gamepad_output = capture_input()
 
                     # Combine inputs
-                    final_output = np.concatenate(
-                        (keyboard_output, gamepad_output),
-                        axis=None
-                    ) if gamepad_output else np.array(keyboard_output)
+                    final_output = (
+                        np.concatenate((keyboard_output, gamepad_output), axis=None)
+                        if gamepad_output
+                        else np.array(keyboard_output)
+                    )
 
                     training_data.append([screen, final_output])
                     frame_count += 1
@@ -362,11 +377,13 @@ Example:
 
                     # Progress logging
                     if frame_count % 100 == 0:
-                        logger.info(f"Captured {frame_count} frames (buffer: {len(training_data)})")
+                        logger.info(
+                            f"Captured {frame_count} frames (buffer: {len(training_data)})"
+                        )
 
                     # Save chunks
                     if len(training_data) >= args.chunk_size:
-                        save_path = out_dir / f'training_data-{starting_value}.npy'
+                        save_path = out_dir / f"training_data-{starting_value}.npy"
                         if save_training_data(training_data, save_path):
                             training_data = []
                             starting_value += 1
@@ -383,20 +400,22 @@ Example:
 
                 # Check for too many consecutive errors
                 if error_count >= max_consecutive_errors:
-                    logger.error(f"Too many consecutive errors ({max_consecutive_errors}). Stopping.")
+                    logger.error(
+                        f"Too many consecutive errors ({max_consecutive_errors}). Stopping."
+                    )
                     break
 
             # Check for pause/quit
             try:
                 keys = key_check() if key_check else []
 
-                if 'T' in keys:
+                if "T" in keys:
                     paused = not paused
                     status = "PAUSED" if paused else "RESUMED"
                     logger.info(f"Recording {status}")
                     time.sleep(0.5)  # Debounce
 
-                if 'Q' in keys:
+                if "Q" in keys:
                     logger.info("User requested quit")
                     break
 
@@ -414,7 +433,7 @@ Example:
         # Save any remaining data
         if training_data:
             logger.info(f"Saving remaining {len(training_data)} frames...")
-            save_path = out_dir / f'training_data-{starting_value}.npy'
+            save_path = out_dir / f"training_data-{starting_value}.npy"
             save_training_data(training_data, save_path)
 
         cleanup()

@@ -9,7 +9,7 @@ import time
 import platform
 
 # Platform detection
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 
 # DirectInput scan codes (used on Windows)
 W = 0x11
@@ -24,14 +24,14 @@ NP_8 = 0x48
 
 # Map scan codes to key names for cross-platform support
 _SCANCODE_TO_KEY = {
-    0x11: 'w',  # W
-    0x1E: 'a',  # A
-    0x1F: 's',  # S
-    0x20: 'd',  # D
-    0x50: 'num2',  # NP_2
-    0x4B: 'num4',  # NP_4
-    0x4D: 'num6',  # NP_6
-    0x48: 'num8',  # NP_8
+    0x11: "w",  # W
+    0x1E: "a",  # A
+    0x1F: "s",  # S
+    0x20: "d",  # D
+    0x50: "num2",  # NP_2
+    0x4B: "num4",  # NP_4
+    0x4D: "num6",  # NP_6
+    0x48: "num8",  # NP_8
 }
 
 if IS_WINDOWS:
@@ -42,33 +42,36 @@ if IS_WINDOWS:
     PUL = ctypes.POINTER(ctypes.c_ulong)
 
     class KeyBdInput(ctypes.Structure):
-        _fields_ = [("wVk", ctypes.c_ushort),
-                    ("wScan", ctypes.c_ushort),
-                    ("dwFlags", ctypes.c_ulong),
-                    ("time", ctypes.c_ulong),
-                    ("dwExtraInfo", PUL)]
+        _fields_ = [
+            ("wVk", ctypes.c_ushort),
+            ("wScan", ctypes.c_ushort),
+            ("dwFlags", ctypes.c_ulong),
+            ("time", ctypes.c_ulong),
+            ("dwExtraInfo", PUL),
+        ]
 
     class HardwareInput(ctypes.Structure):
-        _fields_ = [("uMsg", ctypes.c_ulong),
-                    ("wParamL", ctypes.c_short),
-                    ("wParamH", ctypes.c_ushort)]
+        _fields_ = [
+            ("uMsg", ctypes.c_ulong),
+            ("wParamL", ctypes.c_short),
+            ("wParamH", ctypes.c_ushort),
+        ]
 
     class MouseInput(ctypes.Structure):
-        _fields_ = [("dx", ctypes.c_long),
-                    ("dy", ctypes.c_long),
-                    ("mouseData", ctypes.c_ulong),
-                    ("dwFlags", ctypes.c_ulong),
-                    ("time", ctypes.c_ulong),
-                    ("dwExtraInfo", PUL)]
+        _fields_ = [
+            ("dx", ctypes.c_long),
+            ("dy", ctypes.c_long),
+            ("mouseData", ctypes.c_ulong),
+            ("dwFlags", ctypes.c_ulong),
+            ("time", ctypes.c_ulong),
+            ("dwExtraInfo", PUL),
+        ]
 
     class Input_I(ctypes.Union):
-        _fields_ = [("ki", KeyBdInput),
-                    ("mi", MouseInput),
-                    ("hi", HardwareInput)]
+        _fields_ = [("ki", KeyBdInput), ("mi", MouseInput), ("hi", HardwareInput)]
 
     class Input(ctypes.Structure):
-        _fields_ = [("type", ctypes.c_ulong),
-                    ("ii", Input_I)]
+        _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
 
     def PressKey(hexKeyCode):
         """Press a key using DirectInput (Windows)."""
@@ -90,15 +93,16 @@ else:
     # Cross-platform implementation using pynput (Linux/macOS)
     try:
         from pynput.keyboard import Controller, Key
+
         _keyboard = Controller()
         _PYNPUT_AVAILABLE = True
 
         # Map scan codes to pynput keys
         _SCANCODE_TO_PYNPUT = {
-            0x11: 'w',
-            0x1E: 'a',
-            0x1F: 's',
-            0x20: 'd',
+            0x11: "w",
+            0x1E: "a",
+            0x1F: "s",
+            0x20: "d",
             0x50: Key.num_lock,  # Fallback for numpad
             0x4B: Key.num_lock,
             0x4D: Key.num_lock,
@@ -109,7 +113,7 @@ else:
             """Press a key using pynput (cross-platform)."""
             key = _SCANCODE_TO_PYNPUT.get(hexKeyCode, None)
             if key is None:
-                key = _SCANCODE_TO_KEY.get(hexKeyCode, 'a')
+                key = _SCANCODE_TO_KEY.get(hexKeyCode, "a")
             if isinstance(key, str):
                 _keyboard.press(key)
             else:
@@ -119,7 +123,7 @@ else:
             """Release a key using pynput (cross-platform)."""
             key = _SCANCODE_TO_PYNPUT.get(hexKeyCode, None)
             if key is None:
-                key = _SCANCODE_TO_KEY.get(hexKeyCode, 'a')
+                key = _SCANCODE_TO_KEY.get(hexKeyCode, "a")
             if isinstance(key, str):
                 _keyboard.release(key)
             else:
@@ -130,14 +134,18 @@ else:
 
         def PressKey(hexKeyCode):
             """Stub: pynput not available."""
-            print(f"[directkeys] PressKey({hex(hexKeyCode)}) - pynput not installed, skipping")
+            print(
+                f"[directkeys] PressKey({hex(hexKeyCode)}) - pynput not installed, skipping"
+            )
 
         def ReleaseKey(hexKeyCode):
             """Stub: pynput not available."""
-            print(f"[directkeys] ReleaseKey({hex(hexKeyCode)}) - pynput not installed, skipping")
+            print(
+                f"[directkeys] ReleaseKey({hex(hexKeyCode)}) - pynput not installed, skipping"
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(f"Platform: {platform.system()}")
     print(f"Windows mode: {IS_WINDOWS}")
     print("Testing key press/release in 3 seconds...")

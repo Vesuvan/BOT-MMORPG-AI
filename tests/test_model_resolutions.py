@@ -25,21 +25,21 @@ if SRC_PATH not in sys.path:
 # Skip all tests if PyTorch not available
 try:
     import torch
+
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False
 
 pytestmark = pytest.mark.skipif(
-    not PYTORCH_AVAILABLE,
-    reason="PyTorch required for model resolution tests"
+    not PYTORCH_AVAILABLE, reason="PyTorch required for model resolution tests"
 )
 
 
 # Test resolutions: default (480x270) and medium (960x540)
 # We test these two to verify models handle variable input sizes
 TEST_RESOLUTIONS = [
-    (480, 270, "default"),   # Default NN resolution
-    (960, 540, "medium"),    # Medium resolution (4x pixels)
+    (480, 270, "default"),  # Default NN resolution
+    (960, 540, "medium"),  # Medium resolution (4x pixels)
 ]
 
 
@@ -68,18 +68,20 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x_single)
 
-            assert output.shape == (1, 29), \
-                f"EfficientNet-LSTM {name} ({width}x{height}) single frame: " \
+            assert output.shape == (1, 29), (
+                f"EfficientNet-LSTM {name} ({width}x{height}) single frame: "
                 f"expected (1, 29), got {output.shape}"
+            )
 
             # Sequence input (4 frames)
             x_seq = torch.randn(1, 4, 3, height, width).to(device)
             with torch.no_grad():
                 output = model(x_seq)
 
-            assert output.shape == (1, 29), \
-                f"EfficientNet-LSTM {name} ({width}x{height}) sequence: " \
+            assert output.shape == (1, 29), (
+                f"EfficientNet-LSTM {name} ({width}x{height}) sequence: "
                 f"expected (1, 29), got {output.shape}"
+            )
 
     def test_efficientnet_simple_resolutions(self, device):
         """Test EfficientNet (simple) with multiple resolutions."""
@@ -94,9 +96,10 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x)
 
-            assert output.shape == (1, 29), \
-                f"EfficientNet-Simple {name} ({width}x{height}): " \
+            assert output.shape == (1, 29), (
+                f"EfficientNet-Simple {name} ({width}x{height}): "
                 f"expected (1, 29), got {output.shape}"
+            )
 
     def test_mobilenetv3_resolutions(self, device):
         """Test MobileNetV3 with multiple resolutions."""
@@ -111,9 +114,10 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x)
 
-            assert output.shape == (1, 29), \
-                f"MobileNetV3 {name} ({width}x{height}): " \
+            assert output.shape == (1, 29), (
+                f"MobileNetV3 {name} ({width}x{height}): "
                 f"expected (1, 29), got {output.shape}"
+            )
 
     def test_resnet18_lstm_resolutions(self, device):
         """Test ResNet18-LSTM with multiple resolutions."""
@@ -129,18 +133,20 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x_single)
 
-            assert output.shape == (1, 29), \
-                f"ResNet18-LSTM {name} ({width}x{height}) single: " \
+            assert output.shape == (1, 29), (
+                f"ResNet18-LSTM {name} ({width}x{height}) single: "
                 f"expected (1, 29), got {output.shape}"
+            )
 
             # Sequence (4 frames)
             x_seq = torch.randn(1, 4, 3, height, width).to(device)
             with torch.no_grad():
                 output = model(x_seq)
 
-            assert output.shape == (1, 29), \
-                f"ResNet18-LSTM {name} ({width}x{height}) sequence: " \
+            assert output.shape == (1, 29), (
+                f"ResNet18-LSTM {name} ({width}x{height}) sequence: "
                 f"expected (1, 29), got {output.shape}"
+            )
 
     def test_alexnet_resolutions(self, device):
         """Test AlexNet (legacy) with multiple resolutions."""
@@ -155,9 +161,10 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x)
 
-            assert output.shape == (1, 29), \
-                f"AlexNet {name} ({width}x{height}): " \
+            assert output.shape == (1, 29), (
+                f"AlexNet {name} ({width}x{height}): "
                 f"expected (1, 29), got {output.shape}"
+            )
 
     def test_sentnet_2d_resolutions(self, device):
         """Test SentNet 2D (legacy) with multiple resolutions."""
@@ -172,9 +179,10 @@ class TestModelResolutions:
             with torch.no_grad():
                 output = model(x)
 
-            assert output.shape == (1, 29), \
-                f"SentNet2D {name} ({width}x{height}): " \
+            assert output.shape == (1, 29), (
+                f"SentNet2D {name} ({width}x{height}): "
                 f"expected (1, 29), got {output.shape}"
+            )
 
 
 class TestResolutionConfig:
@@ -184,8 +192,6 @@ class TestResolutionConfig:
         """Test that game configurations are properly defined."""
         from bot_mmorpg.config.game_resolutions import (
             get_game_config,
-            get_recommended_resolution,
-            GAME_CONFIGS,
         )
 
         # Test known games
@@ -261,9 +267,9 @@ class TestResolutionConsistency:
 
         # Test with all supported resolutions
         resolutions = [
-            (480, 270),   # Default
-            (640, 360),   # Low
-            (960, 540),   # Medium
+            (480, 270),  # Default
+            (640, 360),  # Low
+            (960, 540),  # Medium
             (1280, 720),  # HD (max)
         ]
 
@@ -277,8 +283,9 @@ class TestResolutionConsistency:
         # All outputs should be identical
         expected_shape = (1, 29)
         for i, (shape, (w, h)) in enumerate(zip(outputs, resolutions)):
-            assert shape == expected_shape, \
+            assert shape == expected_shape, (
                 f"Resolution {w}x{h} produced shape {shape}, expected {expected_shape}"
+            )
 
 
 if __name__ == "__main__":
