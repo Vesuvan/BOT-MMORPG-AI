@@ -10,6 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+  <!-- Quick Start Wizard Styles -->
+  <link rel="stylesheet" href="./styles/training-school.css">
+
   <style>
     :root {
       --bg-dark: #121212;
@@ -560,6 +563,65 @@
       width: 0%;
       transition: width 0.5s ease;
     }
+  
+    /* --- LOADOUT / NEW CATALOG UI --- */
+    .loadout-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+    .game-select-wrap label { display:block; font-size:10px; font-weight:900; color:var(--text-dim); margin-bottom:5px; letter-spacing:1px; text-transform:uppercase; }
+    .game-select-wrap select { background:var(--bg-panel); border:1px solid var(--border); padding:10px; width:250px; font-weight:bold; height: 45px; border-radius: 10px; color: #fff; }
+
+    .loadout-main { display:grid; grid-template-columns: 1fr 360px; gap:24px; height:calc(100vh - 260px); }
+
+    .inventory-section { display:flex; flex-direction:column; overflow:hidden; }
+    .section-title { font-size:12px; font-weight:900; color:var(--text-dim); margin-bottom:10px; letter-spacing:1px; text-transform:uppercase; }
+    .inventory-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px; overflow-y:auto; padding-right:5px; align-content:start; padding-bottom: 20px; }
+
+    .brain-card { 
+      background:var(--bg-panel); border:1px solid var(--border); border-radius:12px; padding:15px; 
+      cursor:pointer; transition:all 0.2s ease; position:relative; overflow:hidden;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+    }
+    .brain-card:hover { transform:translateY(-3px); border-color:var(--text-dim); background: rgba(255,255,255,0.05); }
+    .brain-card.selected { border-color:var(--primary); box-shadow:0 0 15px rgba(187, 134, 252, 0.15); }
+    .brain-card.equipped { border:1px solid var(--secondary); background:rgba(3,218,198,0.05); }
+
+    .brain-card .card-status { 
+        position:absolute; top:10px; right:10px; font-size: 10px; font-weight: 900; 
+        padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.5); color: var(--text-dim);
+    }
+    .brain-card.equipped .card-status { background:var(--secondary); color: #000; box-shadow:0 0 8px var(--secondary); }
+
+    .brain-name { font-weight:800; font-size:14px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .brain-meta { font-size:11px; color:var(--text-dim); display:flex; flex-wrap: wrap; gap:6px; }
+
+    .inspector-section { background:var(--bg-panel); border-radius:16px; border:1px solid var(--border); padding:20px; display:flex; flex-direction:column; box-shadow: var(--shadow); height: fit-content; min-height: 420px; }
+    .inspector-content.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; opacity:0.65; min-height: 320px; }
+    .placeholder-icon { font-size:48px; margin-bottom:10px; filter:grayscale(1); opacity: 0.6; }
+
+    .insp-header { border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:15px; }
+    .insp-title { font-size:20px; font-weight:900; color:#fff; line-height:1.2; word-break:break-word; }
+    .insp-path { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); margin-top: 5px; word-break: break-word; }
+    .insp-badge { display:inline-block; padding:4px 8px; border-radius:999px; background:var(--bg-dark); font-size:10px; margin-top:10px; border:1px solid var(--border); margin-right: 6px; color: var(--text-dim); font-weight: 900; }
+
+    .insp-stats { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; flex:1; }
+    .stat-row { display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); gap: 10px; }
+    .stat-label { color:var(--text-dim); }
+    .stat-val { color:#fff; font-weight:600; font-family:'JetBrains Mono', monospace; text-align: right; }
+
+    .action-area { margin-top:auto; display: flex; flex-direction: column; gap: 10px; }
+    .big-btn { width:100%; padding:16px; border-radius:12px; font-weight:900; font-size:14px; letter-spacing:1px; cursor:pointer; border:none; transition:all 0.2s; text-transform: uppercase; }
+
+    .btn-equip { background:var(--bg-card); color:#fff; border:1px solid var(--text-dim); }
+    .btn-equip:hover { background:#fff; color:#000; transform: translateY(-2px); }
+
+    .btn-deploy { background:var(--secondary); color:#000; box-shadow:0 0 20px rgba(3,218,198,0.3); animation:pulse 2s infinite; }
+    .btn-deploy:hover { filter: brightness(1.1); }
+
+    .btn-delete { background: transparent; color: var(--accent); border: 1px solid var(--border); padding: 10px; font-size: 12px; cursor: pointer; border-radius: 10px; opacity: 0.8; font-weight: 800; }
+    .btn-delete:hover { opacity: 1; border-color: var(--accent); background: rgba(207, 102, 121, 0.1); }
+
+    @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(3,218,198,0.55); } 70% { box-shadow:0 0 0 10px rgba(3,218,198,0); } 100% { box-shadow:0 0 0 0 rgba(3,218,198,0); } }
+
   </style>
 </head>
 
@@ -574,6 +636,10 @@
       <a onclick="showTab('dashboard')" class="nav-btn active" id="btn-dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Dashboard
+      </a>
+      <a onclick="showTab('wizard')" class="nav-btn" id="btn-wizard">
+        <svg viewBox="0 0 24 24"><path d="M13 3L4 14h7v7l9-11h-7V3z"/></svg>
+        Quick Start
       </a>
       <a onclick="showTab('teach')" class="nav-btn" id="btn-teach">
         <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
@@ -626,9 +692,34 @@
       <div class="hero-status">
         <div class="hero-text">
           <h2 style="color: var(--secondary)">System Ready</h2>
-          <p>Hooked into: <strong>Genshin Impact</strong> <span class="pill" style="margin-left:10px;">Game: <span id="active-game-pill">genshin_impact</span></span></p>
+          <p>Active Game: <strong id="active-game-pill" style="transition: color 0.3s;">⚔️ Genshin Impact</strong></p>
         </div>
-        <button class="btn" onclick="showTab('run')">Quick Start</button>
+        <button class="btn" onclick="showTab('wizard')">⚡ Quick Start</button>
+      </div>
+
+      <!-- Game Preset Selector -->
+      <div class="soft-panel" style="margin-bottom:20px; background: linear-gradient(135deg, rgba(187,134,252,0.08), rgba(3,218,198,0.04));">
+        <div style="font-weight:900; margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+          <span>🎮</span> Select Your Game
+          <span style="font-size:11px; color:var(--text-dim); font-weight:normal; margin-left:auto;">Auto-configures optimal settings</span>
+        </div>
+        <div id="game-preset-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-bottom:14px;">
+          <!-- Game cards populated by JS -->
+        </div>
+        <div id="game-preset-info" style="padding:12px; background:rgba(0,0,0,0.2); border-radius:10px; min-height:60px;">
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <span style="font-size:32px;">⚔️</span>
+            <div>
+              <strong style="color:#FFD93D;">Genshin Impact</strong>
+              <p style="font-size:12px; color:var(--text-dim); margin:4px 0 0;">Action RPG with elemental combat. Mobile UI scales well.</p>
+              <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+                <strong>Resolution:</strong> 480x270 |
+                <strong>Actions:</strong> 48 |
+                <strong>Model:</strong> efficientnet_lstm
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <h3 style="margin-bottom: 15px; color: var(--text-dim);">Quick Actions</h3>
@@ -646,12 +737,17 @@
         <div class="card" onclick="showTab('models')">
           <div class="card-icon" style="color: #69F0AE;">📚</div>
           <h3>Open Catalog</h3>
-          <p>Pick any model (built-in or trained), set it active, then run the bot.</p>
+          <p>Pick any model (built-in or trained), equip it, then launch the bot.</p>
         </div>
         <div class="card" onclick="showTab('strategist')">
           <div class="card-icon" style="color: #FFD700;">✨</div>
           <h3>Ask AI Strategist</h3>
           <p>Get instant advice on routes, builds, and bot configuration.</p>
+        </div>
+        <div class="card" onclick="showTab('wizard')">
+          <div class="card-icon" style="color: #BB86FC;">⚡</div>
+          <h3>Quick Start</h3>
+          <p>Zero-typing setup wizard. Configure game, task, and model automatically.</p>
         </div>
       </div>
 
@@ -670,27 +766,71 @@
 
     <!-- TEACH -->
     <div id="tab-teach" class="tab-content">
-      <div class="game-placeholder">
-        <div style="font-size: 40px; margin-bottom: 10px;">🎮</div>
-        <p>Game Window Detected: 1920x1080</p>
-        <p style="color: #666; font-size: 12px;">(Overlay inactive)</p>
+      <!-- Screen Preview -->
+      <div class="soft-panel" style="margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+          <div style="font-weight:900;">Screen Preview</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <label class="form-label" style="margin:0;">Monitor:</label>
+            <select class="form-select" id="teach-monitor-select" style="width:160px;" onchange="updateTeachPreview()">
+              <option value="1">Monitor 1</option>
+            </select>
+            <button class="btn btn-small btn-secondary" onclick="refreshTeachPreview()">Refresh</button>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);">
+              <input type="checkbox" id="teach-live-preview-toggle" onchange="toggleTeachLivePreview(this.checked)">
+              Live (2fps)
+            </label>
+          </div>
+        </div>
+        <div id="teach-preview-container" style="background:#111; border:2px dashed var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; min-height:180px; overflow:hidden;">
+          <img id="teach-preview-img" style="max-width:100%; max-height:180px; display:none;" />
+          <div id="teach-preview-placeholder" style="color:var(--text-dim); text-align:center;">
+            <div style="font-size:40px; margin-bottom:10px;">🎮</div>
+            <p>Click "Refresh" to see screen preview</p>
+            <p style="font-size:11px; margin-top:6px;">Neural networks expect <strong>480x270</strong> (16:9)</p>
+          </div>
+        </div>
+        <!-- Resolution Settings -->
+        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <label class="form-label" style="margin:0; white-space:nowrap;">Capture Resolution:</label>
+          <select class="form-select" id="teach-capture-resolution" style="width:220px;">
+            <option value="480x270" data-recommended="true">480x270 (Best Performance) *</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540" data-experimental="true">960x540 (Slower Training)</option>
+            <option value="1280x720" data-experimental="true">1280x720 (HD - Experimental)</option>
+            <option value="native" data-experimental="true">Native (Experimental)</option>
+          </select>
+          <span id="teach-resolution-hint" style="font-size:11px; color:var(--text-dim);">* Recommended for best performance</span>
+        </div>
       </div>
 
       <div class="soft-panel" style="margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
           <div>
             <div style="font-weight:900; margin-bottom:6px;">Recording Session</div>
-            <div style="color:var(--text-dim); font-size:12px;">Give your dataset a name. The launcher will archive files automatically when you stop.</div>
+            <div style="color:var(--text-dim); font-size:12px;">Give your dataset a name or auto-generate one. Recording saves to datasets/.</div>
           </div>
           <div class="pill">Game: <span id="teach-game">genshin_impact</span></div>
         </div>
-        <div style="display:grid; grid-template-columns: 1fr 180px; gap:10px; margin-top:12px;">
+        <div style="display:grid; grid-template-columns: 1fr auto 180px; gap:10px; margin-top:12px;">
           <input class="form-input" id="dataset-name" placeholder="Dataset name (e.g. bridge_route_01)" />
-          <button class="btn btn-danger" onclick="toggleRecord(this)">
+          <button class="btn btn-small btn-secondary" onclick="autoGenerateDatasetName()">Auto</button>
+          <button class="btn btn-danger" onclick="toggleRecord(this)" id="btn-record">
             <span>●</span> Start Recording
           </button>
         </div>
         <div style="margin-top:10px; color:var(--text-dim);" id="record-status">Press to start capturing data...</div>
+      </div>
+
+      <!-- Dataset Management -->
+      <div class="soft-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+          <div style="font-weight:900;">Your Datasets</div>
+          <button class="btn btn-small btn-secondary" onclick="refreshDatasetList()">Refresh</button>
+        </div>
+        <div id="teach-dataset-list" style="max-height:200px; overflow-y:auto;">
+          <div style="color:var(--text-dim); font-size:12px;">Loading datasets...</div>
+        </div>
       </div>
     </div>
 
@@ -706,9 +846,15 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
         <div style="display:flex; gap:10px;">
-          <button class="btn" onclick="openTrainWizard()">
-            <span>🧠</span> Train Wizard
-          </button>
+          
+<button class="btn" onclick="startTraining()" id="btn-start-training">
+  <span>🧠</span> Start Training
+</button>
+
+<button class="btn btn-danger" onclick="stopTraining()" id="btn-stop-training" disabled>
+  <span>■</span> Stop Training
+</button>
+
           <button class="btn btn-secondary" onclick="refreshCatalog()">
             <span>↻</span> Refresh Catalog
           </button>
@@ -717,6 +863,70 @@
           </button>
         </div>
         <span id="train-pct">0%</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <label class="form-label">Game ID</label>
+          <input class="form-input" id="train-game-id" value="genshin_impact"/>
+        </div>
+        <div>
+          <label class="form-label">Model name</label>
+          <input class="form-input" id="train-model-name" placeholder="e.g. genshin_combat_v1"/>
+        </div>
+        
+<div>
+  <label class="form-label">Dataset</label>
+  <select class="form-select" id="train-dataset-select">
+    <option value="">Loading datasets…</option>
+  </select>
+
+  <div style="display:flex; gap:10px; margin-top:10px;">
+    <button class="btn btn-small btn-secondary" onclick="refreshTrainDatasets()">↻ Refresh</button>
+    <span style="font-size:11px; color:var(--text-dim); align-self:center;">
+      Datasets are detected automatically from ModelHub.
+    </span>
+  </div>
+</div>
+
+        <div>
+          <label class="form-label">Neural Network</label>
+          <select class="form-select" id="train-arch">
+            <optgroup label="🌟 Modern (Recommended)">
+              <option value="efficientnet_lstm" selected>EfficientNet-LSTM (Best Accuracy)</option>
+              <option value="efficientnet_simple">EfficientNet (Balanced)</option>
+              <option value="mobilenetv3">MobileNetV3 (Fastest)</option>
+              <option value="resnet18_lstm">ResNet18-LSTM</option>
+            </optgroup>
+            <optgroup label="🚀 Advanced (Experimental)">
+              <option value="efficientnet_transformer">EfficientNet-Transformer (Long Sequences)</option>
+              <option value="multihead_action">Multi-Head Action (Simultaneous Actions)</option>
+              <option value="game_attention">Game Attention Network (UI Focus)</option>
+            </optgroup>
+            <optgroup label="📜 Legacy">
+              <option value="inception_v3">Inception V3</option>
+              <option value="alexnet">AlexNet</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Action Space</label>
+          <select class="form-select" id="train-action-space">
+            <option value="basic">Basic (9 actions) - WASD only</option>
+            <option value="standard">Standard (29 actions) - Keyboard + Gamepad</option>
+            <option value="combat" selected>Combat (48 actions) - Skills + Combat</option>
+            <option value="extended">Extended (73 actions) - Full MMORPG</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Training Resolution</label>
+          <select class="form-select" id="train-resolution">
+            <option value="480x270" selected>480x270 (Fastest)</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540">960x540 (Slower)</option>
+            <option value="1280x720">1280x720 (HD - Experimental)</option>
+          </select>
+        </div>
       </div>
 
       <div id="log-analysis-result" class="ai-analysis-box">
@@ -734,10 +944,48 @@
         <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="bot-state">IDLE</div>
       </div>
 
+      <!-- Screen Preview for Run -->
+      <div class="soft-panel" style="margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+          <div style="font-weight:900;">Bot Vision (What AI Sees)</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <label class="form-label" style="margin:0;">Monitor:</label>
+            <select class="form-select" id="run-monitor-select" style="width:160px;" onchange="updateRunPreview()">
+              <option value="1">Monitor 1</option>
+            </select>
+            <button class="btn btn-small btn-secondary" onclick="refreshRunPreview()">Refresh</button>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--text-dim);">
+              <input type="checkbox" id="run-live-preview-toggle" onchange="toggleRunLivePreview(this.checked)">
+              Live (2fps)
+            </label>
+          </div>
+        </div>
+        <div id="run-preview-container" style="background:#111; border:2px dashed var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; min-height:180px; overflow:hidden;">
+          <img id="run-preview-img" style="max-width:100%; max-height:180px; display:none;" />
+          <div id="run-preview-placeholder" style="color:var(--text-dim); text-align:center;">
+            <div style="font-size:40px; margin-bottom:10px;">👁️</div>
+            <p>Click "Refresh" or start bot to see AI vision</p>
+            <p style="font-size:11px; margin-top:6px;">AI processes at <strong>480x270</strong> resolution</p>
+          </div>
+        </div>
+        <!-- Resolution Settings -->
+        <div style="display:flex; gap:12px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <label class="form-label" style="margin:0; white-space:nowrap;">Inference Resolution:</label>
+          <select class="form-select" id="run-capture-resolution" style="width:220px;">
+            <option value="480x270" data-recommended="true">480x270 (Best Performance) *</option>
+            <option value="640x360">640x360 (Good Balance)</option>
+            <option value="960x540" data-experimental="true">960x540 (Slower Inference)</option>
+            <option value="1280x720" data-experimental="true">1280x720 (HD - Experimental)</option>
+            <option value="native" data-experimental="true">Native (Experimental)</option>
+          </select>
+          <span id="run-resolution-hint" style="font-size:11px; color:var(--text-dim);">* Recommended for best performance</span>
+        </div>
+      </div>
+
       <div class="soft-panel" style="margin-bottom: 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
           <div style="color:var(--text-dim); font-size:12px;">
-            Tip: pick a model in <b>Model Catalog</b>, click <b>Set Active</b>, then press <b>Start Bot</b>.
+            Tip: pick a model in <b>Model Catalog</b>, click <b>Equip</b>, then press <b>Start Bot</b>.
           </div>
           <button class="btn btn-secondary btn-small" onclick="showTab('models')">Open Catalog</button>
         </div>
@@ -749,7 +997,7 @@
         </button>
       </div>
 
-      <div style="margin-top: 30px; padding: 20px; background: var(--bg-card); border-radius: 12px; border:1px solid var(--border); box-shadow: var(--shadow-soft);">
+      <div style="margin-top: 20px; padding: 20px; background: var(--bg-card); border-radius: 12px; border:1px solid var(--border); box-shadow: var(--shadow-soft);">
         <h4 style="margin-bottom: 15px;">Safety Settings</h4>
         <div style="display:flex; flex-direction:column; gap: 10px; color:var(--text-dim);">
           <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
@@ -766,67 +1014,112 @@
     <div id="tab-models" class="tab-content">
       <div class="hero-status" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border);">
         <div class="hero-text">
-          <h2>Model Catalog</h2>
-          <p>Built-in testing models + your trained models. Set active, validate, run.</p>
+          <h2>Model Loadout</h2>
+          <p>Select a game, equip a brain, then launch the bot.</p>
         </div>
         <div class="stat-val" style="color: var(--text-dim); font-size: 14px;" id="mh-status">Loading…</div>
       </div>
 
-      <div class="catalog-grid">
-        <!-- LEFT PANEL -->
-        <div class="card" style="cursor: default;">
-          <h3 style="margin-bottom: 10px;">Game</h3>
-          <select class="form-select" id="mh-game" onchange="refreshCatalog()">
-            <option value="">Select game…</option>
+      <div class="loadout-header">
+        <div class="game-select-wrap">
+          <label>Current Operation</label>
+          <select id="mh-game" class="form-select" onchange="refreshCatalog()">
+             <option value="">Loading...</option>
           </select>
+        </div>
+        <div style="display:flex; gap: 10px;">
+             <button class="btn btn-secondary" onclick="refreshCatalog()"><span>↻</span> Refresh</button>
+             <button class="btn" onclick="openTrainWizard()"><span>🧠</span> Train New Brain</button>
+        </div>
+      </div>
 
-          <div style="display:flex; gap:10px; margin-top:12px;">
-            <button class="btn btn-secondary btn-small" onclick="refreshCatalog()" style="flex:1;">
-              ↻ Refresh
-            </button>
-            <button class="btn btn-secondary btn-small" onclick="openTrainWizard()" style="flex:1;">
-              🧠 Train
-            </button>
+      <div class="loadout-main">
+        <div class="inventory-section">
+          <div class="section-title">Available Brains</div>
+          <div id="mh-models-list" class="inventory-grid">
+            <div class="log-entry" style="padding:10px;">Loading inventory...</div>
           </div>
-
-          <h3 style="margin: 16px 0 10px;">Dataset Folder (offline evaluation)</h3>
-          <input class="form-input" id="mh-dataset" placeholder="e.g. datasets/genshin_impact/<dataset_id>/" />
-
-          <div style="display:flex; gap:10px; margin-top: 14px;">
-            <button class="btn btn-secondary" onclick="mhValidate()" id="mh-validate" disabled>
-              Validate
-            </button>
-            <button class="btn btn-ai" onclick="mhEval()" id="mh-eval" disabled>
-              Offline Evaluate
-            </button>
-          </div>
-
-          <p style="font-size: 11px; color: var(--text-dim); margin-top: 10px;">
-            Training scripts are treated as black boxes. The launcher detects new files and archives them.
-          </p>
         </div>
 
-        <!-- RIGHT PANEL -->
-        <div>
-          <div class="catalog-list" style="margin-bottom: 14px;">
-            <div class="list-head">
-              <h3>Models</h3>
-              <div class="pill">Active: <span id="mh-active-pill">—</span></div>
-            </div>
-            <div class="catalog-items" id="mh-models-list">
-              <div class="log-entry" style="padding:10px;"><span class="log-time">[ModelHub]</span> Loading catalog…</div>
-            </div>
+        <div class="inspector-section">
+          <div id="inspector-empty" class="inspector-content empty">
+            <div class="placeholder-icon">🤖</div>
+            <h3>Select a Neural Model</h3>
+            <p style="color: var(--text-dim); margin-top: 5px;">Select a model to view stats,<br>equip it, or delete it.</p>
           </div>
 
-          <div class="ai-analysis-box" id="mh-details" style="display:block; max-height: 320px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-              <strong>Selected Model</strong>
-              <div style="display:flex; gap:10px;">
-                <button class="btn btn-secondary btn-small" onclick="mhSetActive()" id="mh-set-active" disabled>Set Active</button>
-                <button class="btn btn-success btn-small" onclick="mhRunSelected()" id="mh-run" disabled>Run</button>
-              </div>
+          <div id="inspector-content" style="display:none; flex-direction:column; height:100%;">
+            <div class="insp-header">
+               <div id="insp-title" class="insp-title">Model Name</div>
+               <div id="insp-path" class="insp-path">path/to/model</div>
+               <div id="insp-badges"></div>
             </div>
-            <pre id="mh-details-pre" style="margin-top:10px; white-space: pre-wrap; color:#d1d5db;">(none)</pre>
+
+            <div class="insp-stats">
+               <div class="stat-row">
+                  <span class="stat-label">Architecture</span>
+                  <span class="stat-val" id="insp-arch">—</span>
+               </div>
+               <div class="stat-row">
+                  <span class="stat-label">Created</span>
+                  <span class="stat-val" id="insp-date">—</span>
+               </div>
+               <div class="stat-row">
+                  <span class="stat-label">Status</span>
+                  <span class="stat-val" id="insp-status" style="color:var(--text-dim)">—</span>
+               </div>
+            </div>
+
+            <div class="action-area">
+                <button id="btn-main-action" class="big-btn btn-equip" onclick="mhHandleMainAction()">EQUIP MODEL</button>
+                <div style="display:flex; justify-content: center; margin-top: 10px;">
+                   <button class="btn-delete" onclick="mhDeleteSelected()">Delete Model</button>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 10px; display:flex; justify-content: space-between; align-items:center; gap:12px;">
+        <div class="pill">Active: <span id="mh-active-pill">—</span></div>
+        <div style="color: var(--text-dim); font-size: 12px;">Tip: Equip a model here, then press <b>Start Bot</b> in <b>Run Bot</b>.</div>
+      </div>
+    </div>
+
+<!-- QUICK START / WIZARD -->
+    <div id="tab-wizard" class="tab-content">
+      <div class="wizard-container">
+        <div class="wizard-header">
+          <h2 class="wizard-title">⚡ Quick Start</h2>
+          <p class="wizard-subtitle">Zero-typing Setup - Configure and Go</p>
+        </div>
+
+        <div class="wizard-progress">
+          <div class="wizard-progress-step" data-step="0">Game</div>
+          <div class="wizard-progress-step" data-step="1">Task</div>
+          <div class="wizard-progress-step" data-step="2">Config</div>
+          <div class="wizard-progress-step" data-step="3">Ready</div>
+        </div>
+
+        <div id="wizard-content" class="wizard-body">
+          <!-- Wizard steps render here -->
+          <div class="wizard-step-content" style="text-align: center; padding: 40px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎮</div>
+            <h2>Welcome to Quick Start</h2>
+            <p style="color: var(--text-dim); margin: 15px 0 25px;">
+              Configure your game, select a task, and the AI will auto-configure everything else.
+            </p>
+            <button class="btn btn-wide" id="btn-start-wizard" style="max-width: 300px;">
+              ⚡ Begin Setup
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <span id="wizard-step-indicator" style="color: var(--text-dim);">Step 1 of 4</span>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-wizard-back" disabled>Back</button>
+            <button class="btn" id="btn-wizard-next">Next</button>
           </div>
         </div>
       </div>
@@ -1003,6 +1296,237 @@
     let twStep = 1;
 
     // -------------------------
+    // GAME PRESETS - Optimal Settings for Each Game
+    // -------------------------
+    const GAME_PRESETS = {
+      genshin_impact: {
+        id: "genshin_impact", name: "Genshin Impact", icon: "⚔️", color: "#FFD93D",
+        resolution: "480x270", action_space: "combat", architecture: "efficientnet_lstm",
+        description: "Action RPG with elemental combat. Mobile UI scales well.",
+        notes: "Smooth animations, clear UI indicators. 480p captures all elements."
+      },
+      world_of_warcraft: {
+        id: "world_of_warcraft", name: "World of Warcraft", icon: "🐉", color: "#FF6B35",
+        resolution: "640x360", action_space: "extended", architecture: "multihead_action",
+        description: "Classic MMORPG with complex addon UI system.",
+        notes: "Complex UI with addons. 640p recommended for addon text readability."
+      },
+      final_fantasy_xiv: {
+        id: "final_fantasy_xiv", name: "Final Fantasy XIV", icon: "🔮", color: "#4169E1",
+        resolution: "640x360", action_space: "extended", architecture: "multihead_action",
+        description: "Story-rich MMORPG with detailed hotbar system.",
+        notes: "Detailed HUD with many skills. 640p for hotbar visibility."
+      },
+      guild_wars_2: {
+        id: "guild_wars_2", name: "Guild Wars 2", icon: "🛡️", color: "#DC143C",
+        resolution: "480x270", action_space: "combat", architecture: "efficientnet_lstm",
+        description: "Dynamic events with clean UI design.",
+        notes: "Clean UI design. 480p sufficient for core gameplay."
+      },
+      lost_ark: {
+        id: "lost_ark", name: "Lost Ark", icon: "⚡", color: "#FFB347",
+        resolution: "640x360", action_space: "combat", architecture: "game_attention",
+        description: "Fast-paced ARPG with many skill indicators.",
+        notes: "Many skill indicators. 640p recommended for combat clarity."
+      },
+      elder_scrolls_online: {
+        id: "elder_scrolls_online", name: "Elder Scrolls Online", icon: "📜", color: "#8B4513",
+        resolution: "480x270", action_space: "combat", architecture: "efficientnet_lstm",
+        description: "Action combat with minimal UI design.",
+        notes: "Minimal UI design. 480p works well for action combat."
+      },
+      black_desert_online: {
+        id: "black_desert_online", name: "Black Desert Online", icon: "🌙", color: "#191970",
+        resolution: "640x360", action_space: "combat", architecture: "game_attention",
+        description: "Fast action combat with detailed skill effects.",
+        notes: "Action combat with many effects. 640p for skill visibility."
+      },
+      new_world: {
+        id: "new_world", name: "New World", icon: "🏝️", color: "#228B22",
+        resolution: "480x270", action_space: "combat", architecture: "efficientnet_lstm",
+        description: "Survival MMORPG with clean modern UI.",
+        notes: "Clean modern UI. 480p captures gameplay well."
+      },
+      path_of_exile: {
+        id: "path_of_exile", name: "Path of Exile", icon: "💀", color: "#8B0000",
+        resolution: "640x360", action_space: "combat", architecture: "game_attention",
+        description: "Complex ARPG with detailed loot and skills.",
+        notes: "Complex UI with many indicators. 640p for item/skill visibility."
+      },
+      runescape: {
+        id: "runescape", name: "RuneScape / OSRS", icon: "🗡️", color: "#D4AF37",
+        resolution: "480x270", action_space: "standard", architecture: "mobilenetv3",
+        description: "Classic MMO with low-res friendly design.",
+        notes: "Low-res friendly. 480p is ideal for classic gameplay."
+      },
+      albion_online: {
+        id: "albion_online", name: "Albion Online", icon: "🏰", color: "#4682B4",
+        resolution: "480x270", action_space: "combat", architecture: "efficientnet_simple",
+        description: "Sandbox MMO with isometric view.",
+        notes: "Isometric view scales well. 480p recommended."
+      },
+      custom: {
+        id: "custom", name: "Custom Game", icon: "🎮", color: "#9932CC",
+        resolution: "480x270", action_space: "standard", architecture: "efficientnet_lstm",
+        description: "Configure your own game settings.",
+        notes: "Default configuration. Adjust settings as needed."
+      }
+    };
+
+    const ACTION_SPACES = {
+      basic: { name: "Basic (9 actions)", actions: 9 },
+      standard: { name: "Standard (29 actions)", actions: 29 },
+      combat: { name: "Combat (48 actions)", actions: 48 },
+      extended: { name: "Extended (73 actions)", actions: 73 }
+    };
+
+    // Apply game preset settings
+    function applyGamePreset(gameId) {
+      const preset = GAME_PRESETS[gameId] || GAME_PRESETS.custom;
+      activeGameId = gameId;
+
+      // Update resolution selects
+      const teachRes = document.getElementById("teach-capture-resolution");
+      const runRes = document.getElementById("run-capture-resolution");
+      const trainRes = document.getElementById("train-resolution");
+      if (teachRes) teachRes.value = preset.resolution;
+      if (runRes) runRes.value = preset.resolution;
+      if (trainRes) trainRes.value = preset.resolution;
+
+      // Update resolution hints
+      const teachHint = document.getElementById("teach-resolution-hint");
+      const runHint = document.getElementById("run-resolution-hint");
+      const hintText = `Optimized for ${preset.name}`;
+      if (teachHint) teachHint.textContent = hintText;
+      if (runHint) runHint.textContent = hintText;
+
+      // Update architecture select
+      const archSelect = document.getElementById("train-arch");
+      if (archSelect) archSelect.value = preset.architecture;
+
+      // Update action space select
+      const actionSelect = document.getElementById("train-action-space");
+      if (actionSelect) actionSelect.value = preset.action_space;
+
+      // Update game ID inputs
+      const trainGameId = document.getElementById("train-game-id");
+      const teachGame = document.getElementById("teach-game");
+      if (trainGameId) trainGameId.value = gameId;
+      if (teachGame) teachGame.textContent = gameId;
+
+      // Update active game pill
+      const activeGamePill = document.getElementById("active-game-pill");
+      if (activeGamePill) {
+        activeGamePill.innerHTML = `${preset.icon} ${preset.name}`;
+        activeGamePill.style.color = preset.color;
+      }
+
+      // Update game info display
+      const gameInfo = document.getElementById("game-preset-info");
+      if (gameInfo) {
+        const actionCount = ACTION_SPACES[preset.action_space]?.actions || 29;
+        gameInfo.innerHTML = `
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <span style="font-size:32px;">${preset.icon}</span>
+            <div>
+              <strong style="color:${preset.color};">${preset.name}</strong>
+              <p style="font-size:12px; color:var(--text-dim); margin:4px 0 0;">${preset.description}</p>
+              <p style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+                <strong>Resolution:</strong> ${preset.resolution} |
+                <strong>Actions:</strong> ${actionCount} |
+                <strong>Model:</strong> ${preset.architecture}
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
+      // Store selection
+      localStorage.setItem('selected_game_preset', gameId);
+      logSystem(`Applied preset for ${preset.name}: ${preset.resolution}, ${preset.action_space}, ${preset.architecture}`);
+      return preset;
+    }
+
+    // Populate game preset grid
+    function populateGamePresetGrid() {
+      const grid = document.getElementById("game-preset-grid");
+      if (!grid) return;
+
+      grid.innerHTML = "";
+      const savedGame = localStorage.getItem('selected_game_preset') || 'genshin_impact';
+
+      Object.values(GAME_PRESETS).forEach(preset => {
+        const card = document.createElement("div");
+        const isSelected = preset.id === savedGame;
+
+        card.className = "game-preset-card";
+        card.dataset.gameId = preset.id;
+        card.style.cssText = `
+          padding: 10px 8px;
+          border-radius: 10px;
+          border: 2px solid ${isSelected ? preset.color : 'var(--border)'};
+          background: ${isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.2)'};
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+          ${isSelected ? `box-shadow: 0 0 12px ${preset.color}40;` : ''}
+        `;
+
+        card.innerHTML = `
+          <div style="font-size: 24px; margin-bottom: 4px;">${preset.icon}</div>
+          <div style="font-size: 11px; font-weight: 600; color: ${isSelected ? preset.color : 'var(--text-main)'}; line-height: 1.2;">
+            ${preset.name.split(' ').slice(0, 2).join(' ')}
+          </div>
+          <div style="font-size: 9px; color: var(--text-dim); margin-top: 2px;">${preset.resolution}</div>
+        `;
+
+        // Hover effects
+        card.addEventListener("mouseenter", () => {
+          if (card.dataset.gameId !== activeGameId) {
+            card.style.borderColor = preset.color;
+            card.style.background = "rgba(255,255,255,0.05)";
+          }
+        });
+        card.addEventListener("mouseleave", () => {
+          if (card.dataset.gameId !== activeGameId) {
+            card.style.borderColor = "var(--border)";
+            card.style.background = "rgba(0,0,0,0.2)";
+          }
+        });
+
+        // Click handler
+        card.addEventListener("click", () => {
+          // Remove selection from all cards
+          grid.querySelectorAll(".game-preset-card").forEach(c => {
+            c.style.borderColor = "var(--border)";
+            c.style.background = "rgba(0,0,0,0.2)";
+            c.style.boxShadow = "none";
+            const nameEl = c.querySelector("div:nth-child(2)");
+            if (nameEl) nameEl.style.color = "var(--text-main)";
+          });
+
+          // Select this card
+          card.style.borderColor = preset.color;
+          card.style.background = "rgba(255,255,255,0.08)";
+          card.style.boxShadow = `0 0 12px ${preset.color}40`;
+          const nameEl = card.querySelector("div:nth-child(2)");
+          if (nameEl) nameEl.style.color = preset.color;
+
+          // Apply preset
+          applyGamePreset(preset.id);
+          refreshCatalog();
+        });
+
+        grid.appendChild(card);
+      });
+
+      // Apply saved preset on load
+      if (savedGame) {
+        applyGamePreset(savedGame);
+      }
+    }
+
+    // -------------------------
     // Toast helpers
     // -------------------------
     function toast(title, msg, kind="ok"){
@@ -1087,23 +1611,36 @@
     // Expose python -> UI terminal output
     eel.expose(update_terminal);
     function update_terminal(line) {
-      logSystem(line);
+  logSystem(line);
 
-      // simple progress parsing (if your logs include "Epoch X/Y")
-      if (line.includes('Epoch')) {
-        const match = line.match(/Epoch\s+(\d+)\s*\/\s*(\d+)/i);
-        if (match) {
-          const percent = (parseInt(match[1]) / parseInt(match[2])) * 100;
-          document.getElementById('progress-bar').style.width = percent + '%';
-          document.getElementById('train-pct').innerText = Math.round(percent) + '%';
-        }
-      }
-
-      // When training ends, refresh catalog automatically (best-effort)
-      if (line.toLowerCase().includes("saving model") || line.toLowerCase().includes("archived model")) {
-        // do nothing special, just a hint
-      }
+  // progress parsing (if your logs include "Epoch X/Y")
+  if (line.includes('Epoch')) {
+    const match = line.match(/Epoch\s+(\d+)\s*\/\s*(\d+)/i);
+    if (match) {
+      const percent = (parseInt(match[1]) / parseInt(match[2])) * 100;
+      const bar = document.getElementById('progress-bar');
+      const pct = document.getElementById('train-pct');
+      if (bar) bar.style.width = percent + '%';
+      if (pct) pct.innerText = Math.round(percent) + '%';
     }
+  }
+
+  // training completion heuristics
+  const done =
+    line.includes("Training Complete") ||
+    line.includes("Training Complete!") ||
+    line.includes("Final model saved") ||
+    line.toLowerCase().includes("final model saved");
+
+  if (done) {
+    const stopBtn = document.getElementById("btn-stop-training");
+    const startBtn = document.getElementById("btn-start-training");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+    refreshCatalog();
+    refreshTrainDatasets(true);
+  }
+}
 
     // -------------------------
     // AI Calls (unchanged)
@@ -1183,7 +1720,7 @@
     // -------------------------
     function showTab(tabId) {
       const titles = {
-        'dashboard': 'Dashboard', 'teach': 'Teach Mode', 'train': 'Neural Training',
+        'dashboard': 'Dashboard', 'wizard': 'Quick Start', 'teach': 'Teach Mode', 'train': 'Neural Training',
         'run': 'Run Bot', 'models': 'Model Catalog', 'strategist': 'AI Strategist'
       };
       document.getElementById('page-title').innerText = titles[tabId];
@@ -1204,21 +1741,239 @@
     }
 
     // -------------------------
+    // Screen Preview & Monitors
+    // -------------------------
+    let previewInterval = null;
+    let selectedMonitorTeach = 1;
+    let selectedMonitorRun = 1;
+    let livePreviewEnabledTeach = false;
+    let livePreviewEnabledRun = false;
+
+    async function loadMonitors() {
+      if (typeof eel === 'undefined') return;
+      try {
+        const monitors = await eel.list_monitors()();
+        const teachSelect = document.getElementById('teach-monitor-select');
+        const runSelect = document.getElementById('run-monitor-select');
+
+        if (monitors && monitors.length > 0) {
+          teachSelect.innerHTML = '';
+          runSelect.innerHTML = '';
+          monitors.forEach(m => {
+            const opt1 = document.createElement('option');
+            opt1.value = m.id;
+            opt1.textContent = m.name;
+            teachSelect.appendChild(opt1);
+
+            const opt2 = document.createElement('option');
+            opt2.value = m.id;
+            opt2.textContent = m.name;
+            runSelect.appendChild(opt2);
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load monitors:', e);
+      }
+    }
+
+    async function refreshTeachPreview() {
+      const monitorId = parseInt(document.getElementById('teach-monitor-select').value) || 1;
+      selectedMonitorTeach = monitorId;
+      await updatePreviewImage('teach', monitorId);
+    }
+
+    async function refreshRunPreview() {
+      const monitorId = parseInt(document.getElementById('run-monitor-select').value) || 1;
+      selectedMonitorRun = monitorId;
+      await updatePreviewImage('run', monitorId);
+    }
+
+    function updateTeachPreview() {
+      selectedMonitorTeach = parseInt(document.getElementById('teach-monitor-select').value) || 1;
+    }
+
+    function updateRunPreview() {
+      selectedMonitorRun = parseInt(document.getElementById('run-monitor-select').value) || 1;
+    }
+
+    // Toggle functions for live preview checkboxes
+    function toggleTeachLivePreview(enabled) {
+      livePreviewEnabledTeach = enabled;
+      if (enabled) {
+        startLivePreview('teach');
+      } else {
+        stopLivePreview();
+      }
+    }
+
+    function toggleRunLivePreview(enabled) {
+      livePreviewEnabledRun = enabled;
+      if (enabled) {
+        startLivePreview('run');
+      } else {
+        stopLivePreview();
+      }
+    }
+
+    async function updatePreviewImage(tab, monitorId) {
+      if (typeof eel === 'undefined') return;
+
+      const imgEl = document.getElementById(tab + '-preview-img');
+      const placeholder = document.getElementById(tab + '-preview-placeholder');
+
+      try {
+        const result = await eel.get_screen_preview(monitorId)();
+        if (result && result.ok && result.image) {
+          imgEl.src = 'data:image/jpeg;base64,' + result.image;
+          imgEl.style.display = 'block';
+          placeholder.style.display = 'none';
+        }
+      } catch (e) {
+        console.warn('Preview error:', e);
+      }
+    }
+
+    function startLivePreview(tab) {
+      stopLivePreview();
+      previewInterval = setInterval(async () => {
+        const monitorId = tab === 'teach' ? selectedMonitorTeach : selectedMonitorRun;
+        await updatePreviewImage(tab, monitorId);
+      }, 500); // 2 FPS
+    }
+
+    function stopLivePreview() {
+      if (previewInterval) {
+        clearInterval(previewInterval);
+        previewInterval = null;
+      }
+    }
+
+    // Start live preview only if toggle is enabled
+    function maybeStartLivePreview(tab) {
+      const enabled = tab === 'teach' ? livePreviewEnabledTeach : livePreviewEnabledRun;
+      if (enabled) {
+        startLivePreview(tab);
+      }
+    }
+
+    // -------------------------
+    // Auto-generate Dataset Name
+    // -------------------------
+    async function autoGenerateDatasetName() {
+      if (typeof eel === 'undefined') return;
+      try {
+        const gameId = activeGameId || DEFAULT_GAME;
+        const task = "general"; // Could be enhanced with Quick Start config
+        const name = await eel.generate_dataset_name(gameId, task)();
+        document.getElementById('dataset-name').value = name;
+        toast("Dataset Name", `Generated: ${name}`, "ok");
+      } catch (e) {
+        console.warn('Auto-generate failed:', e);
+        // Fallback: client-side generation
+        const ts = new Date().toISOString().slice(0,16).replace(/[-:T]/g, '').slice(0,12);
+        document.getElementById('dataset-name').value = `${activeGameId}_general_${ts}`;
+      }
+    }
+
+    // -------------------------
+    // Dataset List Management
+    // -------------------------
+    async function refreshDatasetList() {
+      const listEl = document.getElementById('teach-dataset-list');
+      if (!listEl) return;
+
+      listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">Loading...</div>';
+
+      if (typeof eel === 'undefined') {
+        listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">Backend not available</div>';
+        return;
+      }
+
+      try {
+        const datasets = await eel.list_datasets(activeGameId)();
+
+        if (!datasets || datasets.length === 0) {
+          listEl.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">No datasets found. Start recording!</div>';
+          return;
+        }
+
+        listEl.innerHTML = '';
+        datasets.forEach(ds => {
+          const item = document.createElement('div');
+          item.className = 'm-item';
+          item.style.marginBottom = '8px';
+          item.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div class="m-name">${escapeHtml(ds.name || ds.id)}</div>
+                <div class="m-sub">${escapeHtml(ds.created_at || '')} • ${ds.sample_count || '?'} samples</div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-small btn-secondary" onclick="selectDatasetForTraining('${escapeHtmlAttr(ds.id)}')">Use</button>
+                <button class="btn btn-small btn-danger" onclick="deleteDataset('${escapeHtmlAttr(ds.id)}', '${escapeHtmlAttr(ds.path || '')}')">Del</button>
+              </div>
+            </div>
+          `;
+          listEl.appendChild(item);
+        });
+      } catch (e) {
+        console.warn('Failed to load datasets:', e);
+        listEl.innerHTML = '<div style="color:var(--accent); font-size:12px;">Failed to load datasets</div>';
+      }
+    }
+
+    function selectDatasetForTraining(datasetId) {
+  const sel = document.getElementById('train-dataset-select');
+  if (sel) sel.value = datasetId;
+
+  const twDataset = document.getElementById('tw-dataset');
+  if (twDataset) twDataset.value = datasetId;
+
+  toast("Dataset Selected", `Using: ${datasetId}`, "ok");
+  showTab('train');
+}
+
+    async function deleteDataset(datasetId, path) {
+      if (!confirm(`Delete dataset "${datasetId}"?\n\nThis cannot be undone.`)) return;
+
+      if (typeof eel === 'undefined') return;
+
+      try {
+        const result = await eel.delete_dataset(activeGameId, datasetId, path)();
+        if (result && result.ok) {
+          toast("Deleted", `Dataset ${datasetId} removed`, "ok");
+          await refreshDatasetList();
+          await refreshCatalog();
+        } else {
+          toast("Error", result?.message || "Failed to delete", "err");
+        }
+      } catch (e) {
+        console.warn('Delete failed:', e);
+        toast("Error", "Failed to delete dataset", "err");
+      }
+    }
+
+    // -------------------------
     // Recording
     // -------------------------
     async function toggleRecord(btn) {
       isRecording = !isRecording;
       const status = document.getElementById('record-status');
       const dsName = (document.getElementById('dataset-name').value || "").trim() || "Untitled";
+      const monitorId = selectedMonitorTeach;
+      const resolution = document.getElementById('teach-capture-resolution')?.value || '480x270';
 
       if (isRecording) {
-        if (typeof eel !== 'undefined') await eel.start_recording(activeGameId, dsName)();
+        if (typeof eel !== 'undefined') await eel.start_recording(activeGameId, dsName, monitorId, resolution)();
         btn.innerHTML = "<span>■</span> Stop";
         btn.classList.remove("btn-danger"); btn.classList.add("btn-secondary");
         status.innerText = "🔴 Recording... Stop to archive dataset into catalog.";
         status.style.color = "#FF5252";
         toast("Recording", `Dataset: ${dsName}`, "warn");
+        // Only start live preview if user has it enabled (default: disabled)
+        maybeStartLivePreview('teach');
       } else {
+        stopLivePreview();
         if (typeof eel !== 'undefined') await eel.stop_process()();
         btn.innerHTML = "<span>●</span> Start Recording";
         btn.classList.remove("btn-secondary"); btn.classList.add("btn-danger");
@@ -1226,6 +1981,7 @@
         status.style.color = "var(--success)";
         toast("Saved", "Recording session finalized.", "ok");
         await refreshCatalog();
+        await refreshDatasetList();
       }
     }
 
@@ -1235,15 +1991,19 @@
     async function toggleBot(btn) {
       isBotRunning = !isBotRunning;
       const stateEl = document.getElementById("bot-state");
+      const resolution = document.getElementById('run-capture-resolution')?.value || '480x270';
 
       if(isBotRunning) {
-        if (typeof eel !== 'undefined') await eel.start_bot()();
+        if (typeof eel !== 'undefined') await eel.start_bot(selectedMonitorRun, resolution)();
         btn.innerText = "■ STOP BOT";
         btn.style.background = "var(--accent)";
         btn.style.color = "white";
         stateEl.innerText = "RUNNING";
         toast("Bot", "Bot started.", "ok");
+        // Only start live preview if user has it enabled (default: disabled)
+        maybeStartLivePreview('run');
       } else {
+        stopLivePreview();
         if (typeof eel !== 'undefined') await eel.stop_process()();
         btn.innerText = "▶ START BOT";
         btn.style.background = "var(--success)";
@@ -1489,7 +2249,7 @@
 
       const ok = await eel.mh_set_active(gameId, modelId, modelPath)();
       if (ok) {
-        toast("Active Model", `Set active: ${modelId}`, "ok");
+        toast("Equipped", `Equipped: ${modelId}`, "ok");
         await refreshCatalog();
         document.getElementById("run-active-model").innerText = modelId;
         showTab("run");
@@ -1628,6 +2388,38 @@
       }
     }
 
+    // Start training from main Train tab form
+    async function startTraining() {
+  const gameId = (document.getElementById("train-game-id")?.value || "").trim() || DEFAULT_GAME;
+  const modelName = (document.getElementById("train-model-name")?.value || "").trim() || `${gameId}_model_${Date.now()}`;
+  const arch = document.getElementById("train-arch")?.value || "efficientnet_lstm";
+
+  const dsSel = document.getElementById("train-dataset-select");
+  const datasetId = (dsSel?.value || "").trim();
+
+  if (!datasetId) {
+    toast("Training", "Pick a dataset from the dropdown (or record one in Teach tab).", "warn");
+    return;
+  }
+
+  logSystem(`🧠 Training requested: name="${modelName}", game="${gameId}", dataset="${datasetId}", arch="${arch}"`);
+  toast("Training", `Started: ${modelName}`, "ok");
+
+  const startBtn = document.getElementById("btn-start-training");
+  const stopBtn = document.getElementById("btn-stop-training");
+  if (startBtn) startBtn.disabled = true;
+  if (stopBtn) stopBtn.disabled = false;
+
+  try {
+    await eel.start_training(gameId, modelName, datasetId, arch)();
+  } catch(e) {
+    console.error(e);
+    toast("Training", "Failed to start training.", "err");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+  }
+}
+
     async function twRefreshDatasets(silent=false){
       const gameId = document.getElementById("tw-game")?.value || activeGameId || DEFAULT_GAME;
       const dsSel = document.getElementById("tw-dataset");
@@ -1655,6 +2447,63 @@
         if (!silent) toast("Datasets", "Failed to load datasets.", "err");
       }
     }
+
+
+// -------------------------
+// Train tab: Dataset dropdown (auto-detected)
+// -------------------------
+async function refreshTrainDatasets(silent=false){
+  const gid = (document.getElementById("train-game-id")?.value || activeGameId || DEFAULT_GAME).trim() || DEFAULT_GAME;
+  const sel = document.getElementById("train-dataset-select");
+  if (!sel || typeof eel === "undefined") return;
+
+  try {
+    const payload = await eel.mh_get_catalog_data(gid)();
+    const ds = payload?.datasets || [];
+
+    sel.innerHTML = "";
+    if (ds.length === 0) {
+      sel.innerHTML = `<option value="">(No datasets found — record in Teach tab)</option>`;
+      if (!silent) toast("Datasets", "No datasets found. Record in Teach tab first.", "warn");
+      return;
+    }
+
+    sel.innerHTML = `<option value="">Select dataset…</option>`;
+    for (const d of ds) {
+      const label = `${d.name || d.id} ${d.created_at ? "— " + d.created_at : ""}`;
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.dataset.path = d.path || "";
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    console.error(e);
+    sel.innerHTML = `<option value="">(Failed to load datasets)</option>`;
+    if (!silent) toast("Datasets", "Failed to load datasets.", "err");
+  }
+}
+
+// -------------------------
+// Train tab: Stop Training
+// -------------------------
+async function stopTraining(){
+  if (typeof eel === "undefined") return;
+
+  try {
+    await eel.stop_process()(); // stops current process (training/recording/bot)
+    toast("Stopped", "Training process stopped.", "warn");
+    const stopBtn = document.getElementById("btn-stop-training");
+    const startBtn = document.getElementById("btn-start-training");
+    if (stopBtn) stopBtn.disabled = true;
+    if (startBtn) startBtn.disabled = false;
+    await refreshCatalog();
+    await refreshTrainDatasets(true);
+  } catch (e) {
+    console.error(e);
+    toast("Error", "Failed to stop training.", "err");
+  }
+}
 
     // -------------------------
     // Training button in Train tab (kept for fallback)
@@ -1708,6 +2557,9 @@
     // INIT
     // -------------------------
     window.addEventListener('DOMContentLoaded', async () => {
+      // Initialize game preset grid first
+      populateGamePresetGrid();
+
       if (typeof eel !== 'undefined') {
         // Load saved config on startup
         const savedConfig = await eel.get_ai_config()();
@@ -1718,10 +2570,278 @@
           updateModalInput();
         }
         await mhInit();
+        await loadMonitors();
+        await refreshDatasetList();
       } else {
         toast("Eel", "Backend not detected.", "err");
       }
+
+      // Load saved Quick Start config
+      try {
+        const savedQsConfig = localStorage.getItem('quickstart_config');
+        if (savedQsConfig) {
+          const config = JSON.parse(savedQsConfig);
+          console.log('Loading saved Quick Start config:', config);
+          // Update active game - prefer preset system
+          if (config.game_id && GAME_PRESETS[config.game_id]) {
+            applyGamePreset(config.game_id);
+            populateGamePresetGrid();
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load saved Quick Start config:', e);
+      }
     });
   </script>
+
+  <!-- Quick Start Setup Wizard -->
+  <script src="./js/wizard.js"></script>
+  <script>
+    // Initialize Quick Start wizard
+    document.addEventListener('DOMContentLoaded', () => {
+      const startBtn = document.getElementById('btn-start-wizard');
+      const backBtn = document.getElementById('btn-wizard-back');
+      const nextBtn = document.getElementById('btn-wizard-next');
+
+      let wizard = null;
+
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          wizard = new SetupWizard();
+          wizard.onComplete = (config) => {
+            console.log('Wizard completed:', config);
+            // Update active game
+            if (config.game_id) {
+              activeGameId = config.game_id;
+              document.getElementById("active-game-pill").innerText = config.game_name || config.game_id;
+              document.getElementById("teach-game").innerText = config.game_id;
+              // Also update train wizard game selector if present
+              const twGame = document.getElementById("tw-game");
+              if (twGame) twGame.value = config.game_id;
+              const mhGame = document.getElementById("mh-game");
+              if (mhGame) mhGame.value = config.game_id;
+            }
+          };
+          await wizard.start();
+          backBtn.disabled = true;
+        });
+      }
+
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          if (wizard) {
+            wizard.back();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', async () => {
+          if (wizard) {
+            await wizard.next();
+            backBtn.disabled = wizard.currentStep === 0;
+          }
+        });
+      }
+    });
+  
+    // ----------------------------------------------------
+    // PATCHED CATALOG UI (Loadout + Inspector)
+    // - Removes dataset-folder/validator cognitive load
+    // - Renames "Set Active" -> "Equip"
+    // - Renames "Run" -> "Launch/Deploy"
+    // ----------------------------------------------------
+
+    // override: refreshCatalog()
+    async function refreshCatalog() {
+      const gid = document.getElementById('mh-game')?.value || activeGameId || DEFAULT_GAME;
+      activeGameId = gid;
+
+      // keep other tabs in sync
+      const pill = document.getElementById("active-game-pill");
+      if (pill) pill.innerText = activeGameId;
+      const teachGame = document.getElementById("teach-game");
+      if (teachGame) teachGame.innerText = activeGameId;
+
+      // clear selection
+      mhSelected = null;
+      const empty = document.getElementById('inspector-empty');
+      const insp = document.getElementById('inspector-content');
+      if (empty) empty.style.display = 'flex';
+      if (insp) insp.style.display = 'none';
+
+      const list = document.getElementById('mh-models-list');
+      if (list) list.innerHTML = `<div style="color:var(--text-dim); padding:20px;">Loading inventory...</div>`;
+
+      try {
+        const payload = await eel.mh_get_catalog_data(gid)();
+        mhCache = payload;
+
+        // Update stats bar (dashboard + run + active pill)
+        if (typeof _setStatsFromCatalog === "function") _setStatsFromCatalog(payload);
+
+        const active = payload?.active || null;
+        const activeId = active?.model_id || null;
+        const builtins = payload?.builtin_models || [];
+        const managed = payload?.models || [];
+
+        const allModels = [
+          ...builtins.map(m => ({...m, kind: 'builtin'})),
+          ...managed.map(m => ({...m, kind: 'managed'})),
+        ];
+
+        if (!list) return;
+        list.innerHTML = "";
+
+        if (allModels.length === 0) {
+          list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:var(--text-dim); padding:40px;">No models found.<br>Train a new brain to get started.</div>`;
+          return;
+        }
+
+        for (const m of allModels) {
+          const id = m.id || m.model_id || m.name || "unknown";
+          const isEquipped = (activeId && id === activeId);
+          const el = renderBrainCard(gid, m, m.kind, isEquipped);
+          list.appendChild(el);
+        }
+
+        // keep train wizard dataset list updated
+        if (typeof twRefreshDatasets === "function") await twRefreshDatasets(true);
+
+      } catch (e) {
+        console.error(e);
+        if (list) list.innerHTML = `<div style="color:var(--accent); padding:20px;">Failed to load inventory.</div>`;
+      }
+    }
+
+    function renderBrainCard(gameId, model, kind, isEquipped) {
+      const el = document.createElement("div");
+      const name = model.name || model.profile_name || model.id || "Unnamed";
+      const arch = model.architecture || model.profile?.architecture || "Custom";
+      const created = model.created_at || model.profile?.created_at || (kind === "builtin" ? "Built-in" : "—");
+
+      el.className = `brain-card ${isEquipped ? 'equipped' : ''}`;
+
+      let statusHtml = "";
+      if (isEquipped) statusHtml = `<div class="card-status">EQUIPPED</div>`;
+      else if (kind === 'builtin') statusHtml = `<div class="card-status" style="background:rgba(255,215,0,0.2); color:#FFD700;">BUILT-IN</div>`;
+
+      const createdShort = (typeof created === "string" && created.length >= 10) ? created.substring(0, 10) : created;
+
+      el.innerHTML = `
+        ${statusHtml}
+        <div class="brain-name">${escapeHtml(name)}</div>
+        <div class="brain-meta">
+           <span class="tag">🧬 ${escapeHtml(arch)}</span>
+           <span class="tag">📅 ${escapeHtml(String(createdShort))}</span>
+        </div>
+      `;
+
+      el.onclick = () => mhSelectCard(gameId, model, kind, isEquipped, el);
+      return el;
+    }
+
+    function mhSelectCard(gameId, model, kind, isEquipped, el) {
+      document.querySelectorAll('.brain-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+
+      mhSelected = { gameId, model, kind, isEquipped };
+
+      // Update Inspector
+      document.getElementById('inspector-empty').style.display = 'none';
+      document.getElementById('inspector-content').style.display = 'flex';
+
+      const name = model.name || model.profile_name || model.id || "Unnamed";
+      const path = model.path || model.paths?.dir || model.dir || "Internal";
+      const arch = model.architecture || model.profile?.architecture || "Custom";
+      const created = model.created_at || model.profile?.created_at || (kind === "builtin" ? "Built-in" : "—");
+
+      document.getElementById('insp-title').innerText = name;
+      document.getElementById('insp-path').innerText = path;
+      document.getElementById('insp-arch').innerText = arch;
+      document.getElementById('insp-date').innerText = created;
+
+      const statusEl = document.getElementById('insp-status');
+      statusEl.innerText = isEquipped ? "Equipped on Bot" : "In Storage";
+      statusEl.style.color = isEquipped ? "var(--secondary)" : "var(--text-dim)";
+
+      // badges
+      const badges = document.getElementById('insp-badges');
+      badges.innerHTML = "";
+      badges.innerHTML += `<span class="insp-badge">${isEquipped ? "ACTIVE" : "INVENTORY"}</span>`;
+      badges.innerHTML += `<span class="insp-badge">${kind === "builtin" ? "BUILT-IN" : "TRAINED"}</span>`;
+
+      // Main button
+      const btn = document.getElementById('btn-main-action');
+      if (isEquipped) {
+         btn.innerText = "LAUNCH / DEPLOY";
+         btn.className = "big-btn btn-deploy";
+      } else {
+         btn.innerText = "EQUIP MODEL";
+         btn.className = "big-btn btn-equip";
+      }
+    }
+
+    async function mhHandleMainAction() {
+      if (!mhSelected) return;
+      const { gameId, model, kind, isEquipped } = mhSelected;
+
+      if (isEquipped) {
+        // Launch
+        showTab('run');
+        if (!isBotRunning) {
+          const btn = document.getElementById('btn-bot');
+          await toggleBot(btn);
+        }
+        return;
+      }
+
+      // Equip
+      const modelId = model.id || model.model_id || model.name || "unknown";
+      const modelPath = (kind === "builtin")
+        ? (model.paths?.dir || model.dir || model.path || "")
+        : (model.path || model.paths?.dir || model.dir || "");
+
+      if (!modelPath) { toast("Equip", "Missing model path.", "err"); return; }
+
+      const ok = await eel.mh_set_active(gameId, modelId, modelPath)();
+      if (ok) {
+        toast("Equipped", `${modelId} is now active.`, "ok");
+        await refreshCatalog();
+      } else {
+        toast("Equip", "Failed to equip model.", "err");
+      }
+    }
+
+    async function mhDeleteSelected() {
+      if (!mhSelected) return;
+      const { gameId, model, kind } = mhSelected;
+
+      if (kind === 'builtin') {
+        alert("Cannot delete built-in models.");
+        return;
+      }
+
+      const modelId = model.id || model.name || "unknown";
+      const path = model.path || model.paths?.dir || model.dir || "";
+
+      if (!confirm(`Delete '${modelId}'?\n\nThis cannot be undone.`)) return;
+
+      try {
+        const res = await eel.delete_model(gameId, modelId, path)();
+        if (res && res.ok) {
+          toast("Deleted", "Model removed.", "ok");
+          await refreshCatalog();
+        } else {
+          toast("Error", (res && (res.error || res.message)) || "Delete failed", "err");
+        }
+      } catch (e) {
+        console.warn('Delete failed:', e);
+        toast("Error", "Delete failed", "err");
+      }
+    }
+
+</script>
 </body>
 </html>

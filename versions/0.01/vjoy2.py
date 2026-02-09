@@ -1,16 +1,62 @@
 import ctypes
-import struct, time
+import struct
+import time
+import os
+import sys
 import numpy as np
 
+# --- VJOY PATH FINDER (Production Ready) ---
+def get_vjoy_path():
+    """
+    Robustly finds the vJoyInterface.dll path.
+    Checks system environment variables for Program Files (x64/x86) first,
+    then falls back to local directories.
+    """
+    # Get system Program Files paths safely (handles different drives/languages)
+    pf_x64 = os.environ.get("ProgramFiles", r"C:\Program Files")
+    pf_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
 
-#Vjoy adapted to MMORPG-AI
+    search_paths = [
+        # 1. Standard 64-bit Install
+        os.path.join(pf_x64, "vJoy", "x64", "vJoyInterface.dll"),
+        
+        # 2. Standard 32-bit Install
+        os.path.join(pf_x86, "vJoy", "x86", "vJoyInterface.dll"),
+        
+        # 3. Local Repo Fallback (vjoy-gamepad folder)
+        os.path.join(os.path.dirname(__file__), "vjoy-gamepad", "vJoyInterface.dll"),
+        
+        # 4. Immediate Folder Fallback
+        os.path.join(os.path.dirname(__file__), "vJoyInterface.dll")
+    ]
 
-CONST_DLL_VJOY = "vJoyInterface.dll"
+    for path in search_paths:
+        if os.path.exists(path):
+            return path
+
+    # Return default if not found (let system PATH handle it)
+    return "vJoyInterface.dll"
+
+# Initialize DLL path
+CONST_DLL_VJOY = get_vjoy_path()
+# -------------------------------------------
+
 
 class vJoy(object):
     def __init__(self, reference = 1):
         self.handle = None
-        self.dll = ctypes.CDLL( CONST_DLL_VJOY )
+        try:
+            self.dll = ctypes.CDLL( CONST_DLL_VJOY )
+        except OSError:
+            print("===============================================================")
+            print("CRITICAL ERROR: vJoy Driver NOT FOUND")
+            print("===============================================================")
+            print(f"Target DLL: vJoyInterface.dll")
+            print(f"Checked paths in: {os.environ.get('ProgramFiles')}\\vJoy\\")
+            print("Solution: Run 'make download-drivers' or install vJoy manually.")
+            print("===============================================================")
+            sys.exit(1)
+            
         self.reference = reference
         self.acquired = False
         
@@ -39,7 +85,7 @@ class vJoy(object):
         wSlider = 0, wDial = 0, wWheel = 0,
         # ???         ???        ???
         wAxisVX = 0, wAxisVY = 0, wAxisVZ = 0,
-        # ???         ???                ???                   
+        # ???         ???                ???                  
         wAxisVBRX = 0, wAxisVBRY = 0, wAxisVBRZ = 0,
         # 1 = a
         # 2 = b  3 = a+b ??
@@ -481,7 +527,3 @@ def button_ABXY():
 if __name__ == '__main__':
 
     ultimate_release()
-
-    
-        
-        

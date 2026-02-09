@@ -44,17 +44,13 @@
       ],
       "resources": [
         "resources/**",
-        "drivers/**",
-        "../versions/**",
-        "../pyproject.toml"
-   
-
-
+        "drivers/**"
       ],
       "windows": {
         "nsis": {
           "installMode": "perMachine",
-          "license": "./license.txt"
+          "license": "./license.txt",
+          "template": "../installer/nsis_template.nsi"
         }
       }
     },

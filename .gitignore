@@ -194,3 +194,14 @@ src-tauri/resources/sidecar/main-backend/main-backend.exe
 /src-tauri/resources/python
 /third_party/python
 /third_party/wheelhouse
+/src-tauri/resources/wheelhouse
+/src-tauri/resources
+
+# User session data
+settings/session/
+modelhub_registry.json
+active_model.json
+active_model.json
+trained_models/genshin_impact/genshin_impact_combat_v1/profile.json
+*.json
+*.json

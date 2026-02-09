@@ -1,1 +1,57 @@
-﻿{}
+{
+  "genshin_impact": {
+    "models": [
+      {
+        "id": "genshin_impact_combat_v1",
+        "name": "genshin_impact_combat_v1",
+        "path": "trained_models\\genshin_impact\\genshin_impact_combat_v1",
+        "created_at": "2026-01-27T19:30:35"
+      }
+    ],
+    "datasets": [
+      {
+        "id": "20260127_192915_untitled",
+        "name": "Untitled",
+        "path": "datasets\\genshin_impact\\20260127_192915_untitled",
+        "file_count": 1,
+        "created_at": "2026-01-27T19:29:15"
+      },
+      {
+        "id": "20260127_190626_genshin_impact_general_20260127_1905",
+        "name": "genshin_impact_general_20260127_1905",
+        "path": "datasets\\genshin_impact\\20260127_190626_genshin_impact_general_20260127_1905",
+        "file_count": 1,
+        "created_at": "2026-01-27T19:06:26"
+      },
+      {
+        "id": "20260127_174222_genshin_impact_general_20260127_1741",
+        "name": "genshin_impact_general_20260127_1741",
+        "path": "datasets\\genshin_impact\\20260127_174222_genshin_impact_general_20260127_1741",
+        "file_count": 1,
+        "created_at": "2026-01-27T17:42:22"
+      },
+      {
+        "id": "20260127_172622_genshin_impact_general_20260127_1726",
+        "name": "genshin_impact_general_20260127_1726",
+        "path": "datasets\\genshin_impact\\20260127_172622_genshin_impact_general_20260127_1726",
+        "file_count": 1,
+        "created_at": "2026-01-27T17:26:22"
+      },
+      {
+        "id": "20260127_172020_genshin_impact_general_20260127_1719",
+        "name": "genshin_impact_general_20260127_1719",
+        "path": "datasets\\genshin_impact\\20260127_172020_genshin_impact_general_20260127_1719",
+        "file_count": 2,
+        "created_at": "2026-01-27T17:20:20"
+      },
+      {
+        "id": "20260127_171339_genshin_impact_general_20260127_1712",
+        "name": "genshin_impact_general_20260127_1712",
+        "path": "datasets\\genshin_impact\\20260127_171339_genshin_impact_general_20260127_1712",
+        "file_count": 2,
+        "created_at": "2026-01-27T17:13:40"
+      }
+    ],
+    "latest": "genshin_impact_combat_v1"
+  }
+}

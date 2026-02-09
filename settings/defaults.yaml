@@ -1,0 +1,154 @@
+# BOT-MMORPG-AI Default Settings
+# These are the base defaults - DO NOT EDIT
+# Override in user_preferences.yaml or session configs
+version: "1.0"
+
+# User experience level (affects UI complexity)
+user:
+  skill_level: "beginner"  # beginner | intermediate | advanced
+  show_advanced_options: false
+  show_tooltips: true
+  theme: "auto"  # auto | light | dark
+
+# Data collection defaults
+data_collection:
+  # Screen capture settings
+  capture:
+    fps: 30
+    resize_to: [224, 224]
+    format: "png"  # png | jpg
+    quality: 95  # for jpg
+
+  # Recording behavior
+  behavior:
+    auto_pause_on_menu: true
+    skip_loading_screens: true
+    minimum_action_interval_ms: 50
+    buffer_size: 1000
+
+  # Quality checks
+  quality:
+    blur_threshold: 100.0
+    min_brightness: 20
+    max_brightness: 240
+    detect_duplicates: true
+
+# Training defaults
+training:
+  # Model architecture
+  model:
+    architecture: "efficientnet_lstm"
+    pretrained: true
+    freeze_backbone_epochs: 10
+
+  # Input processing
+  input:
+    size: [224, 224]
+    normalize: "imagenet"  # imagenet | [0,1] | [-1,1]
+    temporal_frames: 4
+
+  # Training parameters
+  parameters:
+    batch_size: 16
+    epochs: 50
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    optimizer: "adamw"  # adam | adamw | sgd
+
+  # Learning rate schedule
+  scheduler:
+    type: "cosine"  # step | cosine | plateau
+    warmup_epochs: 5
+    min_lr: 0.00001
+
+  # Data handling
+  data:
+    validation_split: 0.2
+    shuffle: true
+    num_workers: 4
+    pin_memory: true
+
+  # Augmentation
+  augmentation:
+    enabled: true
+    horizontal_flip: false  # Usually bad for games
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.1
+    noise: 0.05
+
+  # Checkpointing
+  checkpoints:
+    save_best: true
+    save_interval: 5
+    keep_last_n: 3
+
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+
+  # Class balancing
+  class_balance:
+    enabled: true
+    method: "weighted_loss"  # weighted_loss | oversample | undersample
+
+# Inference defaults
+inference:
+  # Confidence and filtering
+  confidence:
+    threshold: 0.7
+    use_softmax_temperature: true
+    temperature: 1.0
+
+  # Action execution
+  execution:
+    cooldown_ms: 100
+    max_actions_per_second: 20
+    smooth_mouse: true
+
+  # Temporal processing
+  temporal:
+    buffer_size: 4
+    use_temporal_smoothing: true
+    smoothing_window: 3
+
+  # Safety features
+  safety:
+    enabled: true
+    emergency_stop_key: "F12"
+    max_continuous_actions: 100
+    idle_timeout_seconds: 300
+
+  # Performance
+  performance:
+    use_half_precision: false
+    batch_inference: false
+    target_fps: 30
+
+# Hardware detection thresholds
+hardware:
+  vram_thresholds:
+    low: 4096  # < 4GB = low tier
+    medium: 8192  # 4-8GB = medium tier
+    # > 8GB = high tier
+
+  ram_thresholds:
+    minimum: 8192  # 8GB minimum
+    recommended: 16384  # 16GB recommended
+
+# Paths (relative to project root)
+paths:
+  game_profiles: "game_profiles"
+  trained_models: "trained_models"
+  training_data: "training_data"
+  logs: "logs"
+  cache: ".cache"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  file_logging: true
+  console_colors: true
+  tensorboard: true
