@@ -7,8 +7,6 @@ Includes comprehensive error handling for production use.
 
 import argparse
 import logging
-import sys
-import os
 import time
 from pathlib import Path
 from typing import List, Optional, Tuple

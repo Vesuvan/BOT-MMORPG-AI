@@ -6,7 +6,7 @@ Uses Grad-CAM for CNN-based models.
 """
 
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import numpy as np
 from PIL import Image

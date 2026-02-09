@@ -5,14 +5,16 @@ import cv2
 import numpy as np
 import platform
 import base64
-from io import BytesIO
 
 # Platform detection for cross-platform support
 IS_WINDOWS = platform.system() == 'Windows'
 
 if IS_WINDOWS:
     try:
-        import win32gui, win32ui, win32con, win32api
+        import win32gui
+        import win32ui
+        import win32con
+        import win32api
         _WIN32_AVAILABLE = True
     except ImportError:
         _WIN32_AVAILABLE = False

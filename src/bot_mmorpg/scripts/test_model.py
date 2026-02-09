@@ -13,14 +13,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-import os
 import time
 import random
 import platform
 from pathlib import Path
 from collections import deque
 from statistics import mean
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import cv2
@@ -105,11 +104,11 @@ except ImportError:
 
 # Local imports - PyTorch models
 try:
-    from .models_pytorch import load_model, get_model_info, get_device
+    from .models_pytorch import load_model, get_device
     MODELS_AVAILABLE = True
 except ImportError:
     try:
-        from models_pytorch import load_model, get_model_info, get_device
+        from models_pytorch import load_model, get_device  # noqa: F401
         MODELS_AVAILABLE = True
     except ImportError:
         MODELS_AVAILABLE = False
@@ -118,7 +117,7 @@ except ImportError:
 IS_WINDOWS = platform.system() == 'Windows'
 if IS_WINDOWS:
     try:
-        import msvcrt
+        import msvcrt  # noqa: F401
         MSVCRT_AVAILABLE = True
     except ImportError:
         MSVCRT_AVAILABLE = False
@@ -320,7 +319,7 @@ class InferenceEngine:
         self.t_plus = None
 
         print(f"\n{'='*60}")
-        print(f"Inference Engine Initialized")
+        print("Inference Engine Initialized")
         print(f"{'='*60}")
         print(f"  Model: {self.model_path.name}")
         print(f"  Architecture: {self.metadata.get('model_name', 'Unknown')}")

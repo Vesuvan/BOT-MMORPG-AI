@@ -5,8 +5,6 @@ Tests the Setup Wizard controller that guides users through configuration.
 """
 
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 
 class TestWizardState:

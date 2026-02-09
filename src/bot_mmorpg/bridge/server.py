@@ -5,16 +5,14 @@ JSON-RPC server for Tauri-Python communication.
 High-performance async server optimized for real-time ML operations.
 """
 
-import asyncio
 import json
 import logging
 import signal
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
-from queue import Empty, Queue
-from typing import Any, Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 from .handlers import CommandHandler
 

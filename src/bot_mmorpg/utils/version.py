@@ -12,7 +12,7 @@ import re
 import threading
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 

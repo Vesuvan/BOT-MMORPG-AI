@@ -170,7 +170,6 @@ def setJoy(valueX, valueY, scale):
 def test():
     vj.open()
     print("vj opening", flush=True)
-    btn = 1
     time.sleep(2)
     print("sending axes", flush=True)
     for i in range(0, 1000, 1):
@@ -219,7 +218,6 @@ def test2():
 
     print("vj closing", flush=True)
 
-    reset = vj.generateJoystickPosition()
     setJoy(0, 0, scale)
     vj.close()
 

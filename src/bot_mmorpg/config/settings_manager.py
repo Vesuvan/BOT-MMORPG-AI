@@ -4,7 +4,6 @@ Settings Manager
 Handles configuration loading, merging, and persistence with proper precedence.
 """
 
-import os
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from .hardware_detector import HardwareDetector, HardwareTier
+from .hardware_detector import HardwareDetector
 from .profile_loader import GameProfile, GameProfileLoader
 
 

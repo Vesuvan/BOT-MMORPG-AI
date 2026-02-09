@@ -7,14 +7,11 @@ Handles all commands from Tauri frontend.
 import base64
 import io
 import logging
-import os
 import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-import numpy as np
 
 logger = logging.getLogger("bridge.handlers")
 
@@ -273,7 +270,7 @@ class CommandHandler:
     def _training_loop(self, data_path: str, config: Dict[str, Any]):
         """Background training loop with event emission."""
         try:
-            torch = _get_torch()
+            _get_torch()
             from bot_mmorpg.scripts.models_pytorch import create_model
             from bot_mmorpg.training import CurriculumConfig, CurriculumTrainer
 

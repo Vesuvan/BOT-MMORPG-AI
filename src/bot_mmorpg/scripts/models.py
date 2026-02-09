@@ -166,7 +166,7 @@ def otherception3(width, height, frame_count, lr, output=9, model_name = 'otherc
 
 
 
-def resnext(width, height, frame_count, lr, output=9, model_name = 'sentnet_color.model'):
+def resnext(width, height, frame_count, lr, output=9, n=3, model_name = 'sentnet_color.model'):
     net = input_data(shape=[None, width, height, 3], name='input')
     net = tflearn.conv_2d(net, 16, 3, regularizer='L2', weight_decay=0.0001)
     net = tflearn.layers.conv.resnext_block(net, n, 16, 32)
