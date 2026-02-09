@@ -1415,7 +1415,7 @@ if __name__ == "__main__":
 
     device = get_device()
     print(f"\nDevice: {device}")
-    print(f"\nAvailable models:")
+    print("\nAvailable models:")
 
     for name in list_models():
         info = get_model_info(name)

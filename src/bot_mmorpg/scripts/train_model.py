@@ -14,14 +14,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import os
 import time
 from pathlib import Path
-from typing import Optional, Tuple, List
-from random import shuffle
+from typing import Optional, Tuple
 
 import numpy as np
-import cv2
 
 # PyTorch imports
 try:
@@ -155,7 +152,7 @@ class GameplayDataset(Dataset):
                         )
                     except DataValidationError as e:
                         print(f"[Dataset] Security warning for {f}: {e}")
-                        print(f"[Dataset] Skipping untrusted file")
+                        print("[Dataset] Skipping untrusted file")
                         continue
                 else:
                     # Fallback to standard loading with pickle (legacy support)
@@ -307,7 +304,7 @@ def train_model(
     best_val_loss = float('inf')
 
     print(f"\n{'='*60}")
-    print(f"Training Configuration")
+    print("Training Configuration")
     print(f"{'='*60}")
     print(f"  Model: {model.__class__.__name__}")
     print(f"  Parameters: {count_parameters(model):,}")
@@ -431,7 +428,7 @@ def main(argv=None) -> int:
     device = torch.device("cpu") if args.cpu else get_device()
 
     print(f"\n{'='*60}")
-    print(f"BOT-MMORPG-AI Training")
+    print("BOT-MMORPG-AI Training")
     print(f"{'='*60}")
     print(f"Data: {data_dir}")
     print(f"Output: {out_dir}")
@@ -446,7 +443,7 @@ def main(argv=None) -> int:
     print(f"Temporal: {is_temporal} (seq_len={seq_len})")
 
     # Create dataset
-    print(f"\nLoading data...")
+    print("\nLoading data...")
     try:
         dataset = GameplayDataset(data_dir, seq_len=seq_len, limit_files=args.limit_files)
     except ValueError as e:
