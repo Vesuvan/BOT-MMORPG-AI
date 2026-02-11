@@ -41,9 +41,13 @@ endif
 	@echo If 'uv' is not found, restart your terminal so PATH updates take effect.
 
 venv: ## Create the virtual environment (Python 3.10 for best compatibility)
-	@echo Creating virtual environment with Python 3.10...
-	@uv venv --python 3.10
-	@echo Virtual environment created in .venv/
+	@if [ -d ".venv" ]; then \
+		echo "Virtual environment already exists in .venv/"; \
+	else \
+		echo "Creating virtual environment with Python 3.10..."; \
+		uv venv --python 3.10; \
+		echo "Virtual environment created in .venv/"; \
+	fi
 
 install: install-uv venv ## Install production dependencies
 	@echo Installing production dependencies...

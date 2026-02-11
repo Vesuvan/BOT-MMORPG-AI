@@ -1226,15 +1226,18 @@ def get_model(
     model_kwargs = {"num_actions": num_actions}
 
     # Add temporal_frames for temporal models
-    if model_name in ["efficientnet_lstm", "resnet18_lstm"]:
+    if model_name in ["efficientnet_lstm", "resnet18_lstm", "efficientnet_transformer"]:
         model_kwargs["temporal_frames"] = temporal_frames
 
-    # Add pretrained for modern models
+    # Add pretrained for models that support it
     if model_name in [
         "efficientnet_lstm",
         "efficientnet_simple",
         "mobilenet_v3",
         "resnet18_lstm",
+        "efficientnet_transformer",
+        "multihead_action",
+        "game_attention",
     ]:
         model_kwargs["pretrained"] = pretrained
 
