@@ -9,8 +9,9 @@ This ensures the backend works as expected.
 
 import json
 import shutil
-import pytest
+
 import numpy as np
+import pytest
 from PIL import Image
 
 torch = pytest.importorskip("torch", reason="PyTorch required for e2e test")
@@ -152,9 +153,7 @@ class TestE2EWorkflow:
 
         # Verify inference worked
         assert 0 <= action < num_classes, f"Inference: valid action ({action})"
-        assert probs.sum().item() == pytest.approx(1.0, abs=0.01), (
-            "Inference: valid probs"
-        )
+        assert probs.sum().item() == pytest.approx(1.0, abs=0.01), "Inference: valid probs"
 
         # === SUMMARY ===
         print("\n✅ E2E Test Passed:")
@@ -253,9 +252,7 @@ class TestInferenceEngine:
         engine = InferenceEngine(model=model, metadata=metadata)
 
         # Create test image
-        test_img = Image.fromarray(
-            np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8)
-        )
+        test_img = Image.fromarray(np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8))
 
         # Run prediction
         result = engine.predict(test_img)

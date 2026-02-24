@@ -83,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         # Forward args to the server
+        # modelhub.tauri expects --resource-root and --data-root (not --project-root)
         return int(
             modelhub_tauri_main(
                 [
@@ -90,7 +91,9 @@ def main(argv: list[str] | None = None) -> int:
                     str(args.port),
                     "--token",
                     args.token,
-                    "--project-root",
+                    "--resource-root",
+                    str(project_root),
+                    "--data-root",
                     str(project_root),
                 ]
             )

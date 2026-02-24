@@ -12,17 +12,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import platform
+import random
 import sys
 import time
-import random
-import platform
-from pathlib import Path
 from collections import deque
+from pathlib import Path
 from statistics import mean
 from typing import Optional, Tuple
 
-import numpy as np
 import cv2
+import numpy as np
 
 # PyTorch imports
 try:
@@ -49,12 +49,12 @@ except ImportError:
 
 # Local imports - keyboard control
 try:
-    from .directkeys import PressKey, ReleaseKey, W, A, S, D
+    from .directkeys import A, D, PressKey, ReleaseKey, S, W
 
     DIRECTKEYS_AVAILABLE = True
 except ImportError:
     try:
-        from directkeys import PressKey, ReleaseKey, W, A, S, D
+        from directkeys import A, D, PressKey, ReleaseKey, S, W
 
         DIRECTKEYS_AVAILABLE = True
     except ImportError:
@@ -94,20 +94,20 @@ except ImportError:
 # Local imports - gamepad (vJoy)
 try:
     from .vjoy2 import (
-        gamepad_lt,
-        gamepad_rt,
-        game_lx_left,
-        game_lx_right,
-        game_ly_down,
-        game_ly_up,
-        look_rx_left,
-        look_rx_right,
-        look_ry_down,
-        look_ry_up,
         button_A,
         button_B,
         button_X,
         button_Y,
+        game_lx_left,
+        game_lx_right,
+        game_ly_down,
+        game_ly_up,
+        gamepad_lt,
+        gamepad_rt,
+        look_rx_left,
+        look_rx_right,
+        look_ry_down,
+        look_ry_up,
         ultimate_release,
     )
 
@@ -115,20 +115,20 @@ try:
 except ImportError:
     try:
         from vjoy2 import (
-            gamepad_lt,
-            gamepad_rt,
-            game_lx_left,
-            game_lx_right,
-            game_ly_down,
-            game_ly_up,
-            look_rx_left,
-            look_rx_right,
-            look_ry_down,
-            look_ry_up,
             button_A,
             button_B,
             button_X,
             button_Y,
+            game_lx_left,
+            game_lx_right,
+            game_ly_down,
+            game_ly_up,
+            gamepad_lt,
+            gamepad_rt,
+            look_rx_left,
+            look_rx_right,
+            look_ry_down,
+            look_ry_up,
             ultimate_release,
         )
 
@@ -142,12 +142,12 @@ except ImportError:
 
 # Local imports - PyTorch models
 try:
-    from .models_pytorch import load_model, get_device
+    from .models_pytorch import get_device, load_model
 
     MODELS_AVAILABLE = True
 except ImportError:
     try:
-        from models_pytorch import load_model, get_device  # noqa: F401
+        from models_pytorch import get_device, load_model  # noqa: F401
 
         MODELS_AVAILABLE = True
     except ImportError:
@@ -485,9 +485,7 @@ class InferenceEngine:
 
             # Stack frames: (seq, C, H, W)
             input_tensor = torch.stack(list(self.frame_buffer), dim=0)
-            input_tensor = input_tensor.unsqueeze(0).to(
-                self.device
-            )  # (1, seq, C, H, W)
+            input_tensor = input_tensor.unsqueeze(0).to(self.device)  # (1, seq, C, H, W)
         else:
             input_tensor = tensor.unsqueeze(0).to(self.device)  # (1, C, H, W)
 
@@ -635,31 +633,19 @@ def main(argv=None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        "--model", required=True, help="Path to model checkpoint (.pth)"
-    )
-    parser.add_argument(
-        "--no-gamepad", action="store_true", help="Disable gamepad output"
-    )
+    parser.add_argument("--model", required=True, help="Path to model checkpoint (.pth)")
+    parser.add_argument("--no-gamepad", action="store_true", help="Disable gamepad output")
     parser.add_argument("--cpu", action="store_true", help="Force CPU inference")
-    parser.add_argument(
-        "--width", type=int, default=GAME_WIDTH, help="Game window width"
-    )
-    parser.add_argument(
-        "--height", type=int, default=GAME_HEIGHT, help="Game window height"
-    )
-    parser.add_argument(
-        "--delay", type=float, default=0, help="Delay between frames (seconds)"
-    )
+    parser.add_argument("--width", type=int, default=GAME_WIDTH, help="Game window width")
+    parser.add_argument("--height", type=int, default=GAME_HEIGHT, help="Game window height")
+    parser.add_argument("--delay", type=float, default=0, help="Delay between frames (seconds)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
 
     args = parser.parse_args(argv)
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print(
-            "[Error] PyTorch not available. Install with: pip install torch torchvision"
-        )
+        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
         return 1
 
     if not MODELS_AVAILABLE:
@@ -725,9 +711,7 @@ def main(argv=None) -> int:
 
                 # Motion detection
                 if MOTION_AVAILABLE:
-                    delta_count = motion_detection(
-                        t_minus, t_now, t_plus, screen_resized
-                    )
+                    delta_count = motion_detection(t_minus, t_now, t_plus, screen_resized)
                 else:
                     delta_count = 1000  # Default high motion
 

@@ -206,3 +206,91 @@ async function onStartBotClick() {
 
 ---
 
+## Future Features Roadmap
+
+### Mouse Recording (Issue #21)
+
+**Status:** Planned for v2.1
+**Priority:** High
+**Requested by:** Community (Patrwer, BenoitPALISSE)
+
+Currently the data collection system only records keyboard and gamepad inputs.
+Mouse input recording is needed for games that rely heavily on mouse
+movement, left/right click, and scroll actions.
+
+**Implementation plan (enterprise-grade):**
+
+1. **Input layer** (`src/bot_mmorpg/scripts/mouse_capture.py`):
+   - Record mouse position (x, y) relative to the game window at each frame.
+   - Record button states: LMB, RMB, MMB, scroll delta.
+   - Use `pynput.mouse.Listener` (cross-platform) or Interception driver
+     (low-level, Windows) depending on game requirements.
+   - Normalize coordinates to `[0, 1]` range relative to capture region so the
+     model is resolution-independent.
+
+2. **Data format** - extend the label vector:
+   ```
+   [keyboard_9] + [gamepad_20] + [mouse_x, mouse_y, lmb, rmb, mmb, scroll]
+   Total: 9 + 20 + 6 = 35 actions
+   ```
+
+3. **Model changes**:
+   - Split head architecture: discrete actions (keyboard/gamepad) use
+     cross-entropy, continuous actions (mouse x/y/scroll) use MSE loss.
+   - Multi-head output: `ActionHead(29)` + `MouseHead(6)`.
+
+4. **Replay/inference**:
+   - Mouse movement via `pynput.mouse.Controller` or Interception.
+   - Smooth interpolation between predicted positions to avoid jitter.
+
+5. **Performance considerations**:
+   - Mouse data is high-frequency (>60 Hz); downsample to match frame rate.
+   - Ring buffer for temporal mouse trajectory (last N positions).
+
+---
+
+### Anti-Cheat Considerations (Issue - Tibia/BattlEye)
+
+**Status:** Research / Documentation only
+**Priority:** Informational
+
+This project is designed for **educational and research purposes**. It operates
+exclusively through screen capture (reading pixels) and does not inject into
+game processes, modify game memory, or hook game APIs.
+
+**Architecture decisions that minimize detection surface:**
+
+- **Screen capture only**: Uses `mss` (screenshot library) which reads the
+  display framebuffer, not the game process memory.
+- **Input simulation**: Uses OS-level virtual input (vJoy, Interception) which
+  operates at the driver level, not inside the game process.
+- **No process injection**: The bot runs as a completely separate process.
+- **No memory reading**: No ReadProcessMemory or similar calls.
+
+**Important notes for users:**
+
+- Using any form of automation in online games **may violate the game's Terms of
+  Service** and can result in account bans regardless of the method used.
+- Anti-cheat systems like BattlEye, EasyAntiCheat, and Vanguard may detect
+  virtual input drivers (vJoy, Interception) even when used for legitimate
+  purposes.
+- This project does **not** provide anti-cheat bypass functionality.
+- Users are responsible for understanding and complying with the terms of
+  service of any game they use this software with.
+- The recommended use case is **single-player games**, **private servers**, or
+  **games that explicitly allow automation**.
+
+---
+
+### Planned Features Summary
+
+| Feature | Version | Status |
+|---|---|---|
+| Mouse recording and replay | v2.1 | Planned |
+| Multi-monitor support | v2.1 | Planned |
+| Arduino/hardware input bridge | v2.2 | Research |
+| OBS virtual camera integration | v2.2 | Research |
+| Reinforcement learning mode | v3.0 | Design phase |
+| Cloud training (GPU rental) | v3.0 | Design phase |
+| Plugin system for custom games | v3.0 | Design phase |
+

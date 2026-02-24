@@ -107,9 +107,18 @@ Navigate from **Mondstadt** to **Thousand Wind Temple** automatically:
 
 ## 🎮 Quick Start for Gamers
 
+> **Windows 10/11 required.** Linux and macOS are not currently supported for gameplay (training, inference, and input simulation depend on Windows APIs).
+
 **Don't worry - you don't need to be a programmer!** We've made this super simple.
 
-### Step 1️⃣: Basic Setup
+### Option A: Download the Installer (Easiest)
+
+Go to the **[Releases](https://github.com/ruslanmv/BOT-MMORPG-AI/releases)** page and download the latest `.exe` installer. Run it with administrator privileges and follow the wizard. No command line needed!
+
+### Option B: Install from Source
+
+**Prerequisites:** Python 3.10+, Git. For the desktop UI you also need [Rust](https://rustup.rs/) (run `rustup` installer).
+
 ```bash
 # Just copy and paste these commands one by one
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -120,10 +129,12 @@ make install
 
 **That's it!** The bot is now installed.
 
+> **Note:** `make install` installs core dependencies. Use `make install-all` for everything (launcher, backend, docs). A virtual environment (`.venv/`) is created automatically - you do NOT need to activate it manually.
+
 ### Step 2️⃣: Teach The Bot
 
 1. Open your game (Genshin Impact recommended)
-2. Set your resolution to **1920x1080** fullscreen
+2. Set your game resolution to **1920x1080** fullscreen (the bot automatically resizes frames internally for training)
 3. Run: `make collect-data`
 4. Play normally for 10-15 minutes
 5. The bot is now learning!

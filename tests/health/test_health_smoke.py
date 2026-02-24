@@ -1,7 +1,8 @@
 import importlib
 import pathlib
-import py_compile
 import platform
+import py_compile
+
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -44,9 +45,7 @@ def test_cli_modules_import():
 
 
 @pytest.mark.health
-@pytest.mark.skipif(
-    platform.system() != "Windows", reason="Windows-only installer assets"
-)
+@pytest.mark.skipif(platform.system() != "Windows", reason="Windows-only installer assets")
 def test_windows_installer_assets_present():
     # We just verify files exist; we do not execute installers in tests.
     # Note: vJoySetup.exe is a third-party binary not tracked in git;
@@ -62,6 +61,4 @@ def test_windows_installer_assets_present():
     assert not missing, "Missing installer assets: " + ", ".join(missing)
     missing_optional = [str(p) for p in optional_files if not p.exists()]
     if missing_optional:
-        pytest.skip(
-            "Optional installer assets not present: " + ", ".join(missing_optional)
-        )
+        pytest.skip("Optional installer assets not present: " + ", ".join(missing_optional))

@@ -18,8 +18,8 @@ The default resolution is chosen based on:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
 from enum import Enum
+from typing import Any, Dict, List, Tuple
 
 
 class ResolutionTier(Enum):

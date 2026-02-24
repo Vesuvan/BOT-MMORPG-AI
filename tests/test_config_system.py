@@ -202,9 +202,7 @@ class TestSettingsManager:
         manager = SettingsManager()
         manager.settings_dir = tmp_path
 
-        config = manager.create_session_config(
-            game_id="world_of_warcraft", task="combat"
-        )
+        config = manager.create_session_config(game_id="world_of_warcraft", task="combat")
 
         path = manager.save_session_config(config)
 

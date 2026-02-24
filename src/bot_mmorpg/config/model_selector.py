@@ -181,9 +181,7 @@ class ModelSelector:
                 pass
 
         # Determine requirements
-        needs_temporal = self._determine_temporal_need(
-            task, profile, force_temporal, hw_info
-        )
+        needs_temporal = self._determine_temporal_need(task, profile, force_temporal, hw_info)
 
         # Score each architecture
         scores = self._score_architectures(
@@ -265,9 +263,7 @@ class ModelSelector:
             vram = hw_info.gpu.vram_mb if hw_info.gpu else 0
             if vram < specs["min_vram"]:
                 score -= 50
-                warnings.append(
-                    f"May exceed available VRAM ({vram}MB < {specs['min_vram']}MB)"
-                )
+                warnings.append(f"May exceed available VRAM ({vram}MB < {specs['min_vram']}MB)")
 
             # Temporal matching
             if needs_temporal:

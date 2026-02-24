@@ -136,8 +136,7 @@ class GameProfileLoader:
             return cwd_candidate
 
         raise FileNotFoundError(
-            "Could not find game_profiles directory. "
-            "Please specify profiles_dir explicitly."
+            "Could not find game_profiles directory. " "Please specify profiles_dir explicitly."
         )
 
     def _load_index(self) -> Dict:
@@ -257,14 +256,10 @@ class GameProfileLoader:
                 recommended_architecture=training_data.get(
                     "recommended_architecture", "efficientnet_lstm"
                 ),
-                recommended_input_size=training_data.get(
-                    "recommended_input_size", [224, 224]
-                ),
+                recommended_input_size=training_data.get("recommended_input_size", [224, 224]),
                 temporal_frames=training_data.get("temporal_frames", 4),
                 minimum_samples=training_data.get("minimum_samples", 5000),
-                class_balance_tolerance=training_data.get(
-                    "class_balance_tolerance", 0.3
-                ),
+                class_balance_tolerance=training_data.get("class_balance_tolerance", 0.3),
                 learning_rate=training_data.get(
                     "learning_rate",
                     {"initial": 0.001, "decay_factor": 0.1, "decay_epochs": [20, 40]},

@@ -358,9 +358,9 @@ endif
 clean-installer: ## Clean installer build artifacts
 	@echo Cleaning installer artifacts...
 ifeq ($(IS_WINDOWS),1)
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist, build, src-tauri/target, src-tauri/binaries, src-tauri/drivers, src-tauri/resources, *.spec"
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist, build, src-tauri/target, src-tauri/binaries, *.spec"
 else
-	@rm -rf dist build src-tauri/target src-tauri/binaries src-tauri/drivers src-tauri/resources *.spec 2>/dev/null || true
+	@rm -rf dist build src-tauri/target src-tauri/binaries *.spec 2>/dev/null || true
 endif
 	@echo Installer artifacts cleaned
 

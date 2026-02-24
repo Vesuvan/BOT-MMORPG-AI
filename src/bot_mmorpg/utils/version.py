@@ -13,8 +13,8 @@ import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Callable, Optional
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 

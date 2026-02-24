@@ -25,7 +25,7 @@ try:
     import torch
     import torch.nn as nn
     import torch.optim as optim
-    from torch.utils.data import Dataset, DataLoader
+    from torch.utils.data import DataLoader, Dataset
 
     PYTORCH_AVAILABLE = True
 except ImportError:
@@ -46,12 +46,12 @@ except ImportError:
 # Local imports
 try:
     from .models_pytorch import (
-        get_model,
-        list_models,
-        get_model_info,
-        save_model,
         count_parameters,
         get_device,
+        get_model,
+        get_model_info,
+        list_models,
+        save_model,
     )
 
     MODELS_AVAILABLE = True
@@ -63,12 +63,12 @@ except ImportError as e:
 if not MODELS_AVAILABLE:
     try:
         from models_pytorch import (
-            get_model,
-            list_models,
-            get_model_info,
-            save_model,
             count_parameters,
             get_device,
+            get_model,
+            get_model_info,
+            list_models,
+            save_model,
         )
 
         MODELS_AVAILABLE = True
@@ -78,9 +78,9 @@ if not MODELS_AVAILABLE:
 # Secure data loading
 try:
     from ..utils.secure_loader import (
-        load_training_data_secure,
         DataValidationError,
         UntrustedDataWarning,
+        load_training_data_secure,
     )
 
     SECURE_LOADER_AVAILABLE = True
@@ -165,9 +165,7 @@ class GameplayDataset(Dataset):
                 # Use secure loader if available for pickle safety
                 if SECURE_LOADER_AVAILABLE and load_training_data_secure is not None:
                     try:
-                        data = load_training_data_secure(
-                            f, validate=True, allow_untrusted=True
-                        )
+                        data = load_training_data_secure(f, validate=True, allow_untrusted=True)
                     except DataValidationError as e:
                         print(f"[Dataset] Security warning for {f}: {e}")
                         print("[Dataset] Skipping untrusted file")
@@ -341,9 +339,7 @@ def train_model(
         print("-" * 40)
 
         # Train
-        train_loss = train_epoch(
-            model, train_loader, optimizer, criterion, device, epoch
-        )
+        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, epoch)
 
         # Validate
         if val_loader:
@@ -373,9 +369,7 @@ def train_model(
         # Checkpoint every 5 epochs
         if (epoch + 1) % 5 == 0:
             save_path = save_dir / f"{model_name}_epoch{epoch + 1}.pth"
-            save_model(
-                model, str(save_path), optimizer=optimizer, epoch=epoch, loss=train_loss
-            )
+            save_model(model, str(save_path), optimizer=optimizer, epoch=epoch, loss=train_loss)
             print(f"  Checkpoint saved to {save_path}")
 
         epoch_time = time.time() - epoch_start
@@ -402,31 +396,19 @@ def main(argv=None) -> int:
 
     parser.add_argument("--data", default="data/raw", help="Folder with .npy files")
     parser.add_argument("--out", default="artifacts/model", help="Folder to save model")
-    parser.add_argument(
-        "--model", default="efficientnet_lstm", help="Model architecture"
-    )
+    parser.add_argument("--model", default="efficientnet_lstm", help="Model architecture")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument(
         "--seq-len", type=int, default=4, help="Sequence length for temporal models"
     )
-    parser.add_argument(
-        "--num-actions", type=int, default=29, help="Number of output actions"
-    )
-    parser.add_argument(
-        "--val-split", type=float, default=0.1, help="Validation split ratio"
-    )
-    parser.add_argument(
-        "--no-pretrained", action="store_true", help="Don't use pretrained weights"
-    )
+    parser.add_argument("--num-actions", type=int, default=29, help="Number of output actions")
+    parser.add_argument("--val-split", type=float, default=0.1, help="Validation split ratio")
+    parser.add_argument("--no-pretrained", action="store_true", help="Don't use pretrained weights")
     parser.add_argument("--cpu", action="store_true", help="Force CPU training")
-    parser.add_argument(
-        "--list-models", action="store_true", help="List available models"
-    )
-    parser.add_argument(
-        "--limit-files", type=int, help="Limit number of data files (for testing)"
-    )
+    parser.add_argument("--list-models", action="store_true", help="List available models")
+    parser.add_argument("--limit-files", type=int, help="Limit number of data files (for testing)")
 
     args = parser.parse_args(argv)
 
@@ -447,9 +429,7 @@ def main(argv=None) -> int:
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print(
-            "[Error] PyTorch not available. Install with: pip install torch torchvision"
-        )
+        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
         return 1
 
     if not MODELS_AVAILABLE:
@@ -486,9 +466,7 @@ def main(argv=None) -> int:
     # Create dataset
     print("\nLoading data...")
     try:
-        dataset = GameplayDataset(
-            data_dir, seq_len=seq_len, limit_files=args.limit_files
-        )
+        dataset = GameplayDataset(data_dir, seq_len=seq_len, limit_files=args.limit_files)
     except ValueError as e:
         print(f"[Error] {e}")
         return 1
@@ -498,9 +476,7 @@ def main(argv=None) -> int:
     val_size = int(total_size * args.val_split)
     train_size = total_size - val_size
 
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size]
-    )
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
     print(f"Train samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")

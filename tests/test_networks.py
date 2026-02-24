@@ -48,7 +48,7 @@ class TestModelInfo:
 
     def test_model_info_for_all_models(self):
         """Test that MODEL_INFO exists for all registered models."""
-        from bot_mmorpg.scripts.models_pytorch import list_models, get_model_info
+        from bot_mmorpg.scripts.models_pytorch import get_model_info, list_models
 
         for model_name in list_models():
             info = get_model_info(model_name)
@@ -85,9 +85,7 @@ class TestModelInstantiation:
         """Test EfficientNet-LSTM model instantiation."""
         from bot_mmorpg.scripts.models_pytorch import get_model
 
-        model = get_model(
-            "efficientnet_lstm", num_actions=num_actions, pretrained=False
-        )
+        model = get_model("efficientnet_lstm", num_actions=num_actions, pretrained=False)
         assert isinstance(model, nn.Module)
         assert model.num_actions == num_actions
 
@@ -95,9 +93,7 @@ class TestModelInstantiation:
         """Test EfficientNet Simple model instantiation."""
         from bot_mmorpg.scripts.models_pytorch import get_model
 
-        model = get_model(
-            "efficientnet_simple", num_actions=num_actions, pretrained=False
-        )
+        model = get_model("efficientnet_simple", num_actions=num_actions, pretrained=False)
         assert isinstance(model, nn.Module)
         assert model.num_actions == num_actions
 
@@ -260,7 +256,7 @@ class TestParameterCounting:
 
     def test_count_parameters_function(self):
         """Test that count_parameters function works."""
-        from bot_mmorpg.scripts.models_pytorch import get_model, count_parameters
+        from bot_mmorpg.scripts.models_pytorch import count_parameters, get_model
 
         model = get_model("mobilenet_v3", num_actions=29, pretrained=False)
         params = count_parameters(model)
@@ -269,12 +265,10 @@ class TestParameterCounting:
 
     def test_mobilenet_is_smallest(self):
         """Test that MobileNet V3 has fewer parameters than EfficientNet."""
-        from bot_mmorpg.scripts.models_pytorch import get_model, count_parameters
+        from bot_mmorpg.scripts.models_pytorch import count_parameters, get_model
 
         mobilenet = get_model("mobilenet_v3", num_actions=29, pretrained=False)
-        efficientnet = get_model(
-            "efficientnet_simple", num_actions=29, pretrained=False
-        )
+        efficientnet = get_model("efficientnet_simple", num_actions=29, pretrained=False)
 
         mobile_params = count_parameters(mobilenet)
         efficient_params = count_parameters(efficientnet)
@@ -301,7 +295,7 @@ class TestModelRegistry:
 
     def test_all_registered_models_create(self):
         """Test that all registered models can be created."""
-        from bot_mmorpg.scripts.models_pytorch import list_models, get_model
+        from bot_mmorpg.scripts.models_pytorch import get_model, list_models
 
         for model_name in list_models():
             model = get_model(model_name, num_actions=29, pretrained=False)
@@ -355,9 +349,7 @@ class TestLegacyCompatibility:
         """Test sentnet_color_2d legacy wrapper function."""
         from bot_mmorpg.scripts.models_pytorch import sentnet_color_2d
 
-        model = sentnet_color_2d(
-            width=480, height=270, frame_count=4, lr=0.001, output=29
-        )
+        model = sentnet_color_2d(width=480, height=270, frame_count=4, lr=0.001, output=29)
         assert isinstance(model, nn.Module)
 
     def test_googlenet_alias(self):

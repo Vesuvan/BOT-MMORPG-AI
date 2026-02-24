@@ -150,14 +150,16 @@ class CommandHandler:
                 "platform": info.platform,
                 "cpu_cores": info.cpu_cores,
                 "ram_mb": info.ram_mb,
-                "gpu": {
-                    "name": info.gpu.name if info.gpu else None,
-                    "vram_mb": info.gpu.vram_mb if info.gpu else 0,
-                    "cuda_available": info.gpu.cuda_available if info.gpu else False,
-                    "cuda_version": info.gpu.cuda_version if info.gpu else None,
-                }
-                if info.gpu
-                else None,
+                "gpu": (
+                    {
+                        "name": info.gpu.name if info.gpu else None,
+                        "vram_mb": info.gpu.vram_mb if info.gpu else 0,
+                        "cuda_available": info.gpu.cuda_available if info.gpu else False,
+                        "cuda_version": info.gpu.cuda_version if info.gpu else None,
+                    }
+                    if info.gpu
+                    else None
+                ),
                 "tier": info.tier.value,
                 "summary": info.summary(),
             }
@@ -205,9 +207,7 @@ class CommandHandler:
             },
         }
 
-    def handle_config_get_recommendation(
-        self, game_id: str, task: str
-    ) -> Dict[str, Any]:
+    def handle_config_get_recommendation(self, game_id: str, task: str) -> Dict[str, Any]:
         """Get model recommendation for game/task."""
         from bot_mmorpg.config import ModelSelector
 
