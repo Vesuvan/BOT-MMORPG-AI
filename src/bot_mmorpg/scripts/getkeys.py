@@ -1,8 +1,8 @@
 # Citation: Box Of Hats (https://github.com/Box-Of-Hats)
 # Cross-platform support added for Linux/macOS
 
-import time
 import platform
+import time
 
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"

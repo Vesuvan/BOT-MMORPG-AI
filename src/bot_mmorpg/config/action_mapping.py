@@ -19,8 +19,8 @@ Output Design:
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 from enum import Enum, auto
+from typing import Dict, List, Optional
 
 
 class ActionCategory(Enum):
@@ -147,9 +147,7 @@ MOVEMENT_ACTIONS = [
         cooldown_ms=500,
         description="Jump",
     ),
-    ActionDefinition(
-        9, "sprint", ActionCategory.MOVEMENT, "Shift", "L3", description="Sprint/Run"
-    ),
+    ActionDefinition(9, "sprint", ActionCategory.MOVEMENT, "Shift", "L3", description="Sprint/Run"),
     ActionDefinition(
         10,
         "crouch",
@@ -186,9 +184,7 @@ MOVEMENT_ACTIONS = [
         is_toggle=True,
         description="Auto-run toggle",
     ),
-    ActionDefinition(
-        14, "swim_up", ActionCategory.MOVEMENT, "Space", "A", description="Swim up"
-    ),
+    ActionDefinition(14, "swim_up", ActionCategory.MOVEMENT, "Space", "A", description="Swim up"),
     ActionDefinition(
         15, "swim_down", ActionCategory.MOVEMENT, "Ctrl", "B", description="Swim down"
     ),
@@ -588,9 +584,7 @@ CAMERA_ACTIONS = [
         True,
         description="Tilt camera down",
     ),
-    ActionDefinition(
-        60, "zoom_in", ActionCategory.CAMERA, "ScrollUp", "UP", description="Zoom in"
-    ),
+    ActionDefinition(60, "zoom_in", ActionCategory.CAMERA, "ScrollUp", "UP", description="Zoom in"),
     ActionDefinition(
         61,
         "zoom_out",
@@ -622,21 +616,11 @@ UI_ACTIONS = [
     ActionDefinition(
         64, "inventory", ActionCategory.UI, "I", "START", description="Open inventory"
     ),
-    ActionDefinition(
-        65, "map", ActionCategory.UI, "M", "SELECT", description="Open map"
-    ),
-    ActionDefinition(
-        66, "character", ActionCategory.UI, "C", None, description="Character screen"
-    ),
-    ActionDefinition(
-        67, "skills_menu", ActionCategory.UI, "K", None, description="Skills menu"
-    ),
-    ActionDefinition(
-        68, "quest_log", ActionCategory.UI, "J", None, description="Quest log"
-    ),
-    ActionDefinition(
-        69, "social", ActionCategory.UI, "O", None, description="Social/Friends"
-    ),
+    ActionDefinition(65, "map", ActionCategory.UI, "M", "SELECT", description="Open map"),
+    ActionDefinition(66, "character", ActionCategory.UI, "C", None, description="Character screen"),
+    ActionDefinition(67, "skills_menu", ActionCategory.UI, "K", None, description="Skills menu"),
+    ActionDefinition(68, "quest_log", ActionCategory.UI, "J", None, description="Quest log"),
+    ActionDefinition(69, "social", ActionCategory.UI, "O", None, description="Social/Friends"),
     ActionDefinition(
         70,
         "escape_menu",
@@ -758,11 +742,7 @@ ACTION_SPACE_EXTENDED = ActionSpaceConfig(
 ACTION_SPACE_COMBAT = ActionSpaceConfig(
     name="combat",
     description="Combat-focused with movement + skills (48 actions)",
-    actions=(
-        MOVEMENT_ACTIONS  # 0-15
-        + SKILL_ACTIONS  # 16-35
-        + COMBAT_ACTIONS  # 36-47
-    ),
+    actions=(MOVEMENT_ACTIONS + SKILL_ACTIONS + COMBAT_ACTIONS),  # 0-15  # 16-35  # 36-47
     output_type="multi",
 )
 

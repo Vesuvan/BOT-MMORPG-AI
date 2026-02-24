@@ -233,16 +233,12 @@ class InferenceEngine:
 
         # Classes
         num_classes = meta.get("num_classes", config.get("num_classes", 12))
-        class_names = meta.get(
-            "class_names", [f"action_{i}" for i in range(num_classes)]
-        )
+        class_names = meta.get("class_names", [f"action_{i}" for i in range(num_classes)])
 
         # Temporal
         temporal_frames = meta.get(
             "temporal_frames",
-            config.get(
-                "temporal_frames", config.get("input", {}).get("temporal_frames", 0)
-            ),
+            config.get("temporal_frames", config.get("input", {}).get("temporal_frames", 0)),
         )
         if "lstm" not in architecture.lower():
             temporal_frames = 0
@@ -270,9 +266,7 @@ class InferenceEngine:
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
 
-        from bot_mmorpg.scripts.models_pytorch import (
-            create_model,
-        )
+        from bot_mmorpg.scripts.models_pytorch import create_model
 
         model = create_model(
             architecture=metadata.architecture,
@@ -296,9 +290,7 @@ class InferenceEngine:
                 transforms.Normalize(mean=self.IMAGENET_MEAN, std=self.IMAGENET_STD)
             )
         elif self.metadata.normalize == "[-1,1]":
-            transform_list.append(
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-            )
+            transform_list.append(transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
         # [0,1] is already handled by ToTensor
 
         return transforms.Compose(transform_list)
@@ -365,9 +357,7 @@ class InferenceEngine:
         confidence = float(probs[action_id])
 
         # Build probability dict
-        all_probs = {
-            self.metadata.class_names[i]: float(p) for i, p in enumerate(probs)
-        }
+        all_probs = {self.metadata.class_names[i]: float(p) for i, p in enumerate(probs)}
 
         # Calculate inference time
         inference_time = (time.perf_counter() - start_time) * 1000
@@ -385,9 +375,7 @@ class InferenceEngine:
             inference_time_ms=inference_time,
         )
 
-    def predict_batch(
-        self, frames: List[Union[np.ndarray, Image.Image]]
-    ) -> List[InferenceResult]:
+    def predict_batch(self, frames: List[Union[np.ndarray, Image.Image]]) -> List[InferenceResult]:
         """
         Batch prediction for multiple frames.
 
@@ -426,9 +414,7 @@ class InferenceEngine:
             "model": self.metadata.architecture,
             "device": str(self.device),
             "actions_predicted": self.action_count,
-            "temporal_buffer_size": len(self.temporal_buffer.buffer)
-            if self.temporal_buffer
-            else 0,
+            "temporal_buffer_size": len(self.temporal_buffer.buffer) if self.temporal_buffer else 0,
             "emergency_stop": self.emergency_stop,
             "confidence_threshold": self.confidence_threshold,
             "cooldown_ms": self.cooldown_ms,

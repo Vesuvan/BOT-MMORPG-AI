@@ -5,8 +5,9 @@ Tests the JSON-RPC bridge that connects Tauri frontend to Python backend.
 """
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 @pytest.fixture
@@ -90,9 +91,7 @@ class TestRPCResponse:
         """Test error response JSON formatting."""
         from bot_mmorpg.bridge.server import RPCResponse
 
-        response = RPCResponse(
-            error={"code": -32601, "message": "Method not found"}, id=1
-        )
+        response = RPCResponse(error={"code": -32601, "message": "Method not found"}, id=1)
         json_str = response.to_json()
         data = json.loads(json_str)
 

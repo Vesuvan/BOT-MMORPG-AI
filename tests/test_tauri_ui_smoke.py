@@ -1,5 +1,5 @@
-import unittest
 import json
+import unittest
 from pathlib import Path
 
 # Paths
@@ -28,9 +28,7 @@ class TestTauriUI(unittest.TestCase):
         if not UI_JS.exists():
             self.skipTest("JS not found")
         js = UI_JS.read_text(encoding="utf-8", errors="replace")
-        self.assertNotIn(
-            "@tauri-apps/api", js, "main.js still imports npm @tauri-apps/api"
-        )
+        self.assertNotIn("@tauri-apps/api", js, "main.js still imports npm @tauri-apps/api")
 
     def test_main_js_has_event_listeners(self):
         """Ensure JS attaches event listeners (wireEvents or standard listeners)."""
@@ -46,15 +44,11 @@ class TestTauriUI(unittest.TestCase):
             self.skipTest("NSIS not found")
         nsi = NSIS_TEMPLATE.read_text(encoding="utf-8", errors="replace")
         # Ensure correct escaping
-        self.assertIn(
-            r"\\{{main_binary_name}}.exe", nsi, "Missing double-escaped binary name"
-        )
+        self.assertIn(r"\\{{main_binary_name}}.exe", nsi, "Missing double-escaped binary name")
 
         # Ensure no BAD single escaping remains (ignoring the good ones)
         stripped = nsi.replace(r"\\{{main_binary_name}}", "")
-        self.assertNotIn(
-            r"\{{main_binary_name}}", stripped, "Found unescaped Handlebars var"
-        )
+        self.assertNotIn(r"\{{main_binary_name}}", stripped, "Found unescaped Handlebars var")
 
     def test_csp_has_script_src(self):
         """Ensure Tauri conf has CSP defined."""

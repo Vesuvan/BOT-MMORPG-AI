@@ -1,5 +1,7 @@
 # Running BOT MMORPG AI - Complete Guide
 
+> **Windows 10/11 required.** The desktop UI requires [Rust](https://rustup.rs/) and the Tauri CLI (`cargo install tauri-cli`).
+
 ## Quick Start
 
 ### 1. Install Dependencies
@@ -13,7 +15,11 @@ This installs:
 - Creates virtual environment
 - Installs all required packages
 
+> **Note:** A virtual environment (`.venv/`) is created automatically. You do NOT need to activate it manually - all `make` commands use it automatically.
+
 ### 2. Run the Application
+
+**Requires:** Rust + Tauri CLI (for the desktop UI). If you only need the Python pipeline, skip to "Run Without Desktop UI" below.
 
 ```bash
 make run

@@ -15,12 +15,12 @@ from typing import List
 # Version utilities
 try:
     from .version import (  # noqa: F401
-        check_for_updates,
-        check_for_updates_async,
-        get_current_version,
-        compare_versions,
         UpdateInfo,
         VersionInfo,
+        check_for_updates,
+        check_for_updates_async,
+        compare_versions,
+        get_current_version,
     )
 
     _version_available = True
@@ -30,9 +30,9 @@ except ImportError:
 # Secure loader utilities
 try:
     from .secure_loader import (  # noqa: F401
+        DataValidationError,
         load_training_data_secure,
         validate_training_data_structure,
-        DataValidationError,
     )
 
     _secure_loader_available = True

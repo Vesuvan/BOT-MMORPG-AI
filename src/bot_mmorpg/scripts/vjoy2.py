@@ -1,9 +1,9 @@
 import ctypes
+import platform
 import struct
 import time
-import platform
-import numpy as np
 
+import numpy as np
 
 # Vjoy adapted to MMORPG-AI
 # Cross-platform support added for Linux/macOS (stub functions)
@@ -206,9 +206,7 @@ except (OSError, FileNotFoundError):
 def setJoy(valueX, valueY, scale):
     xPos = int(valueX * scale)
     yPos = int(valueY * scale)
-    joystickPosition = vj.generateJoystickPosition(
-        wAxisX=16000 + xPos, wAxisY=16000 + yPos
-    )
+    joystickPosition = vj.generateJoystickPosition(wAxisX=16000 + xPos, wAxisY=16000 + yPos)
     vj.update(joystickPosition)
 
 
@@ -221,9 +219,7 @@ def test():
         xPos = int(10000.0 * np.sin(2.0 * np.pi * i / 1000))
         yPos = int(10000.0 * np.sin(2.0 * np.pi * i / 100))
         print(xPos, flush=True)
-        joystickPosition = vj.generateJoystickPosition(
-            wAxisX=16000 + xPos, wAxisY=16000 + yPos
-        )
+        joystickPosition = vj.generateJoystickPosition(wAxisX=16000 + xPos, wAxisY=16000 + yPos)
         vj.update(joystickPosition)
         time.sleep(0.01)
     joystickPosition = vj.generateJoystickPosition(wAxisX=16000, wAxisY=16000)
@@ -275,9 +271,7 @@ def test3():
     print("vj opening", flush=True)
     time.sleep(2)
     print("sending axes", flush=True)
-    joystickPosition = vj.generateJoystickPosition(
-        wThrottle=32000, wAxisX=16000, wAxisY=16000
-    )
+    joystickPosition = vj.generateJoystickPosition(wThrottle=32000, wAxisX=16000, wAxisY=16000)
     vj.update(joystickPosition)
     time.sleep(5)
     joystickPosition = vj.generateJoystickPosition()

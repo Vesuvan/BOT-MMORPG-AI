@@ -5,8 +5,8 @@
 # Cross-platform support added for Linux/macOS
 
 import ctypes
-import time
 import platform
+import time
 
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"
@@ -134,15 +134,11 @@ else:
 
         def PressKey(hexKeyCode):
             """Stub: pynput not available."""
-            print(
-                f"[directkeys] PressKey({hex(hexKeyCode)}) - pynput not installed, skipping"
-            )
+            print(f"[directkeys] PressKey({hex(hexKeyCode)}) - pynput not installed, skipping")
 
         def ReleaseKey(hexKeyCode):
             """Stub: pynput not available."""
-            print(
-                f"[directkeys] ReleaseKey({hex(hexKeyCode)}) - pynput not installed, skipping"
-            )
+            print(f"[directkeys] ReleaseKey({hex(hexKeyCode)}) - pynput not installed, skipping")
 
 
 if __name__ == "__main__":

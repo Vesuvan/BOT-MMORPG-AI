@@ -90,6 +90,10 @@ Press Enter and wait. You'll see text scrolling - that's normal!
 
 Now we'll install all the AI components.
 
+> **Easiest option:** Download the `.exe` installer from the [Releases](https://github.com/ruslanmv/BOT-MMORPG-AI/releases) page. No command line needed!
+>
+> **For the desktop UI (Tauri):** You also need [Rust](https://rustup.rs/). This is NOT required for the training pipeline (data collection, training, testing).
+
 ### Step 1: Open Command Prompt in Bot Folder
 
 1. Open the "BOT-MMORPG-AI" folder on your Desktop
@@ -406,7 +410,7 @@ While the bot is running:
 **A:** FREE! It's open source (Apache 2.0 license).
 
 ### Q: I'm stuck! Where can I get help?
-**A:** Join our Slack community: [aws-ml-group.slack.com](https://aws-ml-group.slack.com/)
+**A:** Join our Slack community: [#bot-mmorpg-ai](https://ruslanmv.slack.com/archives/C0A5N63DKSS)
 
 ---
 
@@ -416,7 +420,7 @@ While the bot is running:
 
 1. **Read error messages** - they usually tell you what's wrong
 2. **Check our GitHub Issues**: [Issues Page](https://github.com/ruslanmv/BOT-MMORPG-AI/issues)
-3. **Ask in Slack**: [Join Here](https://aws-ml-group.slack.com/)
+3. **Ask in Slack**: [#bot-mmorpg-ai](https://ruslanmv.slack.com/archives/C0A5N63DKSS)
 4. **Email**: contact@ruslanmv.com
 
 ### When Asking For Help, Include:

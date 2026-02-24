@@ -11,9 +11,10 @@ Resolution Support:
 - 1280x720: HD (max supported, experimental)
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path for imports
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,8 +116,7 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"MobileNetV3 {name} ({width}x{height}): "
-                f"expected (1, 29), got {output.shape}"
+                f"MobileNetV3 {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
             )
 
     def test_resnet18_lstm_resolutions(self, device):
@@ -162,8 +162,7 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"AlexNet {name} ({width}x{height}): "
-                f"expected (1, 29), got {output.shape}"
+                f"AlexNet {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
             )
 
     def test_sentnet_2d_resolutions(self, device):
@@ -180,8 +179,7 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"SentNet2D {name} ({width}x{height}): "
-                f"expected (1, 29), got {output.shape}"
+                f"SentNet2D {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
             )
 
 
@@ -190,9 +188,7 @@ class TestResolutionConfig:
 
     def test_game_config_exists(self):
         """Test that game configurations are properly defined."""
-        from bot_mmorpg.config.game_resolutions import (
-            get_game_config,
-        )
+        from bot_mmorpg.config.game_resolutions import get_game_config
 
         # Test known games
         known_games = [
@@ -283,9 +279,9 @@ class TestResolutionConsistency:
         # All outputs should be identical
         expected_shape = (1, 29)
         for i, (shape, (w, h)) in enumerate(zip(outputs, resolutions)):
-            assert shape == expected_shape, (
-                f"Resolution {w}x{h} produced shape {shape}, expected {expected_shape}"
-            )
+            assert (
+                shape == expected_shape
+            ), f"Resolution {w}x{h} produced shape {shape}, expected {expected_shape}"
 
 
 if __name__ == "__main__":

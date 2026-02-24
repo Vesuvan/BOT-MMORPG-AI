@@ -9,9 +9,9 @@ This module provides a hierarchical configuration system with:
 """
 
 from .hardware_detector import HardwareDetector, HardwareTier
-from .profile_loader import GameProfileLoader, GameProfile
+from .model_selector import ModelRecommendation, ModelSelector
+from .profile_loader import GameProfile, GameProfileLoader
 from .settings_manager import SettingsManager
-from .model_selector import ModelSelector, ModelRecommendation
 
 __all__ = [
     "HardwareDetector",
