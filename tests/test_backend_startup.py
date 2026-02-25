@@ -5,10 +5,7 @@ Validates that main_backend.py correctly parses CLI args and forwards
 them to modelhub.tauri with the right parameter names.
 """
 
-import argparse
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 class TestBackendArgParsing:
@@ -16,8 +13,6 @@ class TestBackendArgParsing:
 
     def test_default_args(self):
         """Test default argument values parse without error."""
-        from backend.main_backend import main
-
         captured_args = []
 
         def fake_tauri_main(argv):
@@ -39,22 +34,27 @@ class TestBackendArgParsing:
         assert "0" in captured_args
         assert "--resource-root" in captured_args
 
-    def test_project_root_resolution(self):
+    def test_project_root_resolution(self, tmp_path):
         """Test project root resolution from CLI arg."""
+        from pathlib import Path
+
         from backend.main_backend import _resolve_project_root
 
-        result = _resolve_project_root("/tmp/test")
-        assert str(result) == "/tmp/test"
+        test_dir = str(tmp_path / "testroot")
+        result = _resolve_project_root(test_dir)
+        assert result == Path(test_dir).resolve()
 
-    def test_project_root_env_fallback(self):
+    def test_project_root_env_fallback(self, tmp_path):
         """Test project root resolution from environment variable."""
         import os
+        from pathlib import Path
 
         from backend.main_backend import _resolve_project_root
 
-        with patch.dict(os.environ, {"MODELHUB_PROJECT_ROOT": "/tmp/envtest"}):
+        env_dir = str(tmp_path / "envroot")
+        with patch.dict(os.environ, {"MODELHUB_PROJECT_ROOT": env_dir}):
             result = _resolve_project_root("")
-            assert str(result) == "/tmp/envtest"
+            assert result == Path(env_dir).resolve()
 
     def test_project_root_auto_detection(self):
         """Test project root auto-detection from file location."""
