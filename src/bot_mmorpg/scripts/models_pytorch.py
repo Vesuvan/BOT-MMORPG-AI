@@ -788,7 +788,9 @@ class EfficientNetTransformer(nn.Module):
         self.feature_proj = nn.Linear(self.feature_dim, d_model)
 
         # Learnable positional encoding for temporal dimension
-        self.pos_encoding = nn.Parameter(torch.randn(1, temporal_frames, d_model) * 0.02)
+        self.pos_encoding = nn.Parameter(
+            torch.randn(1, temporal_frames, d_model) * 0.02
+        )
 
         # Transformer encoder for temporal modeling
         encoder_layer = nn.TransformerEncoderLayer(
@@ -799,7 +801,9 @@ class EfficientNetTransformer(nn.Module):
             activation="gelu",
             batch_first=True,
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_encoder_layers
+        )
 
         # Classification token (like BERT's [CLS])
         self.cls_token = nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
@@ -1257,7 +1261,11 @@ def get_device(prefer_gpu: bool = True) -> torch.device:
     """Get the best available device."""
     if prefer_gpu and torch.cuda.is_available():
         return torch.device("cuda")
-    elif prefer_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    elif (
+        prefer_gpu
+        and hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+    ):
         return torch.device("mps")  # Apple Silicon
     return torch.device("cpu")
 
@@ -1410,7 +1418,9 @@ def save_model(
 
 
 # These match the original TFLearn function names for drop-in replacement
-def inception_v3(width, height, frame_count, lr, output=29, model_name="model", **kwargs):
+def inception_v3(
+    width, height, frame_count, lr, output=29, model_name="model", **kwargs
+):
     """Legacy API compatibility wrapper."""
     return get_model("inception_v3", num_actions=output)
 

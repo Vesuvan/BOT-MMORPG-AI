@@ -485,7 +485,9 @@ class InferenceEngine:
 
             # Stack frames: (seq, C, H, W)
             input_tensor = torch.stack(list(self.frame_buffer), dim=0)
-            input_tensor = input_tensor.unsqueeze(0).to(self.device)  # (1, seq, C, H, W)
+            input_tensor = input_tensor.unsqueeze(0).to(
+                self.device
+            )  # (1, seq, C, H, W)
         else:
             input_tensor = tensor.unsqueeze(0).to(self.device)  # (1, C, H, W)
 
@@ -633,19 +635,31 @@ def main(argv=None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument("--model", required=True, help="Path to model checkpoint (.pth)")
-    parser.add_argument("--no-gamepad", action="store_true", help="Disable gamepad output")
+    parser.add_argument(
+        "--model", required=True, help="Path to model checkpoint (.pth)"
+    )
+    parser.add_argument(
+        "--no-gamepad", action="store_true", help="Disable gamepad output"
+    )
     parser.add_argument("--cpu", action="store_true", help="Force CPU inference")
-    parser.add_argument("--width", type=int, default=GAME_WIDTH, help="Game window width")
-    parser.add_argument("--height", type=int, default=GAME_HEIGHT, help="Game window height")
-    parser.add_argument("--delay", type=float, default=0, help="Delay between frames (seconds)")
+    parser.add_argument(
+        "--width", type=int, default=GAME_WIDTH, help="Game window width"
+    )
+    parser.add_argument(
+        "--height", type=int, default=GAME_HEIGHT, help="Game window height"
+    )
+    parser.add_argument(
+        "--delay", type=float, default=0, help="Delay between frames (seconds)"
+    )
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
 
     args = parser.parse_args(argv)
 
     # Check dependencies
     if not PYTORCH_AVAILABLE:
-        print("[Error] PyTorch not available. Install with: pip install torch torchvision")
+        print(
+            "[Error] PyTorch not available. Install with: pip install torch torchvision"
+        )
         return 1
 
     if not MODELS_AVAILABLE:
@@ -711,7 +725,9 @@ def main(argv=None) -> int:
 
                 # Motion detection
                 if MOTION_AVAILABLE:
-                    delta_count = motion_detection(t_minus, t_now, t_plus, screen_resized)
+                    delta_count = motion_detection(
+                        t_minus, t_now, t_plus, screen_resized
+                    )
                 else:
                     delta_count = 1000  # Default high motion
 

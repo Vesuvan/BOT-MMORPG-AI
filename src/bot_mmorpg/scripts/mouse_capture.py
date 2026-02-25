@@ -53,7 +53,14 @@ class MouseState:
     def to_array(self) -> np.ndarray:
         """Return [x, y, lmb, rmb, mmb, scroll] as float32 array (len 6)."""
         return np.array(
-            [self.x, self.y, float(self.lmb), float(self.rmb), float(self.mmb), self.scroll],
+            [
+                self.x,
+                self.y,
+                float(self.lmb),
+                float(self.rmb),
+                float(self.mmb),
+                self.scroll,
+            ],
             dtype=np.float32,
         )
 
@@ -112,7 +119,8 @@ class MouseCapture:
             from pynput import mouse  # type: ignore[import-untyped]
         except ImportError:
             raise ImportError(
-                "pynput is required for mouse capture. " "Install it with: pip install pynput"
+                "pynput is required for mouse capture. "
+                "Install it with: pip install pynput"
             )
 
         def on_move(x: int, y: int) -> None:

@@ -270,7 +270,9 @@ class CurriculumTrainer:
             self.current_phase_idx = phase_idx
 
             logger.info(f"\n{'=' * 50}")
-            logger.info(f"Phase {phase_idx + 1}/{len(self.config.phases)}: {phase.name}")
+            logger.info(
+                f"Phase {phase_idx + 1}/{len(self.config.phases)}: {phase.name}"
+            )
             logger.info(f"Description: {phase.description}")
             logger.info(f"Epochs: {phase.epochs}, LR: {phase.learning_rate}")
             logger.info("=" * 50)
@@ -284,7 +286,9 @@ class CurriculumTrainer:
                 self.current_epoch = total_epochs_done + epoch
 
                 # Training
-                train_loss, train_acc = self._train_epoch(train_loader, optimizer, phase)
+                train_loss, train_acc = self._train_epoch(
+                    train_loader, optimizer, phase
+                )
 
                 # Validation
                 val_loss, val_acc = self._validate(val_loader)
@@ -427,9 +431,12 @@ class CurriculumTrainer:
             "total_epochs": self.current_epoch + 1,
             "phases_completed": self.current_phase_idx + 1,
             "best_val_accuracy": self.best_val_accuracy,
-            "final_train_accuracy": self.history[-1].train_accuracy if self.history else 0,
+            "final_train_accuracy": self.history[-1].train_accuracy
+            if self.history
+            else 0,
             "final_val_accuracy": self.history[-1].val_accuracy if self.history else 0,
-            "early_stopped": self.patience_counter >= self.config.early_stopping_patience,
+            "early_stopped": self.patience_counter
+            >= self.config.early_stopping_patience,
             "history": [
                 {
                     "epoch": m.epoch,

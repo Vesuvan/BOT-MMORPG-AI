@@ -96,19 +96,27 @@ def validate_training_data_structure(data: np.ndarray) -> bool:
         item = data[i]
 
         if not isinstance(item, (list, tuple, np.ndarray)):
-            raise DataValidationError(f"Item {i} is not a valid container type: {type(item)}")
+            raise DataValidationError(
+                f"Item {i} is not a valid container type: {type(item)}"
+            )
 
         if len(item) < 2:
-            raise DataValidationError(f"Item {i} must have at least 2 elements (frame, action)")
+            raise DataValidationError(
+                f"Item {i} must have at least 2 elements (frame, action)"
+            )
 
         frame, action = item[0], item[1]
 
         # Validate frame is image-like
         if isinstance(frame, np.ndarray):
             if frame.ndim not in (2, 3):
-                raise DataValidationError(f"Frame at item {i} has invalid dimensions: {frame.ndim}")
+                raise DataValidationError(
+                    f"Frame at item {i} has invalid dimensions: {frame.ndim}"
+                )
         else:
-            raise DataValidationError(f"Frame at item {i} is not a numpy array: {type(frame)}")
+            raise DataValidationError(
+                f"Frame at item {i} is not a numpy array: {type(frame)}"
+            )
 
         # Validate action is numeric array
         if isinstance(action, np.ndarray):
@@ -118,9 +126,13 @@ def validate_training_data_structure(data: np.ndarray) -> bool:
                 )
         elif isinstance(action, (list, tuple)):
             if not all(isinstance(x, (int, float, np.number)) for x in action):
-                raise DataValidationError(f"Action at item {i} contains non-numeric values")
+                raise DataValidationError(
+                    f"Action at item {i} contains non-numeric values"
+                )
         else:
-            raise DataValidationError(f"Action at item {i} is not an array or list: {type(action)}")
+            raise DataValidationError(
+                f"Action at item {i} is not an array or list: {type(action)}"
+            )
 
     return True
 

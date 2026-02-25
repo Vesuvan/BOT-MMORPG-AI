@@ -172,7 +172,11 @@ class SettingsManager:
         result = deepcopy(base)
 
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = deepcopy(value)
@@ -276,7 +280,9 @@ class SettingsManager:
                     "types": task_config.augmentation,
                 }
                 # Override architecture if task-specific
-                profile_training["model"]["architecture"] = task_config.recommended_architecture
+                profile_training["model"]["architecture"] = (
+                    task_config.recommended_architecture
+                )
 
             result = self._deep_merge(result, {"training": profile_training})
 
@@ -349,7 +355,9 @@ class SettingsManager:
             use_half_precision=performance.get("use_half_precision", False),
         )
 
-    def save_session_config(self, config: SessionConfig, path: Optional[Path] = None) -> Path:
+    def save_session_config(
+        self, config: SessionConfig, path: Optional[Path] = None
+    ) -> Path:
         """
         Save session configuration to file.
 

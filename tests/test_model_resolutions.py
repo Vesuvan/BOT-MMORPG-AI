@@ -116,7 +116,8 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"MobileNetV3 {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
+                f"MobileNetV3 {name} ({width}x{height}): "
+                f"expected (1, 29), got {output.shape}"
             )
 
     def test_resnet18_lstm_resolutions(self, device):
@@ -162,7 +163,8 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"AlexNet {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
+                f"AlexNet {name} ({width}x{height}): "
+                f"expected (1, 29), got {output.shape}"
             )
 
     def test_sentnet_2d_resolutions(self, device):
@@ -179,7 +181,8 @@ class TestModelResolutions:
                 output = model(x)
 
             assert output.shape == (1, 29), (
-                f"SentNet2D {name} ({width}x{height}): " f"expected (1, 29), got {output.shape}"
+                f"SentNet2D {name} ({width}x{height}): "
+                f"expected (1, 29), got {output.shape}"
             )
 
 
@@ -279,9 +282,9 @@ class TestResolutionConsistency:
         # All outputs should be identical
         expected_shape = (1, 29)
         for i, (shape, (w, h)) in enumerate(zip(outputs, resolutions)):
-            assert (
-                shape == expected_shape
-            ), f"Resolution {w}x{h} produced shape {shape}, expected {expected_shape}"
+            assert shape == expected_shape, (
+                f"Resolution {w}x{h} produced shape {shape}, expected {expected_shape}"
+            )
 
 
 if __name__ == "__main__":
