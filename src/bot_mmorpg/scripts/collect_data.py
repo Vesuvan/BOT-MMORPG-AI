@@ -34,7 +34,9 @@ except ImportError:
         from grabscreen import grab_screen
     except ImportError as e:
         logger.error(f"Failed to import required modules: {e}")
-        logger.error("Please ensure grabscreen.py, getkeys.py, and getgamepad.py are available")
+        logger.error(
+            "Please ensure grabscreen.py, getkeys.py, and getgamepad.py are available"
+        )
         grab_screen = None
         key_check = None
         gamepad_check = None
@@ -179,7 +181,9 @@ def capture_input() -> Tuple[List[int], List[int]]:
         # Capture gamepad (with fallback for missing gamepad)
         try:
             gamepad_keys = gamepad_check() if gamepad_check else []
-            gamepad_output = gamepad_keys_to_output(gamepad_keys) if gamepad_keys else []
+            gamepad_output = (
+                gamepad_keys_to_output(gamepad_keys) if gamepad_keys else []
+            )
         except Exception:
             # Gamepad not available - use empty output
             gamepad_output = []
@@ -279,7 +283,9 @@ Example:
   python collect_data.py --out data/my_session
         """,
     )
-    parser.add_argument("--out", default="data/raw", help="Output folder for training data")
+    parser.add_argument(
+        "--out", default="data/raw", help="Output folder for training data"
+    )
     parser.add_argument(
         "--region", default="0,40,1920,1120", help="Screen capture region (x1,y1,x2,y2)"
     )
@@ -289,7 +295,9 @@ Example:
         default=500,
         help="Frames per chunk file (default: 500)",
     )
-    parser.add_argument("--no-preview", action="store_true", help="Disable preview window")
+    parser.add_argument(
+        "--no-preview", action="store_true", help="Disable preview window"
+    )
     args = parser.parse_args(argv)
 
     # Parse region
@@ -371,7 +379,9 @@ Example:
 
                     # Progress logging
                     if frame_count % 100 == 0:
-                        logger.info(f"Captured {frame_count} frames (buffer: {len(training_data)})")
+                        logger.info(
+                            f"Captured {frame_count} frames (buffer: {len(training_data)})"
+                        )
 
                     # Save chunks
                     if len(training_data) >= args.chunk_size:

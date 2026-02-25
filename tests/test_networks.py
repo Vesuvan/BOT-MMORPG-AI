@@ -85,7 +85,9 @@ class TestModelInstantiation:
         """Test EfficientNet-LSTM model instantiation."""
         from bot_mmorpg.scripts.models_pytorch import get_model
 
-        model = get_model("efficientnet_lstm", num_actions=num_actions, pretrained=False)
+        model = get_model(
+            "efficientnet_lstm", num_actions=num_actions, pretrained=False
+        )
         assert isinstance(model, nn.Module)
         assert model.num_actions == num_actions
 
@@ -93,7 +95,9 @@ class TestModelInstantiation:
         """Test EfficientNet Simple model instantiation."""
         from bot_mmorpg.scripts.models_pytorch import get_model
 
-        model = get_model("efficientnet_simple", num_actions=num_actions, pretrained=False)
+        model = get_model(
+            "efficientnet_simple", num_actions=num_actions, pretrained=False
+        )
         assert isinstance(model, nn.Module)
         assert model.num_actions == num_actions
 
@@ -268,7 +272,9 @@ class TestParameterCounting:
         from bot_mmorpg.scripts.models_pytorch import count_parameters, get_model
 
         mobilenet = get_model("mobilenet_v3", num_actions=29, pretrained=False)
-        efficientnet = get_model("efficientnet_simple", num_actions=29, pretrained=False)
+        efficientnet = get_model(
+            "efficientnet_simple", num_actions=29, pretrained=False
+        )
 
         mobile_params = count_parameters(mobilenet)
         efficient_params = count_parameters(efficientnet)
@@ -349,7 +355,9 @@ class TestLegacyCompatibility:
         """Test sentnet_color_2d legacy wrapper function."""
         from bot_mmorpg.scripts.models_pytorch import sentnet_color_2d
 
-        model = sentnet_color_2d(width=480, height=270, frame_count=4, lr=0.001, output=29)
+        model = sentnet_color_2d(
+            width=480, height=270, frame_count=4, lr=0.001, output=29
+        )
         assert isinstance(model, nn.Module)
 
     def test_googlenet_alias(self):

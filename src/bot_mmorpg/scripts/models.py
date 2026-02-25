@@ -43,7 +43,9 @@ except ImportError:
             "TensorFlow/TFLearn not installed. Install with: pip install tensorflow==2.11.0 tflearn"
         )
 
-    conv_2d = max_pool_2d = avg_pool_2d = conv_3d = max_pool_3d = avg_pool_3d = _stub_model
+    conv_2d = max_pool_2d = avg_pool_2d = conv_3d = max_pool_3d = avg_pool_3d = (
+        _stub_model
+    )
     input_data = dropout = fully_connected = regression = _stub_model
     local_response_normalization = merge = _stub_model
 
@@ -61,14 +63,24 @@ def otherception3(
 ):
     with tf.device("/{}:{}".format(device, num)):
         network = input_data(shape=[None, width, height, 3], name="input")
-        conv1_7_7 = conv_2d(network, 64, 28, strides=4, activation="relu", name="conv1_7_7_s2")
+        conv1_7_7 = conv_2d(
+            network, 64, 28, strides=4, activation="relu", name="conv1_7_7_s2"
+        )
         pool1_3_3 = max_pool_2d(conv1_7_7, 9, strides=4)
         pool1_3_3 = local_response_normalization(pool1_3_3)
-        conv2_3_3_reduce = conv_2d(pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce")
-        conv2_3_3 = conv_2d(conv2_3_3_reduce, 192, 12, activation="relu", name="conv2_3_3")
+        conv2_3_3_reduce = conv_2d(
+            pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce"
+        )
+        conv2_3_3 = conv_2d(
+            conv2_3_3_reduce, 192, 12, activation="relu", name="conv2_3_3"
+        )
         conv2_3_3 = local_response_normalization(conv2_3_3)
-        pool2_3_3 = max_pool_2d(conv2_3_3, kernel_size=12, strides=2, name="pool2_3_3_s2")
-        inception_3a_1_1 = conv_2d(pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1")
+        pool2_3_3 = max_pool_2d(
+            conv2_3_3, kernel_size=12, strides=2, name="pool2_3_3_s2"
+        )
+        inception_3a_1_1 = conv_2d(
+            pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1"
+        )
         inception_3a_3_3_reduce = conv_2d(
             pool2_3_3, 96, 1, activation="relu", name="inception_3a_3_3_reduce"
         )
@@ -173,7 +185,9 @@ def otherception3(
             name="inception_3b_output",
         )
 
-        pool3_3_3 = max_pool_2d(inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3")
+        pool3_3_3 = max_pool_2d(
+            inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3"
+        )
         inception_4a_1_1 = conv_2d(
             pool3_3_3, 192, filter_size=1, activation="relu", name="inception_4a_1_1"
         )
@@ -459,7 +473,9 @@ def otherception3(
             mode="concat",
         )
 
-        pool4_3_3 = max_pool_2d(inception_4e_output, kernel_size=3, strides=2, name="pool_3_3")
+        pool4_3_3 = max_pool_2d(
+            inception_4e_output, kernel_size=3, strides=2, name="pool_3_3"
+        )
 
         inception_5a_1_1 = conv_2d(
             pool4_3_3, 256, filter_size=1, activation="relu", name="inception_5a_1_1"
@@ -590,7 +606,9 @@ def otherception3(
         return model
 
 
-def resnext(width, height, frame_count, lr, output=9, n=3, model_name="sentnet_color.model"):
+def resnext(
+    width, height, frame_count, lr, output=9, n=3, model_name="sentnet_color.model"
+):
     net = input_data(shape=[None, width, height, 3], name="input")
     net = tflearn.conv_2d(net, 16, 3, regularizer="L2", weight_decay=0.0001)
     net = tflearn.layers.conv.resnext_block(net, n, 16, 32)
@@ -606,12 +624,16 @@ def resnext(width, height, frame_count, lr, output=9, n=3, model_name="sentnet_c
     opt = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
     net = tflearn.regression(net, optimizer=opt, loss="categorical_crossentropy")
 
-    model = tflearn.DNN(net, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log")
+    model = tflearn.DNN(
+        net, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log"
+    )
 
     return model
 
 
-def sentnet_color_2d(width, height, frame_count, lr, output=9, model_name="sentnet_color.model"):
+def sentnet_color_2d(
+    width, height, frame_count, lr, output=9, model_name="sentnet_color.model"
+):
     network = input_data(shape=[None, width, height, 3], name="input")
     network = conv_2d(network, 96, 11, strides=4, activation="relu")
     network = max_pool_2d(network, 3, strides=2)
@@ -648,21 +670,31 @@ def sentnet_color_2d(width, height, frame_count, lr, output=9, model_name="sentn
         name="targets",
     )
 
-    model = tflearn.DNN(network, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log")
+    model = tflearn.DNN(
+        network, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log"
+    )
 
     return model
 
 
-def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_color.model"):
+def inception_v3(
+    width, height, frame_count, lr, output=9, model_name="sentnet_color.model"
+):
     network = input_data(shape=[None, width, height, 3], name="input")
-    conv1_7_7 = conv_2d(network, 64, 7, strides=2, activation="relu", name="conv1_7_7_s2")
+    conv1_7_7 = conv_2d(
+        network, 64, 7, strides=2, activation="relu", name="conv1_7_7_s2"
+    )
     pool1_3_3 = max_pool_2d(conv1_7_7, 3, strides=2)
     pool1_3_3 = local_response_normalization(pool1_3_3)
-    conv2_3_3_reduce = conv_2d(pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce")
+    conv2_3_3_reduce = conv_2d(
+        pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce"
+    )
     conv2_3_3 = conv_2d(conv2_3_3_reduce, 192, 3, activation="relu", name="conv2_3_3")
     conv2_3_3 = local_response_normalization(conv2_3_3)
     pool2_3_3 = max_pool_2d(conv2_3_3, kernel_size=3, strides=2, name="pool2_3_3_s2")
-    inception_3a_1_1 = conv_2d(pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1")
+    inception_3a_1_1 = conv_2d(
+        pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1"
+    )
     inception_3a_3_3_reduce = conv_2d(
         pool2_3_3, 96, 1, activation="relu", name="inception_3a_3_3_reduce"
     )
@@ -731,7 +763,9 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         activation="relu",
         name="inception_3b_5_5_reduce",
     )
-    inception_3b_5_5 = conv_2d(inception_3b_5_5_reduce, 96, filter_size=5, name="inception_3b_5_5")
+    inception_3b_5_5 = conv_2d(
+        inception_3b_5_5_reduce, 96, filter_size=5, name="inception_3b_5_5"
+    )
     inception_3b_pool = max_pool_2d(
         inception_3a_output, kernel_size=3, strides=1, name="inception_3b_pool"
     )
@@ -751,7 +785,9 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         name="inception_3b_output",
     )
 
-    pool3_3_3 = max_pool_2d(inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3")
+    pool3_3_3 = max_pool_2d(
+        inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3"
+    )
     inception_4a_1_1 = conv_2d(
         pool3_3_3, 192, filter_size=1, activation="relu", name="inception_4a_1_1"
     )
@@ -775,7 +811,9 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         activation="relu",
         name="inception_4a_5_5",
     )
-    inception_4a_pool = max_pool_2d(pool3_3_3, kernel_size=3, strides=1, name="inception_4a_pool")
+    inception_4a_pool = max_pool_2d(
+        pool3_3_3, kernel_size=3, strides=1, name="inception_4a_pool"
+    )
     inception_4a_pool_1_1 = conv_2d(
         inception_4a_pool,
         64,
@@ -1002,7 +1040,9 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         mode="concat",
     )
 
-    pool4_3_3 = max_pool_2d(inception_4e_output, kernel_size=3, strides=2, name="pool_3_3")
+    pool4_3_3 = max_pool_2d(
+        inception_4e_output, kernel_size=3, strides=2, name="pool_3_3"
+    )
 
     inception_5a_1_1 = conv_2d(
         pool4_3_3, 256, filter_size=1, activation="relu", name="inception_5a_1_1"
@@ -1027,7 +1067,9 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         activation="relu",
         name="inception_5a_5_5",
     )
-    inception_5a_pool = max_pool_2d(pool4_3_3, kernel_size=3, strides=1, name="inception_5a_pool")
+    inception_5a_pool = max_pool_2d(
+        pool4_3_3, kernel_size=3, strides=1, name="inception_5a_pool"
+    )
     inception_5a_pool_1_1 = conv_2d(
         inception_5a_pool,
         128,
@@ -1106,21 +1148,31 @@ def inception_v3(width, height, frame_count, lr, output=9, model_name="sentnet_c
         name="targets",
     )
 
-    model = tflearn.DNN(network, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log")
+    model = tflearn.DNN(
+        network, max_checkpoints=0, tensorboard_verbose=0, tensorboard_dir="log"
+    )
 
     return model
 
 
-def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentnet_color.model"):
+def inception_v3_3d(
+    width, height, frame_count, lr, output=9, model_name="sentnet_color.model"
+):
     network = input_data(shape=[None, width, height, 3, 1], name="input")
-    conv1_7_7 = conv_3d(network, 64, 7, strides=2, activation="relu", name="conv1_7_7_s2")
+    conv1_7_7 = conv_3d(
+        network, 64, 7, strides=2, activation="relu", name="conv1_7_7_s2"
+    )
     pool1_3_3 = max_pool_3d(conv1_7_7, 3, strides=2)
     # pool1_3_3 = local_response_normalization(pool1_3_3)
-    conv2_3_3_reduce = conv_3d(pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce")
+    conv2_3_3_reduce = conv_3d(
+        pool1_3_3, 64, 1, activation="relu", name="conv2_3_3_reduce"
+    )
     conv2_3_3 = conv_3d(conv2_3_3_reduce, 192, 3, activation="relu", name="conv2_3_3")
     # conv2_3_3 = local_response_normalization(conv2_3_3)
     pool2_3_3 = max_pool_3d(conv2_3_3, kernel_size=3, strides=2, name="pool2_3_3_s2")
-    inception_3a_1_1 = conv_3d(pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1")
+    inception_3a_1_1 = conv_3d(
+        pool2_3_3, 64, 1, activation="relu", name="inception_3a_1_1"
+    )
     inception_3a_3_3_reduce = conv_3d(
         pool2_3_3, 96, 1, activation="relu", name="inception_3a_3_3_reduce"
     )
@@ -1189,7 +1241,9 @@ def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentne
         activation="relu",
         name="inception_3b_5_5_reduce",
     )
-    inception_3b_5_5 = conv_3d(inception_3b_5_5_reduce, 96, filter_size=5, name="inception_3b_5_5")
+    inception_3b_5_5 = conv_3d(
+        inception_3b_5_5_reduce, 96, filter_size=5, name="inception_3b_5_5"
+    )
     inception_3b_pool = max_pool_3d(
         inception_3a_output, kernel_size=3, strides=1, name="inception_3b_pool"
     )
@@ -1209,7 +1263,9 @@ def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentne
         name="inception_3b_output",
     )
 
-    pool3_3_3 = max_pool_3d(inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3")
+    pool3_3_3 = max_pool_3d(
+        inception_3b_output, kernel_size=3, strides=2, name="pool3_3_3"
+    )
     inception_4a_1_1 = conv_3d(
         pool3_3_3, 192, filter_size=1, activation="relu", name="inception_4a_1_1"
     )
@@ -1233,7 +1289,9 @@ def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentne
         activation="relu",
         name="inception_4a_5_5",
     )
-    inception_4a_pool = max_pool_3d(pool3_3_3, kernel_size=3, strides=1, name="inception_4a_pool")
+    inception_4a_pool = max_pool_3d(
+        pool3_3_3, kernel_size=3, strides=1, name="inception_4a_pool"
+    )
     inception_4a_pool_1_1 = conv_3d(
         inception_4a_pool,
         64,
@@ -1460,7 +1518,9 @@ def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentne
         mode="concat",
     )
 
-    pool4_3_3 = max_pool_3d(inception_4e_output, kernel_size=3, strides=2, name="pool_3_3")
+    pool4_3_3 = max_pool_3d(
+        inception_4e_output, kernel_size=3, strides=2, name="pool_3_3"
+    )
 
     inception_5a_1_1 = conv_3d(
         pool4_3_3, 256, filter_size=1, activation="relu", name="inception_5a_1_1"
@@ -1485,7 +1545,9 @@ def inception_v3_3d(width, height, frame_count, lr, output=9, model_name="sentne
         activation="relu",
         name="inception_5a_5_5",
     )
-    inception_5a_pool = max_pool_3d(pool4_3_3, kernel_size=3, strides=1, name="inception_5a_pool")
+    inception_5a_pool = max_pool_3d(
+        pool4_3_3, kernel_size=3, strides=1, name="inception_5a_pool"
+    )
     inception_5a_pool_1_1 = conv_3d(
         inception_5a_pool,
         128,
@@ -1596,7 +1658,9 @@ def sentnet_LSTM_gray(width, height, frame_count, lr, output=9):
     return model
 
 
-def sentnet_color(width, height, frame_count, lr, output=9, model_name="sentnet_color.model"):
+def sentnet_color(
+    width, height, frame_count, lr, output=9, model_name="sentnet_color.model"
+):
     network = input_data(shape=[None, width, height, 3, 1], name="input")
     network = conv_3d(network, 96, 11, strides=4, activation="relu")
     network = max_pool_3d(network, 3, strides=2)

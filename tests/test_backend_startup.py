@@ -21,7 +21,9 @@ class TestBackendArgParsing:
 
         mock_module = MagicMock()
         mock_module.main = fake_tauri_main
-        with patch.dict("sys.modules", {"modelhub": MagicMock(), "modelhub.tauri": mock_module}):
+        with patch.dict(
+            "sys.modules", {"modelhub": MagicMock(), "modelhub.tauri": mock_module}
+        ):
             import importlib
 
             import backend.main_backend
