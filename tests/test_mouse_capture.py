@@ -68,7 +68,7 @@ class TestMouseCaptureNormalization:
 
     def test_normalize_center(self):
         """Test that center of region normalizes to (0.5, 0.5)."""
-        from bot_mmorpg.scripts.mouse_capture import MouseCapture, _RawMouseState
+        from bot_mmorpg.scripts.mouse_capture import MouseCapture
 
         mc = MouseCapture(capture_region=(0, 0, 1920, 1080))
 
