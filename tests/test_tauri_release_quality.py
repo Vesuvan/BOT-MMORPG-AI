@@ -14,10 +14,7 @@ These tests catch common release issues:
 
 import json
 import re
-import sys
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 TAURI_DIR = ROOT / "src-tauri"
@@ -158,7 +155,8 @@ class TestReleaseConfiguration:
         # The expected installer name pattern
         expected_pattern = f"{product}_{version}"
         assert product and version, "Product name and version must be set"
-        # Verify the pattern would produce a clear filename
+        # Verify the pattern would produce a clear, non-empty filename
+        assert len(expected_pattern) > 3, "Installer filename pattern too short"
         assert "_" not in product or product == "BOT-MMORPG-AI", (
             "Product name should use hyphens not underscores"
         )
