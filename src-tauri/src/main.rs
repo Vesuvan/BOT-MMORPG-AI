@@ -1675,3 +1675,227 @@ fn main() {
             }
         });
 }
+
+// ---------------------------
+// UNIT TESTS
+// ---------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- normalize_game_id ---
+
+    #[test]
+    fn test_normalize_game_id_with_valid_id() {
+        let result = normalize_game_id(Some("world_of_warcraft".to_string()));
+        assert_eq!(result, "world_of_warcraft");
+    }
+
+    #[test]
+    fn test_normalize_game_id_with_none() {
+        let result = normalize_game_id(None);
+        assert_eq!(result, DEFAULT_GAME_ID);
+    }
+
+    #[test]
+    fn test_normalize_game_id_with_empty_string() {
+        let result = normalize_game_id(Some("".to_string()));
+        assert_eq!(result, DEFAULT_GAME_ID);
+    }
+
+    #[test]
+    fn test_normalize_game_id_trims_whitespace() {
+        let result = normalize_game_id(Some("  genshin_impact  ".to_string()));
+        assert_eq!(result, "genshin_impact");
+    }
+
+    #[test]
+    fn test_normalize_game_id_whitespace_only() {
+        let result = normalize_game_id(Some("   ".to_string()));
+        assert_eq!(result, DEFAULT_GAME_ID);
+    }
+
+    // --- parse_ready_line ---
+
+    #[test]
+    fn test_parse_ready_line_valid() {
+        let line = "READY url=http://127.0.0.1:8080 token=tkn-123-456";
+        let result = parse_ready_line(line);
+        assert!(result.is_some());
+        let api = result.unwrap();
+        assert_eq!(api.base_url, "http://127.0.0.1:8080");
+        assert_eq!(api.token, "tkn-123-456");
+    }
+
+    #[test]
+    fn test_parse_ready_line_not_ready() {
+        let line = "Starting sidecar...";
+        assert!(parse_ready_line(line).is_none());
+    }
+
+    #[test]
+    fn test_parse_ready_line_partial() {
+        let line = "READY url=http://127.0.0.1:8080";
+        // Missing token
+        assert!(parse_ready_line(line).is_none());
+    }
+
+    #[test]
+    fn test_parse_ready_line_empty() {
+        assert!(parse_ready_line("").is_none());
+    }
+
+    #[test]
+    fn test_parse_ready_line_with_whitespace() {
+        let line = "  READY url=http://127.0.0.1:9090 token=abc  ";
+        let result = parse_ready_line(line);
+        assert!(result.is_some());
+        let api = result.unwrap();
+        assert_eq!(api.base_url, "http://127.0.0.1:9090");
+        assert_eq!(api.token, "abc");
+    }
+
+    // --- is_windows / path_sep ---
+
+    #[test]
+    fn test_path_sep_returns_valid_separator() {
+        let sep = path_sep();
+        assert!(sep == ";" || sep == ":");
+    }
+
+    // --- normalize_provider ---
+
+    #[test]
+    fn test_normalize_provider_openai() {
+        assert_eq!(normalize_provider("openai"), "openai");
+        assert_eq!(normalize_provider("OpenAI"), "openai");
+        assert_eq!(normalize_provider("  openai  "), "openai");
+    }
+
+    #[test]
+    fn test_normalize_provider_gemini() {
+        assert_eq!(normalize_provider("gemini"), "gemini");
+        assert_eq!(normalize_provider("Gemini"), "gemini");
+        assert_eq!(normalize_provider("anything_else"), "gemini");
+        assert_eq!(normalize_provider(""), "gemini");
+    }
+
+    // --- Constants ---
+
+    #[test]
+    fn test_default_game_id_is_set() {
+        assert!(!DEFAULT_GAME_ID.is_empty());
+        assert_eq!(DEFAULT_GAME_ID, "genshin_impact");
+    }
+
+    #[test]
+    fn test_default_version_is_set() {
+        assert!(!DEFAULT_VERSION.is_empty());
+        assert_eq!(DEFAULT_VERSION, "0.01");
+    }
+
+    #[test]
+    fn test_prod_extras_does_not_include_ml() {
+        // ML deps are installed on-demand, not at initial setup
+        assert!(!PROD_EXTRAS.contains("ml"));
+        assert!(PROD_EXTRAS.contains("launcher"));
+        assert!(PROD_EXTRAS.contains("backend"));
+    }
+
+    // --- SidecarApi ---
+
+    #[test]
+    fn test_sidecar_api_clone() {
+        let api = SidecarApi {
+            base_url: "http://localhost:8080".to_string(),
+            token: "test-token".to_string(),
+        };
+        let cloned = api.clone();
+        assert_eq!(cloned.base_url, "http://localhost:8080");
+        assert_eq!(cloned.token, "test-token");
+    }
+
+    // --- AiConfig serialization ---
+
+    #[test]
+    fn test_ai_config_serialization() {
+        let config = AiConfig {
+            provider: "gemini".to_string(),
+            gemini_key: "key123".to_string(),
+            openai_key: "".to_string(),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("gemini"));
+        assert!(json.contains("key123"));
+    }
+
+    #[test]
+    fn test_ai_config_deserialization() {
+        let json = r#"{"provider":"openai","gemini_key":"","openai_key":"sk-123"}"#;
+        let config: AiConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.openai_key, "sk-123");
+    }
+
+    // --- AppState construction ---
+
+    #[test]
+    fn test_app_state_construction() {
+        let state = AppState {
+            inner: Arc::new(AppStateInner {
+                current_process: Mutex::new(None),
+                sidecar_process: Mutex::new(None),
+                sidecar: Mutex::new(None),
+                http: Client::new(),
+            }),
+        };
+        assert!(state.inner.current_process.lock().unwrap().is_none());
+        assert!(state.inner.sidecar_process.lock().unwrap().is_none());
+        assert!(state.inner.sidecar.lock().unwrap().is_none());
+    }
+
+    // --- Dev helpers ---
+
+    #[test]
+    fn test_dev_repo_root_returns_path() {
+        let root = dev_repo_root();
+        // Should return a valid path (may not exist in CI)
+        assert!(!root.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn test_venv_python_path_format() {
+        let root = Path::new("/some/project");
+        let py = venv_python_from_root(root);
+        let py_str = py.to_string_lossy();
+
+        if is_windows() {
+            assert!(py_str.contains("Scripts"));
+            assert!(py_str.ends_with("python.exe"));
+        } else {
+            assert!(py_str.contains("bin"));
+            assert!(py_str.ends_with("python3"));
+        }
+    }
+
+    #[test]
+    fn test_venv_bin_path_format() {
+        let root = Path::new("/some/project");
+        let bin = venv_bin_from_root(root);
+        let bin_str = bin.to_string_lossy();
+
+        if is_windows() {
+            assert!(bin_str.contains("Scripts"));
+        } else {
+            assert!(bin_str.contains("bin"));
+        }
+    }
+
+    // --- Installation directory ---
+
+    #[test]
+    fn test_installation_dir_returns_valid_path() {
+        let dir = installation_dir();
+        assert!(!dir.to_string_lossy().is_empty());
+    }
+}
