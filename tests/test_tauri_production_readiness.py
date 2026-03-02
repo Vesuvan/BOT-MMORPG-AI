@@ -9,8 +9,6 @@ All tests are non-destructive and additive - they only read and verify.
 """
 
 import json
-import os
-import re
 import sys
 from pathlib import Path
 
