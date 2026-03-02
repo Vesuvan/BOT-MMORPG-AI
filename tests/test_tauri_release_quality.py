@@ -61,7 +61,9 @@ class TestVersionConsistency:
         assert version is not None, "pyproject.toml version not found"
         parts = version.split(".")
         assert len(parts) == 3, f"Version must be semver (x.y.z): {version}"
-        assert all(p.isdigit() for p in parts), f"Version parts must be numeric: {version}"
+        assert all(p.isdigit() for p in parts), (
+            f"Version parts must be numeric: {version}"
+        )
 
     def test_tauri_conf_version_is_semver(self):
         """tauri.conf.json version must be valid semver."""
@@ -141,8 +143,9 @@ class TestReleaseConfiguration:
         pyproject_name = match.group(1) if match else ""
 
         # Normalize for comparison (hyphens vs underscores)
-        assert tauri_name.lower().replace("-", "").replace("_", "") == \
-               pyproject_name.lower().replace("-", "").replace("_", ""), (
+        assert tauri_name.lower().replace("-", "").replace(
+            "_", ""
+        ) == pyproject_name.lower().replace("-", "").replace("_", ""), (
             f"Product name mismatch: Tauri='{tauri_name}', pyproject='{pyproject_name}'"
         )
 
@@ -242,7 +245,11 @@ class TestGamerDocumentation:
         readme = (ROOT / "README.md").read_text(encoding="utf-8", errors="replace")
         has_record = "record" in readme.lower() or "collect" in readme.lower()
         has_train = "train" in readme.lower()
-        has_play = "play" in readme.lower() or "bot" in readme.lower() or "run" in readme.lower()
+        has_play = (
+            "play" in readme.lower()
+            or "bot" in readme.lower()
+            or "run" in readme.lower()
+        )
 
         assert has_record, "README must mention recording/data collection"
         assert has_train, "README must mention training"
@@ -274,7 +281,9 @@ class TestPythonPackageIntegrity:
     def test_all_subpackages_have_init(self):
         """All subpackages must have __init__.py."""
         pkg = ROOT / "src" / "bot_mmorpg"
-        subdirs = [d for d in pkg.iterdir() if d.is_dir() and not d.name.startswith("__")]
+        subdirs = [
+            d for d in pkg.iterdir() if d.is_dir() and not d.name.startswith("__")
+        ]
 
         for subdir in subdirs:
             init = subdir / "__init__.py"

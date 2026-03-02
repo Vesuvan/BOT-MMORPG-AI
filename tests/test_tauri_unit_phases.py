@@ -32,9 +32,7 @@ try:
 except ImportError:
     PYTORCH_AVAILABLE = False
 
-requires_pytorch = pytest.mark.skipif(
-    not PYTORCH_AVAILABLE, reason="PyTorch required"
-)
+requires_pytorch = pytest.mark.skipif(not PYTORCH_AVAILABLE, reason="PyTorch required")
 
 
 # ---------------------------------------------------------------------------
