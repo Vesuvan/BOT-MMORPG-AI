@@ -335,8 +335,18 @@ function Ensure-BundledSitePackages {
   Log-Info "Wheelhouse Source: $whWheels"
 
   # ---- Host Python (drives pip install into target) ----
+  # Prefer .venv if it exists (local dev), otherwise fall back to system Python (CI)
   $hostPy = Join-Path $RootDir ".venv\Scripts\python.exe"
-  if (-not (Test-Path $hostPy)) { throw "Build venv python not found: $hostPy" }
+  if (-not (Test-Path $hostPy)) {
+    Log-Info "Build venv not found at $hostPy, falling back to system Python..."
+    $sysPy = Get-Command python -ErrorAction SilentlyContinue
+    if ($sysPy) {
+      $hostPy = $sysPy.Source
+      Log-Info "Using system Python: $hostPy"
+    } else {
+      throw "No Python found: neither .venv\Scripts\python.exe nor system 'python' in PATH"
+    }
+  }
 
   # Validate host python is 3.10 and 64-bit (wheelhouse is cp310 win_amd64)
   $hostInfo = & $hostPy -c "import sys,platform; print(f'{sys.version_info.major}.{sys.version_info.minor}|{platform.architecture()[0]}|{sys.executable}')"
