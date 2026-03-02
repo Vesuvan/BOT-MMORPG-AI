@@ -132,8 +132,8 @@ if (-not $hasPip) {
     Ok "pip is already present."
 }
 
-Info "Upgrading build tools..."
-& $pyExe -m pip install --upgrade pip setuptools wheel --quiet
+Info "Upgrading build tools (including hatchling build backend)..."
+& $pyExe -m pip install --upgrade pip setuptools wheel hatchling --quiet
 
 # -------------------------
 # 4. Preparing Directories

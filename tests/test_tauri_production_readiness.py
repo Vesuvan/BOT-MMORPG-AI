@@ -42,6 +42,7 @@ UI_HTML = UI_DIR / "index.html"
 UI_JS = UI_DIR / "main.js"
 LAUNCHER_PY = ROOT / "launcher" / "launcher.py"
 
+
 # ---------------------------------------------------------------------------
 # Build Configuration
 # ---------------------------------------------------------------------------

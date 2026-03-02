@@ -1,9 +1,8 @@
-name: Release
+name: Release (Legacy)
 
 on:
-  push:
-    tags:
-      - 'v*'
+  # Tag-triggered releases are handled by release-windows-installer.yml
+  # This workflow is kept for manual/dispatch use only
   workflow_dispatch:
     inputs:
       version:
@@ -62,9 +61,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up Rust
-        uses: dtolnay/rust-action@stable
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^1.0"
