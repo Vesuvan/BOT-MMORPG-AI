@@ -3,6 +3,11 @@ Data Collection Script for BOT-MMORPG-AI
 
 Captures screen and input data for training neural networks.
 Includes comprehensive error handling for production use.
+
+Supports keyboard, gamepad, and optional mouse recording.
+Mouse recording is additive and non-destructive: when enabled it
+appends 6 extra values to the action vector; when disabled the
+existing keyboard+gamepad pipeline is completely unchanged.
 """
 
 import argparse
@@ -40,6 +45,15 @@ except ImportError:
         grab_screen = None
         key_check = None
         gamepad_check = None
+
+# Optional mouse capture – additive only, never breaks existing pipeline
+try:
+    from .mouse_capture import MouseCapture
+except ImportError:
+    try:
+        from mouse_capture import MouseCapture
+    except ImportError:
+        MouseCapture = None
 
 
 class DataCollectionError(Exception):
@@ -163,12 +177,23 @@ def capture_screen(
         raise ScreenCaptureError(f"Failed to capture screen: {e}")
 
 
-def capture_input() -> Tuple[List[int], List[int]]:
+def capture_input(
+    mouse_capturer: Optional[object] = None,
+) -> Tuple[List[int], List[int], Optional[np.ndarray]]:
     """
-    Capture keyboard and gamepad input.
+    Capture keyboard, gamepad, and (optionally) mouse input.
+
+    Mouse recording is additive and non-destructive:
+    - When *mouse_capturer* is ``None`` the returned mouse vector is ``None``
+      and the existing keyboard+gamepad values are unchanged.
+    - When a :class:`MouseCapture` instance is provided, a 6-element float32
+      array ``[x, y, lmb, rmb, mmb, scroll]`` is appended.
+
+    Args:
+        mouse_capturer: Optional MouseCapture instance (or None to skip).
 
     Returns:
-        Tuple of (keyboard_output, gamepad_output)
+        Tuple of (keyboard_output, gamepad_output, mouse_output_or_none)
 
     Raises:
         InputCaptureError: If input capture fails
@@ -188,7 +213,17 @@ def capture_input() -> Tuple[List[int], List[int]]:
             # Gamepad not available - use empty output
             gamepad_output = []
 
-        return keyboard_output, gamepad_output
+        # Capture mouse (additive – only when explicitly enabled)
+        mouse_output = None
+        if mouse_capturer is not None:
+            try:
+                state = mouse_capturer.snapshot()
+                mouse_output = state.to_array()  # float32, shape (6,)
+            except Exception:
+                # Mouse capture failure must never break recording
+                mouse_output = None
+
+        return keyboard_output, gamepad_output, mouse_output
 
     except Exception as e:
         raise InputCaptureError(f"Failed to capture input: {e}")
@@ -298,7 +333,20 @@ Example:
     parser.add_argument(
         "--no-preview", action="store_true", help="Disable preview window"
     )
+    parser.add_argument(
+        "--mouse",
+        action="store_true",
+        help="Enable mouse recording (additive – appends 6 values to action vector)",
+    )
     args = parser.parse_args(argv)
+
+    # Environment variable fallback for --mouse (used by Tauri/launcher UI)
+    if not args.mouse:
+        import os
+
+        env_mouse = os.environ.get("BOTMMO_CAPTURE_MOUSE", "").lower()
+        if env_mouse == "true":
+            args.mouse = True
 
     # Parse region
     try:
@@ -342,6 +390,21 @@ Example:
     error_count = 0
     max_consecutive_errors = 10
 
+    # --- Optional mouse capture (additive, non-destructive) ---
+    mouse_capturer = None
+    if args.mouse:
+        if MouseCapture is None:
+            logger.warning(
+                "Mouse recording requested but pynput is not installed. "
+                "Continuing without mouse. Install with: pip install pynput"
+            )
+        else:
+            mouse_capturer = MouseCapture(capture_region=region)
+            mouse_capturer.start()
+            logger.info(
+                "Mouse recording ENABLED (adds 6 values: x, y, lmb, rmb, mmb, scroll)"
+            )
+
     # Countdown
     logger.info("Starting in...")
     for i in range(3, 0, -1):
@@ -357,15 +420,18 @@ Example:
                     # Capture screen
                     screen = capture_screen(region=region)
 
-                    # Capture input
-                    keyboard_output, gamepad_output = capture_input()
-
-                    # Combine inputs
-                    final_output = (
-                        np.concatenate((keyboard_output, gamepad_output), axis=None)
-                        if gamepad_output
-                        else np.array(keyboard_output)
+                    # Capture input (mouse is additive / non-destructive)
+                    keyboard_output, gamepad_output, mouse_output = capture_input(
+                        mouse_capturer=mouse_capturer
                     )
+
+                    # Combine inputs – mouse appended only when enabled
+                    parts = [np.array(keyboard_output)]
+                    if gamepad_output:
+                        parts.append(np.array(gamepad_output))
+                    if mouse_output is not None:
+                        parts.append(mouse_output)
+                    final_output = np.concatenate(parts, axis=None)
 
                     training_data.append([screen, final_output])
                     frame_count += 1
@@ -437,6 +503,11 @@ Example:
             logger.info(f"Saving remaining {len(training_data)} frames...")
             save_path = out_dir / f"training_data-{starting_value}.npy"
             save_training_data(training_data, save_path)
+
+        # Stop mouse capture if it was started
+        if mouse_capturer is not None:
+            mouse_capturer.stop()
+            logger.info("Mouse capture stopped.")
 
         cleanup()
         logger.info(f"Data collection complete. Total frames: {frame_count}")

@@ -28,11 +28,35 @@ class TestMouseState:
         assert state.scroll == 0.0
 
     def test_to_array_shape(self):
-        """Test to_array returns correct shape and dtype."""
+        """Test to_array returns 10-element vector (x,y,dx,dy,vx,vy,lmb,rmb,mmb,scroll)."""
+        from bot_mmorpg.scripts.mouse_capture import MouseState
+
+        state = MouseState(
+            x=0.5,
+            y=0.25,
+            dx=0.01,
+            dy=-0.02,
+            vx=0.1,
+            vy=-0.1,
+            lmb=1,
+            rmb=0,
+            mmb=1,
+            scroll=-2.0,
+        )
+        arr = state.to_array()
+
+        assert arr.shape == (10,)
+        assert arr.dtype == np.float32
+        np.testing.assert_array_almost_equal(
+            arr, [0.5, 0.25, 0.01, -0.02, 0.1, -0.1, 1.0, 0.0, 1.0, -2.0]
+        )
+
+    def test_to_array_legacy_shape(self):
+        """Test to_array_legacy returns 6-element backward-compatible vector."""
         from bot_mmorpg.scripts.mouse_capture import MouseState
 
         state = MouseState(x=0.5, y=0.25, lmb=1, rmb=0, mmb=1, scroll=-2.0)
-        arr = state.to_array()
+        arr = state.to_array_legacy()
 
         assert arr.shape == (6,)
         assert arr.dtype == np.float32
@@ -42,8 +66,10 @@ class TestMouseState:
         """Test vector_size matches array length."""
         from bot_mmorpg.scripts.mouse_capture import MouseState
 
-        assert MouseState.vector_size() == 6
+        assert MouseState.vector_size() == 10
         assert len(MouseState().to_array()) == MouseState.vector_size()
+        assert MouseState.vector_size_legacy() == 6
+        assert len(MouseState().to_array_legacy()) == MouseState.vector_size_legacy()
 
     def test_labels_match_vector_size(self):
         """Test labels list matches vector size."""
@@ -52,7 +78,12 @@ class TestMouseState:
         labels = MouseState.labels()
         assert len(labels) == MouseState.vector_size()
         assert "mouse_x" in labels
+        assert "mouse_dx" in labels
+        assert "mouse_vx" in labels
         assert "lmb" in labels
+
+        labels_legacy = MouseState.labels_legacy()
+        assert len(labels_legacy) == MouseState.vector_size_legacy()
 
     def test_frozen_dataclass(self):
         """Test MouseState is immutable (frozen)."""
@@ -216,7 +247,7 @@ class TestMouseCaptureThreadSafety:
                         mc._state.abs_y = i * 10
                     state = mc.snapshot()
                     arr = state.to_array()
-                    assert arr.shape == (6,)
+                    assert arr.shape == (10,)
                     assert 0.0 <= state.x <= 1.0
                     assert 0.0 <= state.y <= 1.0
                     results.append(state)
@@ -251,25 +282,39 @@ class TestMouseCaptureIntegration:
         """Test that mouse vector concatenates with keyboard/gamepad vectors."""
         from bot_mmorpg.scripts.mouse_capture import MouseState
 
-        # Simulate typical pipeline: keyboard(9) + gamepad(20) + mouse(6)
+        # Simulate typical pipeline: keyboard(9) + gamepad(20) + mouse(10)
         keyboard_output = np.array([1, 0, 0, 0, 0, 0, 0, 0, 0])
         gamepad_output = np.zeros(20, dtype=int)
-        mouse_state = MouseState(x=0.5, y=0.3, lmb=1)
+        mouse_state = MouseState(
+            x=0.5, y=0.3, dx=0.01, dy=-0.02, vx=0.1, vy=-0.1, lmb=1
+        )
         mouse_output = mouse_state.to_array()
 
         combined = np.concatenate([keyboard_output, gamepad_output, mouse_output])
 
-        assert combined.shape == (35,)  # 9 + 20 + 6
+        assert combined.shape == (39,)  # 9 + 20 + 10
         assert combined[0] == 1  # W key
         assert abs(combined[29] - 0.5) < 0.01  # mouse_x
         assert abs(combined[30] - 0.3) < 0.01  # mouse_y
-        assert combined[31] == 1.0  # lmb
+        assert abs(combined[31] - 0.01) < 0.001  # mouse_dx
+        assert combined[35] == 1.0  # lmb (index 29+6)
 
     def test_array_save_load_roundtrip(self, tmp_path):
         """Test that mouse data survives numpy save/load."""
         from bot_mmorpg.scripts.mouse_capture import MouseState
 
-        state = MouseState(x=0.75, y=0.25, lmb=1, rmb=0, mmb=0, scroll=2.5)
+        state = MouseState(
+            x=0.75,
+            y=0.25,
+            dx=0.05,
+            dy=-0.1,
+            vx=0.3,
+            vy=-0.2,
+            lmb=1,
+            rmb=0,
+            mmb=0,
+            scroll=2.5,
+        )
         arr = state.to_array()
 
         path = tmp_path / "mouse_test.npy"

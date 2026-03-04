@@ -241,7 +241,7 @@ const GAME_PRESETS = {
     color: "#FF6B35",
     resolution: "640x360",
     action_space: "extended",
-    architecture: "multihead_action",
+    architecture: "efficientnet_lstm",
     description: "Classic MMORPG with complex addon UI system.",
     recommended_tasks: ["dungeons", "raids", "questing", "farming"],
     notes: "Complex UI with addons. 640p recommended for addon text readability."
@@ -253,7 +253,7 @@ const GAME_PRESETS = {
     color: "#4169E1",
     resolution: "640x360",
     action_space: "extended",
-    architecture: "multihead_action",
+    architecture: "efficientnet_lstm",
     description: "Story-rich MMORPG with detailed hotbar system.",
     recommended_tasks: ["dungeons", "trials", "crafting", "gathering"],
     notes: "Detailed HUD with many skills. 640p for hotbar visibility."
@@ -277,7 +277,7 @@ const GAME_PRESETS = {
     color: "#FFB347",
     resolution: "640x360",
     action_space: "combat",
-    architecture: "game_attention",
+    architecture: "efficientnet_lstm",
     description: "Fast-paced ARPG with many skill indicators.",
     recommended_tasks: ["chaos_dungeons", "guardian_raids", "abyss"],
     notes: "Many skill indicators. 640p recommended for combat clarity."
@@ -771,7 +771,8 @@ window.toggleRecord = async function (btn) {
       const game_id = (getEl("teach-game-id")?.value || selectedGameId || DEFAULT_GAME_ID).trim();
       const dataset_name = (getEl("teach-dataset-name")?.value || "Untitled").trim();
 
-      const res = await invoke("start_recording", { game_id, dataset_name, monitor_id: monitorId, resolution });
+      const captureMouse = getEl("teach-capture-mouse")?.checked ?? false;
+      const res = await invoke("start_recording", { game_id, dataset_name, monitor_id: monitorId, resolution, capture_mouse: captureMouse });
       logToTerminal(res, "success");
       btn.innerHTML = "<span>■</span> Stop Recording";
       btn.style.background = "#333";

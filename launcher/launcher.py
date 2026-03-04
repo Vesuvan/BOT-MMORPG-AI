@@ -301,8 +301,14 @@ def log_to_python(msg):
 
 
 @eel.expose
-def start_recording(game_id="unknown", dataset_name="Untitled", monitor_id=None, resolution="480x270"):
-    """Start 1-collect_data.py with session tracking."""
+def start_recording(game_id="unknown", dataset_name="Untitled", monitor_id=None, resolution="480x270", capture_mouse=False):
+    """Start 1-collect_data.py with session tracking.
+
+    Args:
+        capture_mouse: Enable mouse recording (beta, disabled by default).
+            Adds 6 mouse values to the action vector without breaking
+            the existing keyboard+gamepad pipeline.
+    """
     global current_process
     script_path = SCRIPTS_PATH / "1-collect_data.py"
     gid = _normalize_game_id(game_id)
@@ -317,9 +323,10 @@ def start_recording(game_id="unknown", dataset_name="Untitled", monitor_id=None,
         if session_manager:
             session_manager.begin_recording(gid, dataset_name)
 
+        mouse_label = " +Mouse" if capture_mouse else ""
         print(
             f"[Process] Starting recording: {script_path} "
-            f"(Session: {dataset_name}, Game: {gid}, Monitor: {monitor_id}, Res: {resolution})"
+            f"(Session: {dataset_name}, Game: {gid}, Monitor: {monitor_id}, Res: {resolution}{mouse_label})"
         )
 
         env = os.environ.copy()
@@ -328,6 +335,7 @@ def start_recording(game_id="unknown", dataset_name="Untitled", monitor_id=None,
         if monitor_id is not None:
             env["BOTMMO_MONITOR_ID"] = str(monitor_id)
         env["BOTMMO_RESOLUTION"] = str(resolution)
+        env["BOTMMO_CAPTURE_MOUSE"] = "true" if capture_mouse else "false"
         # Keep outputs under versions/0.01 by default (collector uses cwd); stored as datasets/...
         env.setdefault("BOTMMO_OUTPUT_DIR", "datasets")
 
