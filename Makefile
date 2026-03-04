@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-uv venv sync install-drivers download-drivers clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer
+.PHONY: help install install-dev install-uv venv sync install-drivers download-drivers clean lint format format-check type-check test test-cov test-unit test-integration build docs clean-build clean-pyc clean-test clean-venv check all release install-launcher launcher install-all collect-data train-model test-model artifact build-installer verify-installer test-installer clean-installer ci ci-lint ci-format
 
 # Default target
 .DEFAULT_GOAL := help
@@ -165,6 +165,18 @@ type-check: ## Run type checking with mypy
 	@echo Type checking complete
 
 check: format-check lint type-check ## Run all code quality checks
+
+ci-lint: ## Run ruff linter (same as GitHub Actions CI)
+	@echo "Running ruff lint check..."
+	@$(RUN_PYTHON) -m ruff check src/ tests/
+	@echo "Ruff lint passed"
+
+ci-format: ## Run ruff format check (same as GitHub Actions CI)
+	@echo "Running ruff format check..."
+	@$(RUN_PYTHON) -m ruff format --check src/ tests/
+	@echo "Ruff format passed"
+
+ci: ci-lint ci-format test ## Run full CI pipeline locally (lint + format + tests)
 
 ##@ Testing
 

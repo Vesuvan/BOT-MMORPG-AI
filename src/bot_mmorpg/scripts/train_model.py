@@ -13,12 +13,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gc
+import logging
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 # PyTorch imports
 try:
@@ -191,9 +196,15 @@ class GameplayDataset(Dataset):
         self.frames = np.array(all_frames)
         self.actions = np.array(all_actions, dtype=np.float32)
 
+        # Auto-detect action vector size (handles variable mouse sizes)
+        self.num_actions = (
+            self.actions.shape[1] if self.actions.ndim == 2 else len(self.actions[0])
+        )
+
         print(f"[Dataset] Loaded {len(self.frames)} samples")
         print(f"[Dataset] Frame shape: {self.frames[0].shape}")
         print(f"[Dataset] Action shape: {self.actions[0].shape}")
+        print(f"[Dataset] Auto-detected num_actions: {self.num_actions}")
 
     def __len__(self) -> int:
         return max(0, len(self.frames) - self.seq_len + 1)
@@ -235,36 +246,65 @@ def train_epoch(
     criterion: nn.Module,
     device: torch.device,
     epoch: int,
+    scaler: Optional["torch.amp.GradScaler"] = None,
+    use_amp: bool = False,
 ) -> float:
-    """Train for one epoch."""
+    """Train for one epoch with optional mixed-precision and OOM recovery."""
     model.train()
     total_loss = 0.0
     num_batches = len(dataloader)
+    oom_count = 0
 
     for batch_idx, (frames, actions) in enumerate(dataloader):
         frames = frames.to(device)
         actions = actions.to(device)
 
-        # Forward pass
-        optimizer.zero_grad()
-        outputs = model(frames)
-        loss = criterion(outputs, actions)
+        try:
+            optimizer.zero_grad()
 
-        # Backward pass
-        loss.backward()
+            if use_amp and scaler is not None:
+                with torch.amp.autocast("cuda"):
+                    outputs = model(frames)
+                    loss = criterion(outputs, actions)
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                outputs = model(frames)
+                loss = criterion(outputs, actions)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
 
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            total_loss += loss.item()
 
-        optimizer.step()
-
-        total_loss += loss.item()
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                oom_count += 1
+                if device.type == "cuda":
+                    torch.cuda.empty_cache()
+                gc.collect()
+                print(
+                    f"  [OOM] Skipped batch {batch_idx + 1} "
+                    f"(total OOM skips: {oom_count}). "
+                    f"Try --batch-size {max(1, dataloader.batch_size // 2)}"
+                )
+                if oom_count > 5:
+                    raise RuntimeError(
+                        f"Too many OOM errors ({oom_count}). "
+                        f"Reduce batch size with --batch-size {max(1, dataloader.batch_size // 2)}"
+                    ) from e
+                continue
+            raise
 
         # Progress
         if (batch_idx + 1) % 10 == 0 or batch_idx == num_batches - 1:
             print(f"  Batch {batch_idx + 1}/{num_batches} - Loss: {loss.item():.4f}")
 
-    return total_loss / num_batches
+    effective = num_batches - oom_count
+    return total_loss / max(effective, 1)
 
 
 def validate(
@@ -299,6 +339,34 @@ def validate(
     return avg_loss, accuracy
 
 
+def _enable_gradient_checkpointing(model: nn.Module) -> bool:
+    """Enable gradient checkpointing on supported backbones to reduce VRAM."""
+    enabled = False
+    # EfficientNet backbone
+    if hasattr(model, "backbone") and hasattr(model.backbone, "features"):
+        for module in model.backbone.features:
+            if hasattr(module, "gradient_checkpointing_enable"):
+                module.gradient_checkpointing_enable()
+                enabled = True
+    # Generic torch >=2.0 API
+    if hasattr(model, "set_grad_checkpointing"):
+        model.set_grad_checkpointing(True)
+        enabled = True
+    return enabled
+
+
+def _log_gpu_memory(prefix: str = "") -> None:
+    """Print current GPU memory usage (no-op on CPU)."""
+    if not PYTORCH_AVAILABLE or not torch.cuda.is_available():
+        return
+    alloc = torch.cuda.memory_allocated() / 1e9
+    reserved = torch.cuda.memory_reserved() / 1e9
+    total = torch.cuda.get_device_properties(0).total_mem / 1e9
+    print(
+        f"  [GPU] {prefix}Allocated: {alloc:.2f}GB | Reserved: {reserved:.2f}GB | Total: {total:.2f}GB"
+    )
+
+
 def train_model(
     model: nn.Module,
     train_loader: DataLoader,
@@ -308,9 +376,23 @@ def train_model(
     learning_rate: float = 1e-4,
     save_dir: Path = Path("artifacts/model"),
     model_name: str = "model",
+    use_amp: bool = False,
+    gradient_checkpointing: bool = False,
 ) -> nn.Module:
-    """Full training loop with validation and checkpointing."""
+    """Full training loop with validation, checkpointing, and GPU memory management."""
     model = model.to(device)
+
+    # --- GPU memory optimisations ---
+    use_amp = use_amp and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
+
+    if gradient_checkpointing:
+        ckpt = _enable_gradient_checkpointing(model)
+        if ckpt:
+            print("  Gradient checkpointing enabled (saves VRAM, slower training)")
+
+    if device.type == "cuda":
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     # Optimizer and scheduler
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
@@ -328,12 +410,18 @@ def train_model(
     print(f"  Model: {model.__class__.__name__}")
     print(f"  Parameters: {count_parameters(model):,}")
     print(f"  Device: {device}")
+    print(f"  Mixed Precision (AMP): {use_amp}")
+    print(f"  Gradient Checkpointing: {gradient_checkpointing}")
     print(f"  Epochs: {epochs}")
     print(f"  Learning Rate: {learning_rate}")
+    print(f"  Batch Size: {train_loader.batch_size}")
     print(f"  Train Batches: {len(train_loader)}")
     if val_loader:
         print(f"  Val Batches: {len(val_loader)}")
     print(f"{'=' * 60}\n")
+
+    if device.type == "cuda":
+        _log_gpu_memory("Before training: ")
 
     for epoch in range(epochs):
         epoch_start = time.time()
@@ -342,7 +430,14 @@ def train_model(
 
         # Train
         train_loss = train_epoch(
-            model, train_loader, optimizer, criterion, device, epoch
+            model,
+            train_loader,
+            optimizer,
+            criterion,
+            device,
+            epoch,
+            scaler=scaler,
+            use_amp=use_amp,
         )
 
         # Validate
@@ -379,7 +474,10 @@ def train_model(
             print(f"  Checkpoint saved to {save_path}")
 
         epoch_time = time.time() - epoch_start
-        print(f"  Time: {epoch_time:.1f}s\n")
+        print(f"  Time: {epoch_time:.1f}s")
+        if device.type == "cuda":
+            _log_gpu_memory()
+        print()
 
     # Save final model
     save_path = save_dir / f"{model_name}_final.pth"
@@ -412,7 +510,10 @@ def main(argv=None) -> int:
         "--seq-len", type=int, default=4, help="Sequence length for temporal models"
     )
     parser.add_argument(
-        "--num-actions", type=int, default=29, help="Number of output actions"
+        "--num-actions",
+        type=int,
+        default=0,
+        help="Number of output actions (0 = auto-detect from data)",
     )
     parser.add_argument(
         "--val-split", type=float, default=0.1, help="Validation split ratio"
@@ -421,6 +522,16 @@ def main(argv=None) -> int:
         "--no-pretrained", action="store_true", help="Don't use pretrained weights"
     )
     parser.add_argument("--cpu", action="store_true", help="Force CPU training")
+    parser.add_argument(
+        "--amp",
+        action="store_true",
+        help="Enable mixed-precision training (fp16) — halves VRAM usage on NVIDIA GPUs",
+    )
+    parser.add_argument(
+        "--gradient-checkpointing",
+        action="store_true",
+        help="Trade compute for memory — enables training large models on small GPUs",
+    )
     parser.add_argument(
         "--list-models", action="store_true", help="List available models"
     )
@@ -468,6 +579,31 @@ def main(argv=None) -> int:
     # Device
     device = torch.device("cpu") if args.cpu else get_device()
 
+    # Auto-enable AMP on CUDA when not explicitly set
+    use_amp = args.amp
+    use_grad_ckpt = args.gradient_checkpointing
+
+    # Auto-detect safe batch-size for GPU VRAM
+    batch_size = args.batch_size
+    if device.type == "cuda" and not args.cpu:
+        total_mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        if total_mem_gb <= 8 and batch_size > 8:
+            old_bs = batch_size
+            batch_size = 8
+            use_amp = True  # Auto-enable AMP for small GPUs
+            print(
+                f"[Auto] GPU has {total_mem_gb:.1f}GB VRAM — "
+                f"reducing batch_size {old_bs} -> {batch_size} and enabling AMP (fp16)"
+            )
+        elif total_mem_gb <= 12 and batch_size > 16:
+            old_bs = batch_size
+            batch_size = 16
+            use_amp = True
+            print(
+                f"[Auto] GPU has {total_mem_gb:.1f}GB VRAM — "
+                f"reducing batch_size {old_bs} -> {batch_size} and enabling AMP (fp16)"
+            )
+
     print(f"\n{'=' * 60}")
     print("BOT-MMORPG-AI Training")
     print(f"{'=' * 60}")
@@ -508,7 +644,7 @@ def main(argv=None) -> int:
     # Create dataloaders
     train_loader = DataLoader(
         train_dataset,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=0,
         pin_memory=device.type == "cuda",
@@ -517,7 +653,7 @@ def main(argv=None) -> int:
     val_loader = (
         DataLoader(
             val_dataset,
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=0,
         )
@@ -525,11 +661,18 @@ def main(argv=None) -> int:
         else None
     )
 
+    # Auto-detect num_actions from dataset or use CLI override
+    num_actions = args.num_actions if args.num_actions > 0 else dataset.num_actions
+    print(f"\nAction vector size: {num_actions}")
+    if num_actions > 29:
+        mouse_extra = num_actions - 29
+        print(f"  (keyboard=9 + gamepad=20 + mouse={mouse_extra})")
+
     # Create model
-    print(f"\nCreating model: {args.model}")
+    print(f"Creating model: {args.model}")
     model = get_model(
         args.model,
-        num_actions=args.num_actions,
+        num_actions=num_actions,
         temporal_frames=seq_len,
         pretrained=not args.no_pretrained,
     )
@@ -547,6 +690,8 @@ def main(argv=None) -> int:
         learning_rate=args.lr,
         save_dir=out_dir,
         model_name=args.model,
+        use_amp=use_amp,
+        gradient_checkpointing=use_grad_ckpt,
     )
 
     print(f"\n{'=' * 60}")

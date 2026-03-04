@@ -153,6 +153,17 @@ except ImportError:
     except ImportError:
         MODELS_AVAILABLE = False
 
+# Mouse output – optional, only used when model has mouse predictions
+try:
+    from pynput.mouse import Button as _MBtn
+    from pynput.mouse import Controller as _MouseCtrl
+
+    _MOUSE_CTRL = _MouseCtrl()
+    MOUSE_OUTPUT_AVAILABLE = True
+except ImportError:
+    _MOUSE_CTRL = None
+    MOUSE_OUTPUT_AVAILABLE = False
+
 # Platform-specific imports
 IS_WINDOWS = platform.system() == "Windows"
 if IS_WINDOWS:
@@ -177,43 +188,78 @@ HEIGHT = 270
 
 # Motion detection settings
 LOG_LEN = 25
-MOTION_REQ = 800
+MOTION_REQ = 500  # Lowered from 800 – catches stuck-on-wall earlier
 
-# Action weights for prediction adjustment
-# Format: [keyboard(9), gamepad(20)] = 29 total
-ACTION_WEIGHTS = np.array(
+# Stuck recovery cooldown (seconds) – prevents spam-reversing
+STUCK_COOLDOWN = 4.0
+
+# Base action weights for keyboard(9) + gamepad(20) = 29
+# Mouse weights are appended dynamically when model has mouse outputs.
+_BASE_ACTION_WEIGHTS = np.array(
     [
-        4.5,
-        0.1,
-        0.1,
-        0.1,
-        1.8,
-        1.8,
+        2.5,
         0.5,
-        0.5,
-        0.2,  # Keyboard: W, S, A, D, WA, WD, SA, SD, NK
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,  # Gamepad: LT, RT, Lx, Ly, Rx, Ry
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,  # Gamepad: UP, DOWN, LEFT, RIGHT, START, SELECT, L3, R3, LB, RB
-        1,
-        1,
-        1,
-        1,  # Gamepad: A, B, X, Y
+        1.0,
+        1.0,
+        1.5,
+        1.5,
+        0.8,
+        0.8,
+        0.1,  # Keyboard: W, S, A, D, WA, WD, SA, SD, NK
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,  # Gamepad: LT, RT, Lx, Ly, Rx, Ry
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,  # Gamepad: UP, DOWN, LEFT, RIGHT, START, SELECT, L3, R3, LB, RB
+        1.2,
+        1.2,
+        1.2,
+        1.2,  # Gamepad: A, B, X, Y – slight boost for ability buttons
     ]
 )
+
+# Mouse weight block: [x, y, dx, dy, vx, vy, lmb, rmb, mmb, scroll]
+# Position/delta/velocity are continuous outputs (not chosen via argmax),
+# so their weights are low to avoid competing with discrete actions.
+_MOUSE_WEIGHTS_10 = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 1.0, 0.8, 0.3])
+
+# Legacy 6-value mouse: [x, y, lmb, rmb, mmb, scroll]
+_MOUSE_WEIGHTS_6 = np.array([0.1, 0.1, 1.0, 1.0, 0.8, 0.3])
+
+
+def build_action_weights(num_actions: int) -> np.ndarray:
+    """Build action weights array matching model output size.
+
+    Automatically appends mouse weights when num_actions > 29.
+    """
+    if num_actions <= 29:
+        return _BASE_ACTION_WEIGHTS[:num_actions].copy()
+
+    mouse_size = num_actions - 29
+    if mouse_size == 10:
+        mouse_w = _MOUSE_WEIGHTS_10
+    elif mouse_size == 6:
+        mouse_w = _MOUSE_WEIGHTS_6
+    else:
+        # Unknown mouse format – equal weight
+        mouse_w = np.ones(mouse_size) * 0.5
+
+    return np.concatenate([_BASE_ACTION_WEIGHTS, mouse_w])
+
+
+# Default for backward compatibility (29 actions, no mouse)
+ACTION_WEIGHTS = build_action_weights(29)
 
 # Action names for logging
 ACTION_NAMES = [
@@ -415,11 +461,23 @@ class InferenceEngine:
         # Frame buffer for temporal models
         self.frame_buffer = deque(maxlen=self.temporal_frames)
 
+        # Detect model output size and mouse support
+        self.num_actions = self.metadata.get("num_actions", 29)
+        self.has_mouse_output = self.num_actions > 29
+        self.mouse_output_size = max(0, self.num_actions - 29)
+
+        # Build action weights matching model output size
+        self._action_weights = build_action_weights(self.num_actions)
+
         # Motion detection
         self.motion_log = deque(maxlen=LOG_LEN)
         self.t_minus = None
         self.t_now = None
         self.t_plus = None
+
+        # Stuck recovery state
+        self._last_evasion_time = 0.0
+        self._consecutive_stuck = 0
 
         print(f"\n{'=' * 60}")
         print("Inference Engine Initialized")
@@ -429,6 +487,9 @@ class InferenceEngine:
         print(f"  Device: {self.device}")
         print(f"  Temporal: {self.is_temporal} (frames={self.temporal_frames})")
         print(f"  Gamepad: {'Enabled' if self.enable_gamepad else 'Disabled'}")
+        print(
+            f"  Actions: {self.num_actions} (mouse={'%d values' % self.mouse_output_size if self.has_mouse_output else 'off'})"
+        )
         print(f"{'=' * 60}\n")
 
     def _load_model(self) -> Tuple[torch.nn.Module, dict]:
@@ -466,6 +527,11 @@ class InferenceEngine:
         """
         Run inference on a frame.
 
+        For models with mouse output (num_actions > 29), the mouse values
+        are continuous predictions at indices [29:].  The discrete action
+        index is chosen only from the first 29 (keyboard+gamepad) slots;
+        mouse movement is executed separately via ``execute_mouse()``.
+
         Args:
             frame: BGR frame from screen capture
 
@@ -481,7 +547,7 @@ class InferenceEngine:
 
             # Wait until buffer is full
             if len(self.frame_buffer) < self.temporal_frames:
-                return 0, 0.0, np.zeros(29)  # Default action
+                return 0, 0.0, np.zeros(self.num_actions)
 
             # Stack frames: (seq, C, H, W)
             input_tensor = torch.stack(list(self.frame_buffer), dim=0)
@@ -501,12 +567,14 @@ class InferenceEngine:
         predictions = probs.cpu().numpy()[0]
         predictions = np.round(predictions, 2)
 
-        # Apply action weights
-        weighted = predictions * ACTION_WEIGHTS
+        # Apply action weights (dynamically sized)
+        weighted = predictions * self._action_weights
         weighted_abs = np.abs(weighted)
 
-        # Get best action
-        action_idx = int(np.argmax(weighted_abs))
+        # Best discrete action is chosen from first 29 slots only
+        # (mouse outputs are continuous, not picked by argmax)
+        discrete_end = min(29, len(weighted_abs))
+        action_idx = int(np.argmax(weighted_abs[:discrete_end]))
         action_val = weighted[action_idx]
 
         return action_idx, action_val, predictions
@@ -562,56 +630,145 @@ class InferenceEngine:
         elif action_idx == 28:
             button_Y()
 
+    def execute_mouse(self, predictions: np.ndarray):
+        """Execute mouse actions from model predictions (optional, additive).
+
+        Only called when ``self.has_mouse_output`` is True.
+        Uses delta movement (dx, dy) for smooth camera control via
+        linear interpolation, and handles click predictions.
+
+        The mouse values live at prediction indices [29:].
+        10-value format: [x, y, dx, dy, vx, vy, lmb, rmb, mmb, scroll]
+         6-value format: [x, y, lmb, rmb, mmb, scroll]
+        """
+        if not MOUSE_OUTPUT_AVAILABLE or _MOUSE_CTRL is None:
+            return
+
+        mouse_preds = predictions[29:]
+        if len(mouse_preds) == 0:
+            return
+
+        if len(mouse_preds) >= 10:
+            # 10-value format: prefer delta for camera (smoother than absolute)
+            dx, dy = mouse_preds[2], mouse_preds[3]
+            lmb_prob, rmb_prob, _mmb_prob = (
+                mouse_preds[6],
+                mouse_preds[7],
+                mouse_preds[8],
+            )
+            scroll_val = mouse_preds[9]
+        elif len(mouse_preds) >= 6:
+            # Legacy 6-value: no delta available, skip movement
+            dx, dy = 0.0, 0.0
+            lmb_prob, rmb_prob, _mmb_prob = (
+                mouse_preds[2],
+                mouse_preds[3],
+                mouse_preds[4],
+            )
+            scroll_val = mouse_preds[5]
+        else:
+            return
+
+        # ── Smooth mouse movement via delta ──
+        # dx/dy are sigmoid outputs in [0,1]; remap to [-1,1] then scale to pixels
+        # The model learned normalized deltas: -1 = full left, +1 = full right
+        dx_remapped = (dx - 0.5) * 2.0  # [0,1] → [-1,1]
+        dy_remapped = (dy - 0.5) * 2.0
+        # Scale: max ~100px per frame for smooth camera
+        pixel_dx = int(dx_remapped * 100)
+        pixel_dy = int(dy_remapped * 100)
+
+        if abs(pixel_dx) > 2 or abs(pixel_dy) > 2:
+            _MOUSE_CTRL.move(pixel_dx, pixel_dy)
+
+        # ── Click handling (threshold 0.5) ──
+        if lmb_prob > 0.5:
+            _MOUSE_CTRL.press(_MBtn.left)
+        else:
+            _MOUSE_CTRL.release(_MBtn.left)
+
+        if rmb_prob > 0.5:
+            _MOUSE_CTRL.press(_MBtn.right)
+        else:
+            _MOUSE_CTRL.release(_MBtn.right)
+
+        # ── Scroll ──
+        scroll_remapped = (scroll_val - 0.5) * 2.0
+        if abs(scroll_remapped) > 0.3:
+            _MOUSE_CTRL.scroll(0, int(scroll_remapped * 3))
+
     def check_stuck(self, delta_count: int) -> bool:
         """
         Check if the character appears stuck based on motion.
+
+        Uses a cooldown to avoid repeated evasive maneuvers.
 
         Args:
             delta_count: Current frame motion value
 
         Returns:
-            True if stuck detected
+            True if stuck detected and cooldown has elapsed
         """
         self.motion_log.append(delta_count)
 
         if len(self.motion_log) >= LOG_LEN:
             motion_avg = mean(self.motion_log)
             if motion_avg < MOTION_REQ:
-                return True
+                # Respect cooldown so we don't spam evasive maneuvers
+                now = time.time()
+                if now - self._last_evasion_time >= STUCK_COOLDOWN:
+                    return True
 
         return False
 
     def evasive_maneuver(self):
-        """Execute random evasive maneuver when stuck."""
-        print("STUCK DETECTED! Executing evasive maneuver...")
+        """Execute structured evasive maneuver when stuck.
 
-        choice = random.randrange(0, 4)
+        Escalates strategy on consecutive detections:
+        1st: back up + turn
+        2nd: longer reverse + opposite turn
+        3rd+: full 180-degree turn attempt
+        """
+        self._consecutive_stuck += 1
+        self._last_evasion_time = time.time()
 
-        if choice == 0:
+        level = min(self._consecutive_stuck, 3)
+        print(f"STUCK DETECTED (level {level})! Executing evasive maneuver...")
+
+        if level == 1:
+            # Simple: back up briefly, turn one direction
             reverse()
-            time.sleep(random.uniform(1, 2))
-            forward_left()
-            time.sleep(random.uniform(1, 2))
-        elif choice == 1:
+            time.sleep(0.8)
+            turn = random.choice([forward_left, forward_right])
+            turn()
+            time.sleep(1.0)
+        elif level == 2:
+            # Medium: longer reverse, turn opposite direction
             reverse()
-            time.sleep(random.uniform(1, 2))
-            forward_right()
-            time.sleep(random.uniform(1, 2))
-        elif choice == 2:
-            reverse_left()
-            time.sleep(random.uniform(1, 2))
-            forward_right()
-            time.sleep(random.uniform(1, 2))
-        elif choice == 3:
-            reverse_right()
-            time.sleep(random.uniform(1, 2))
-            forward_left()
-            time.sleep(random.uniform(1, 2))
+            time.sleep(1.5)
+            turn = random.choice([left, right])
+            turn()
+            time.sleep(1.5)
+            straight()
+            time.sleep(0.5)
+        else:
+            # Aggressive: full 180 turn
+            reverse()
+            time.sleep(1.0)
+            turn = random.choice([left, right])
+            turn()
+            time.sleep(2.5)
+            straight()
+            time.sleep(1.0)
 
-        # Clear most of motion log
-        for _ in range(LOG_LEN - 2):
-            if self.motion_log:
-                self.motion_log.popleft()
+        # Clear motion log so we re-evaluate from fresh state
+        self.motion_log.clear()
+
+    def reset_stuck_counter(self):
+        """Reset consecutive stuck counter when normal motion resumes."""
+        if self._consecutive_stuck > 0 and len(self.motion_log) >= LOG_LEN:
+            if mean(self.motion_log) >= MOTION_REQ * 1.5:
+                self._consecutive_stuck = 0
 
 
 # =============================================================================
@@ -742,6 +899,10 @@ def main(argv=None) -> int:
                 # Execute action
                 engine.execute_action(action_idx, action_val)
 
+                # Execute mouse output if model supports it (additive)
+                if engine.has_mouse_output:
+                    engine.execute_mouse(predictions)
+
                 # Get action name
                 action_name = (
                     ACTION_NAMES[action_idx]
@@ -749,9 +910,11 @@ def main(argv=None) -> int:
                     else f"action_{action_idx}"
                 )
 
-                # Check if stuck
+                # Check if stuck or reset counter when moving normally
                 if engine.check_stuck(delta_count):
                     engine.evasive_maneuver()
+                else:
+                    engine.reset_stuck_counter()
 
                 # Logging
                 loop_time = time.time() - loop_start

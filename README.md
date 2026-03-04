@@ -119,38 +119,72 @@ Go to the **[Releases](https://github.com/ruslanmv/BOT-MMORPG-AI/releases)** pag
 
 **Prerequisites:** Python 3.10+, Git. For the desktop UI you also need [Rust](https://rustup.rs/) (run `rustup` installer).
 
+<details>
+<summary><b>Linux / macOS (bash)</b></summary>
+
 ```bash
-# Just copy and paste these commands one by one
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/ruslanmv/BOT-MMORPG-AI.git
 cd BOT-MMORPG-AI
 make install
 ```
+</details>
+
+<details open>
+<summary><b>Windows PowerShell</b></summary>
+
+```powershell
+# 1. Install uv (Python package manager)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Restart your terminal so the PATH update takes effect
+
+# 2. Clone and install
+git clone https://github.com/ruslanmv/BOT-MMORPG-AI.git
+cd BOT-MMORPG-AI
+pip install -e .
+```
+
+> **Windows note:** `make` is not available by default on Windows. Use the `pip`/`python` commands shown below instead of `make` targets.
+</details>
 
 **That's it!** The bot is now installed.
 
-> **Note:** `make install` installs core dependencies. Use `make install-all` for everything (launcher, backend, docs). A virtual environment (`.venv/`) is created automatically - you do NOT need to activate it manually.
+> **Note:** `make install` (Linux/macOS) or `pip install -e .` (Windows) installs core dependencies. A virtual environment (`.venv/`) is created automatically - you do NOT need to activate it manually.
 
 ### Step 2️⃣: Teach The Bot
 
 1. Open your game (Genshin Impact recommended)
 2. Set your game resolution to **1920x1080** fullscreen (the bot automatically resizes frames internally for training)
-3. Run: `make collect-data`
+3. Run data collection:
+   - **Linux/macOS:** `make collect-data`
+   - **Windows:** `python src/bot_mmorpg/scripts/collect_data.py --mouse`
 4. Play normally for 10-15 minutes
 5. The bot is now learning!
+
+> **Mouse recording:** Add the `--mouse` flag to capture mouse movements and clicks alongside keyboard/gamepad input.
 
 ### Step 3️⃣: Train Your AI
 
 ```bash
+# Linux/macOS
 make train-model
+
+# Windows PowerShell
+python src/bot_mmorpg/scripts/train_model.py --data datasets --model efficientnet_lstm
 ```
 
 Grab a coffee ☕ - training takes 30-60 minutes depending on your GPU.
 
+> **GPU out of memory?** The training script auto-detects your VRAM and adjusts batch size. You can also use `--amp` for mixed precision (halves VRAM) or `--batch-size 8` to force a smaller batch.
+
 ### Step 4️⃣: Let It Play!
 
 ```bash
+# Linux/macOS
 make test-model
+
+# Windows PowerShell
+python src/bot_mmorpg/scripts/test_model.py
 ```
 
 **Boom!** Your AI is now playing for you! 🎉
@@ -169,9 +203,16 @@ make test-model
 - **Game**: Any supported MMORPG/RPG game
 
 ### Recommended for Best Performance
-- **GPU**: NVIDIA Graphics Card (makes training 10x faster!)
+- **GPU**: NVIDIA Graphics Card with 6GB+ VRAM (makes training 10x faster!)
 - **Controller**: Xbox/PS controller (optional, but recommended)
 - **Internet**: For downloading dependencies
+
+> **NVIDIA GPU users:** If training runs on CPU despite having a GPU, you likely installed the CPU-only PyTorch. Fix it with:
+> ```powershell
+> pip uninstall -y torch torchvision torchaudio
+> pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+> ```
+> Replace `cu126` with your CUDA version (`cu118`, `cu121`, `cu124`, `cu126`). Check your CUDA version with `nvidia-smi`.
 
 ### Supported Games
 - ✅ **Genshin Impact** (Best Support)
@@ -443,7 +484,7 @@ The project uses **PyTorch 2.x** and supports multiple modern neural network arc
 | **AlexNet** | ~60M | Classic deep learning |
 | **SentNet 2D/3D** | ~70M | 3D convolutions for video |
 
-**Recommended**: `efficientnet_lstm` for best results with temporal game context.
+**Recommended**: Use `efficientnet_lstm` for all MMORPGs — it delivers the best accuracy with temporal awareness across all 6 tested game profiles (Genshin, WoW, FFXIV, GW2, Lost Ark, New World) while maintaining >5 FPS inference on CPU and >30 FPS on GPU; use `mobilenetv3` only on low-end hardware (<4GB VRAM).
 
 ### Action Spaces
 

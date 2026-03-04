@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOT-MMORPG-AI &mdash; AI-Powered Gaming Bot</title>
+<meta name="description" content="The ultimate open-source AI bot for MMORPG games. Record, train, and let neural networks play for you. Supports Genshin Impact, WoW, FFXIV, Lost Ark, GW2, and New World.">
+<meta property="og:title" content="BOT-MMORPG-AI - AI-Powered MMORPG Bot">
+<meta property="og:description" content="Record your gameplay. Train a neural network. Let the AI grind for you 24/7.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ruslanmv.github.io/BOT-MMORPG-AI/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<style>
+/* ================================================================
+   CSS RESET & ROOT
+   ================================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#FFD700;--gold-dim:#B8860B;--cyan:#00F0FF;--purple:#A855F7;
+  --red:#FF4444;--green:#22C55E;--bg:#0A0E17;--bg-card:#111827;
+  --bg-glass:rgba(17,24,39,.55);--border:rgba(255,215,0,.15);
+  --text:#E5E7EB;--text-dim:#9CA3AF;--text-bright:#F9FAFB;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:'Cascadia Code','Fira Code','JetBrains Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);color:var(--text);background:var(--bg);
+  overflow-x:hidden;line-height:1.6;
+}
+a{color:var(--cyan);text-decoration:none;transition:color .2s}
+a:hover{color:var(--gold)}
+
+/* ================================================================
+   ANIMATED BACKGROUND — PARTICLE FIELD
+   ================================================================ */
+#bg-canvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;
+  pointer-events:none;opacity:.35;
+}
+
+/* Radial gradient overlays */
+.bg-glow{
+  position:fixed;border-radius:50%;filter:blur(120px);
+  pointer-events:none;z-index:0;
+}
+.bg-glow.g1{
+  width:600px;height:600px;top:-200px;left:-100px;
+  background:radial-gradient(circle,rgba(168,85,247,.25),transparent 70%);
+  animation:float-glow 12s ease-in-out infinite alternate;
+}
+.bg-glow.g2{
+  width:500px;height:500px;bottom:-150px;right:-80px;
+  background:radial-gradient(circle,rgba(0,240,255,.2),transparent 70%);
+  animation:float-glow 15s ease-in-out infinite alternate-reverse;
+}
+.bg-glow.g3{
+  width:400px;height:400px;top:40%;left:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(255,215,0,.1),transparent 70%);
+  animation:float-glow 10s ease-in-out infinite alternate;
+}
+@keyframes float-glow{
+  0%{transform:translate(0,0) scale(1)}
+  100%{transform:translate(30px,-40px) scale(1.15)}
+}
+
+/* ================================================================
+   NAVIGATION
+   ================================================================ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(10,14,23,.85);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+nav .inner{
+  max-width:1200px;margin:0 auto;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;height:64px;
+}
+nav .logo{
+  font-size:20px;font-weight:800;letter-spacing:1px;
+  background:linear-gradient(135deg,var(--gold),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+nav .links{display:flex;gap:24px}
+nav .links a{
+  color:var(--text-dim);font-size:14px;font-weight:500;
+  transition:color .2s;position:relative;
+}
+nav .links a::after{
+  content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;
+  background:var(--gold);transition:width .3s;
+}
+nav .links a:hover{color:var(--text-bright)}
+nav .links a:hover::after{width:100%}
+.nav-cta{
+  padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;
+  background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+  color:#000;border:none;cursor:pointer;transition:transform .2s,box-shadow .2s;
+}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,215,0,.3)}
+
+/* ================================================================
+   HERO SECTION
+   ================================================================ */
+.hero{
+  position:relative;z-index:1;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:120px 24px 80px;
+}
+.hero-content{max-width:800px}
+.hero-badge{
+  display:inline-block;padding:6px 16px;border-radius:999px;
+  background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);
+  color:var(--purple);font-size:12px;font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;margin-bottom:24px;
+  animation:pulse-badge 3s ease-in-out infinite;
+}
+@keyframes pulse-badge{
+  0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,.3)}
+  50%{box-shadow:0 0 20px 4px rgba(168,85,247,.15)}
+}
+.hero h1{
+  font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;line-height:1.1;
+  margin-bottom:24px;
+}
+.hero h1 .grad{
+  background:linear-gradient(135deg,var(--gold) 0%,var(--cyan) 50%,var(--purple) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-size:200% 200%;animation:grad-shift 4s ease infinite;
+}
+@keyframes grad-shift{
+  0%,100%{background-position:0% 50%}50%{background-position:100% 50%}
+}
+.hero p{
+  font-size:clamp(1rem,2vw,1.25rem);color:var(--text-dim);
+  max-width:600px;margin:0 auto 40px;
+}
+.hero-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 32px;border-radius:12px;font-size:15px;font-weight:700;
+  cursor:pointer;border:none;transition:all .25s;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold),#FFA500);color:#000;
+  box-shadow:0 4px 24px rgba(255,215,0,.25);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,215,0,.4)}
+.btn-secondary{
+  background:var(--bg-glass);color:var(--text-bright);
+  border:1px solid var(--border);backdrop-filter:blur(8px);
+}
+.btn-secondary:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* Hero stats bar */
+.hero-stats{
+  display:flex;gap:32px;justify-content:center;flex-wrap:wrap;margin-top:40px;
+  padding:20px 0;border-top:1px solid rgba(255,255,255,.06);
+}
+.stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.stat-num{
+  font-size:28px;font-weight:900;
+  background:linear-gradient(135deg,var(--gold),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.stat-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+
+/* GitHub Star CTA Banner */
+.star-banner{
+  position:relative;z-index:1;text-align:center;padding:60px 24px;
+  background:linear-gradient(135deg,rgba(255,215,0,.06),rgba(168,85,247,.06));
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+}
+.star-banner h2{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;margin-bottom:12px}
+.star-banner p{color:var(--text-dim);font-size:1rem;max-width:550px;margin:0 auto 28px}
+.star-btn-big{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 40px;border-radius:14px;font-size:17px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold),#FFA500);color:#000;
+  border:none;cursor:pointer;transition:all .3s;text-decoration:none;
+  box-shadow:0 4px 24px rgba(255,215,0,.25);
+  animation:star-glow 3s ease-in-out infinite;
+}
+.star-btn-big:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 8px 40px rgba(255,215,0,.4)}
+@keyframes star-glow{
+  0%,100%{box-shadow:0 4px 24px rgba(255,215,0,.25)}
+  50%{box-shadow:0 4px 32px rgba(255,215,0,.45)}
+}
+
+/* Scroll indicator */
+.scroll-hint{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  animation:bounce 2s infinite;
+}
+.scroll-hint svg{width:24px;height:24px;stroke:var(--text-dim)}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(10px)}}
+
+/* ================================================================
+   SECTION LAYOUT
+   ================================================================ */
+section{position:relative;z-index:1;padding:100px 24px}
+.section-inner{max-width:1100px;margin:0 auto}
+.section-label{
+  display:inline-block;padding:4px 12px;border-radius:6px;
+  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:12px;
+}
+.section-label.gold{background:rgba(255,215,0,.1);color:var(--gold)}
+.section-label.cyan{background:rgba(0,240,255,.1);color:var(--cyan)}
+.section-label.purple{background:rgba(168,85,247,.1);color:var(--purple)}
+.section-label.green{background:rgba(34,197,94,.1);color:var(--green)}
+.section-label.red{background:rgba(255,68,68,.1);color:var(--red)}
+h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;margin-bottom:16px;color:var(--text-bright)}
+.section-desc{font-size:1.1rem;color:var(--text-dim);max-width:650px;margin-bottom:48px}
+
+/* ================================================================
+   FEATURE CARDS
+   ================================================================ */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.card{
+  background:var(--bg-glass);backdrop-filter:blur(12px);
+  border:1px solid var(--border);border-radius:16px;padding:32px;
+  transition:transform .3s,border-color .3s,box-shadow .3s;
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));
+  opacity:0;transition:opacity .3s;
+}
+.card:hover{
+  transform:translateY(-4px);border-color:rgba(255,215,0,.3);
+  box-shadow:0 12px 40px rgba(0,0,0,.3);
+}
+.card:hover::before{opacity:1}
+.card-icon{
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;margin-bottom:16px;
+}
+.card-icon.gold{background:rgba(255,215,0,.1)}
+.card-icon.cyan{background:rgba(0,240,255,.1)}
+.card-icon.purple{background:rgba(168,85,247,.1)}
+.card-icon.green{background:rgba(34,197,94,.1)}
+.card h3{font-size:18px;font-weight:700;color:var(--text-bright);margin-bottom:8px}
+.card p{font-size:14px;color:var(--text-dim);line-height:1.7}
+
+/* ================================================================
+   GAME GRID
+   ================================================================ */
+.game-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;
+}
+.game-tile{
+  background:var(--bg-glass);backdrop-filter:blur(8px);
+  border:1px solid var(--border);border-radius:14px;
+  padding:24px 16px;text-align:center;
+  transition:all .3s;cursor:default;position:relative;overflow:hidden;
+}
+.game-tile:hover{
+  transform:translateY(-4px);border-color:var(--gold);
+  box-shadow:0 8px 30px rgba(255,215,0,.15);
+}
+.game-tile .icon{font-size:36px;margin-bottom:10px;display:block}
+.game-tile .name{font-size:13px;font-weight:700;color:var(--text-bright);line-height:1.3}
+.game-tile .meta{font-size:11px;color:var(--text-dim);margin-top:6px}
+
+/* ================================================================
+   ARCHITECTURE SVG DIAGRAM
+   ================================================================ */
+.arch-diagram{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:20px;
+  padding:40px 24px;margin:40px auto;max-width:900px;overflow-x:auto;
+}
+.arch-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}
+/* SVG animations */
+.arch-diagram .data-flow{
+  stroke-dasharray:8 4;
+  animation:dash-flow 1.5s linear infinite;
+}
+@keyframes dash-flow{to{stroke-dashoffset:-24}}
+.arch-diagram .pulse-node{
+  animation:node-pulse 2s ease-in-out infinite;
+}
+@keyframes node-pulse{
+  0%,100%{opacity:.8;filter:drop-shadow(0 0 4px rgba(0,240,255,.3))}
+  50%{opacity:1;filter:drop-shadow(0 0 12px rgba(0,240,255,.6))}
+}
+
+/* ================================================================
+   MODEL TABLE
+   ================================================================ */
+.model-table{
+  width:100%;border-collapse:separate;border-spacing:0;
+  background:var(--bg-glass);border-radius:16px;overflow:hidden;
+  border:1px solid var(--border);backdrop-filter:blur(8px);
+}
+.model-table thead{background:rgba(255,215,0,.08)}
+.model-table th{
+  padding:14px 20px;text-align:left;font-size:12px;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--gold);border-bottom:1px solid var(--border);
+}
+.model-table td{
+  padding:14px 20px;font-size:14px;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.model-table tr:last-child td{border-bottom:none}
+.model-table tr:hover td{background:rgba(255,215,0,.03)}
+.badge{
+  display:inline-block;padding:2px 10px;border-radius:999px;
+  font-size:11px;font-weight:600;
+}
+.badge.rec{background:rgba(34,197,94,.15);color:var(--green)}
+.badge.adv{background:rgba(168,85,247,.15);color:var(--purple)}
+.badge.leg{background:rgba(156,163,175,.15);color:var(--text-dim)}
+
+/* ================================================================
+   INSTALL STEPS
+   ================================================================ */
+.steps{display:flex;flex-direction:column;gap:24px;counter-reset:step}
+.step{
+  display:flex;gap:20px;align-items:flex-start;
+  background:var(--bg-glass);backdrop-filter:blur(8px);
+  border:1px solid var(--border);border-radius:16px;padding:28px;
+  transition:border-color .3s;counter-increment:step;
+}
+.step:hover{border-color:rgba(0,240,255,.3)}
+.step-num{
+  flex-shrink:0;width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:900;color:#000;
+}
+.step-body h3{font-size:16px;font-weight:700;color:var(--text-bright);margin-bottom:6px}
+.step-body p{font-size:14px;color:var(--text-dim)}
+pre.code-block{
+  background:#0D1117;border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:16px 20px;margin-top:12px;
+  font-family:var(--mono);font-size:13px;color:#C9D1D9;
+  overflow-x:auto;line-height:1.7;
+}
+pre.code-block .comment{color:#8B949E}
+pre.code-block .cmd{color:var(--cyan)}
+pre.code-block .flag{color:var(--purple)}
+
+/* ================================================================
+   GAME RECOMMENDATION TABLE
+   ================================================================ */
+.rec-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;
+}
+.rec-card{
+  background:var(--bg-glass);backdrop-filter:blur(8px);
+  border:1px solid var(--border);border-radius:16px;padding:24px;
+  transition:all .3s;
+}
+.rec-card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.rec-card .header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.rec-card .header .icon{font-size:28px}
+.rec-card .header h3{font-size:16px;font-weight:700;color:var(--text-bright)}
+.rec-card .specs{display:flex;flex-wrap:wrap;gap:8px}
+.spec-tag{
+  padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;
+  background:rgba(0,240,255,.08);color:var(--cyan);
+  border:1px solid rgba(0,240,255,.15);
+}
+
+/* ================================================================
+   FOOTER
+   ================================================================ */
+footer{
+  position:relative;z-index:1;border-top:1px solid var(--border);
+  padding:48px 24px;text-align:center;
+}
+footer p{font-size:13px;color:var(--text-dim)}
+footer a{color:var(--gold)}
+
+/* ================================================================
+   SCROLL ANIMATIONS
+   ================================================================ */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s,transform .7s}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ================================================================
+   ANIMATED SVG ICONS
+   ================================================================ */
+.icon-spin{animation:icon-spin 8s linear infinite}
+@keyframes icon-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.icon-float{animation:icon-float 3s ease-in-out infinite}
+@keyframes icon-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.icon-pulse{animation:icon-pulse 2s ease-in-out infinite}
+@keyframes icon-pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.1);opacity:1}}
+
+/* Floating runes background per section */
+.section-runes{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  overflow:hidden;pointer-events:none;z-index:0;
+}
+.rune{
+  position:absolute;font-size:24px;opacity:.04;
+  animation:rune-drift linear infinite;
+}
+@keyframes rune-drift{
+  0%{transform:translateY(100vh) rotate(0deg);opacity:0}
+  10%{opacity:.06}
+  90%{opacity:.06}
+  100%{transform:translateY(-100px) rotate(360deg);opacity:0}
+}
+
+/* Hero sword animation */
+.hero-sword{
+  position:absolute;right:5%;top:20%;width:120px;height:120px;
+  opacity:.08;animation:sword-float 6s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes sword-float{
+  0%,100%{transform:translateY(0) rotate(-15deg)}
+  50%{transform:translateY(-20px) rotate(5deg)}
+}
+
+/* Glowing border on game tiles */
+.game-tile::after{
+  content:'';position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(135deg,transparent 40%,rgba(255,215,0,.05) 50%,transparent 60%);
+  background-size:200% 200%;
+  animation:shine-sweep 4s ease-in-out infinite;
+}
+@keyframes shine-sweep{
+  0%{background-position:200% 200%}
+  100%{background-position:-200% -200%}
+}
+
+/* Card hover glow ring */
+.card::after{
+  content:'';position:absolute;inset:-1px;border-radius:16px;
+  background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(0,240,255,.15),rgba(168,85,247,.15));
+  opacity:0;transition:opacity .3s;z-index:-1;filter:blur(8px);
+}
+.card:hover::after{opacity:1}
+
+/* Step number glow */
+.step-num{
+  position:relative;overflow:visible;
+}
+.step-num::after{
+  content:'';position:absolute;inset:-4px;border-radius:16px;
+  background:inherit;opacity:.3;filter:blur(8px);z-index:-1;
+}
+
+/* Table row highlight animation */
+.model-table tbody tr{
+  transition:background .3s,transform .2s;
+}
+.model-table tbody tr:hover{
+  background:rgba(255,215,0,.04);
+}
+
+/* Recommendation box pulse */
+.rec-box-glow{
+  animation:rec-glow 3s ease-in-out infinite;
+}
+@keyframes rec-glow{
+  0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.1)}
+  50%{box-shadow:0 0 20px 4px rgba(34,197,94,.08)}
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media(max-width:768px){
+  nav .links{display:none}
+  .card-grid{grid-template-columns:1fr}
+  .game-grid{grid-template-columns:repeat(2,1fr)}
+  .rec-grid{grid-template-columns:1fr}
+  .step{flex-direction:column}
+  .arch-diagram{padding:20px 12px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     ANIMATED BACKGROUND
+     ============================================================ -->
+<canvas id="bg-canvas"></canvas>
+<div class="bg-glow g1"></div>
+<div class="bg-glow g2"></div>
+<div class="bg-glow g3"></div>
+
+<!-- ============================================================
+     NAVIGATION
+     ============================================================ -->
+<nav>
+  <div class="inner">
+    <div class="logo">BOT-MMORPG-AI</div>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#games">Games</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#models">Models</a>
+      <a href="#install">Install</a>
+      <a href="#best-practices">Best Practices</a>
+    </div>
+    <a class="nav-cta" href="https://github.com/ruslanmv/BOT-MMORPG-AI/releases">Download</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section class="hero">
+  <!-- Animated SVG sword decoration -->
+  <svg class="hero-sword" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 5 L55 40 L65 42 L50 95 L35 42 L45 40 Z" fill="url(#gGoldH)" stroke="rgba(255,215,0,.3)" stroke-width="1"/>
+    <path d="M30 42 L70 42 L65 48 L35 48 Z" fill="rgba(255,215,0,.2)" stroke="rgba(255,215,0,.3)" stroke-width="0.5"/>
+    <circle cx="50" cy="42" r="4" fill="rgba(0,240,255,.4)">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <defs><linearGradient id="gGoldH" x1="0.5" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="rgba(255,215,0,.3)"/><stop offset="100%" stop-color="rgba(255,215,0,.05)"/></linearGradient></defs>
+  </svg>
+
+  <!-- Animated shield on left -->
+  <svg class="hero-sword" style="left:5%;right:auto;top:30%;width:100px;height:100px;animation-delay:-3s" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 10 C20 20 15 50 50 90 C85 50 80 20 50 10Z" fill="rgba(0,240,255,.05)" stroke="rgba(0,240,255,.2)" stroke-width="1.5"/>
+    <path d="M50 25 L50 75" stroke="rgba(0,240,255,.15)" stroke-width="1"/>
+    <path d="M30 45 L70 45" stroke="rgba(0,240,255,.15)" stroke-width="1"/>
+    <circle cx="50" cy="45" r="6" fill="none" stroke="rgba(0,240,255,.2)" stroke-width="1">
+      <animate attributeName="r" values="5;8;5" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </svg>
+
+  <div class="hero-content">
+    <div class="hero-badge">Open Source &middot; AI-Powered &middot; Free Forever</div>
+    <h1>Stop Grinding.<br><span class="grad">Let AI Carry.</span></h1>
+    <p>Record your gameplay. Train a neural network. AFK while the bot farms, fights, and loots for you 24/7. Battle-tested on Genshin, WoW, FFXIV, Lost Ark, GW2, and New World.</p>
+    <div class="hero-buttons">
+      <a class="btn btn-primary" href="#install">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        Download Now
+      </a>
+      <a class="btn btn-secondary" href="https://github.com/ruslanmv/BOT-MMORPG-AI" id="star-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--gold)" stroke="var(--gold)" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-num">401</span><span class="stat-label">Tests Passing</span></div>
+      <div class="stat"><span class="stat-num">6</span><span class="stat-label">MMORPGs</span></div>
+      <div class="stat"><span class="stat-num">9</span><span class="stat-label">Neural Nets</span></div>
+      <div class="stat"><span class="stat-num">24/7</span><span class="stat-label">Auto-Farm</span></div>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+  </div>
+</section>
+
+<!-- ============================================================
+     FEATURES
+     ============================================================ -->
+<section id="features">
+  <div class="section-inner reveal">
+    <span class="section-label gold">Legendary Features</span>
+    <h2>Not a Macro. Not a Script. Pure AI.</h2>
+    <p class="section-desc">This isn't your average auto-clicker. This is a full neural network that watches you play, learns your strats, and executes them at 30+ FPS while you sleep.</p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon gold icon-pulse">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+            <circle cx="12" cy="12" r="10" stroke="var(--gold)" stroke-width="0.5" opacity="0.3">
+              <animate attributeName="r" values="10;13;10" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        </div>
+        <h3>Record &amp; Learn</h3>
+        <p>Just play your game for 10-15 min. The AI watches every input you make &mdash; keyboard combos, controller sticks, mouse flicks &mdash; and records it all at 10+ FPS. Your gameplay is the training data.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon cyan icon-float">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3>Train Your AI Clone</h3>
+        <p>Hit one command and grab a coffee. PyTorch trains a deep neural network on your recorded plays. It auto-detects your action space, picks the right model, and tunes everything to your game's profile.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple icon-pulse">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2">
+              <animate attributeName="opacity" values="0.7;1;0.7" dur="1.5s" repeatCount="indefinite"/>
+            </polygon>
+          </svg>
+        </div>
+        <h3>GG, It Plays For You</h3>
+        <p>Launch the bot and go AFK. It reads the screen, predicts your next move, and executes at 30+ FPS. Built-in anti-stuck tech means no more running into walls. Farm all night, wake up to full bags.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon green">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Every Input, Every Button</h3>
+        <p>WASD, PS4/Xbox controller (sticks, triggers, bumpers, d-pad), and full mouse (aim, delta, velocity, LMB/RMB/MMB, scroll). If you can press it, the AI can learn it and reproduce it.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon gold">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <h3>Game Launcher Vibes</h3>
+        <p>A dark-themed gaming dashboard with one-click Record, Train, and Play. Looks like a Steam overlay, works like a pro tool. Game presets, model catalog, real-time logs. No terminal needed.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon cyan">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Raid-Tested, Ship-Ready</h3>
+        <p>401 automated tests. Every game profile, every neural net, every action space &mdash; tested end-to-end with real PyTorch training. This isn't a prototype. It's production-grade.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SUPPORTED GAMES
+     ============================================================ -->
+<section id="games" style="background:rgba(0,0,0,.2)">
+  <div class="section-inner reveal">
+    <span class="section-label cyan">Supported Titles</span>
+    <h2>Your Favorite MMOs. Day-One Support.</h2>
+    <p class="section-desc">Each title ships with a hand-tuned game profile &mdash; resolution, action space, neural net, learning rate &mdash; all dialed in so you can jump straight into training.</p>
+    <div class="game-grid">
+      <div class="game-tile"><span class="icon">&#x2694;&#xFE0F;</span><span class="name">Genshin Impact</span><span class="meta">16 actions &middot; 480p</span></div>
+      <div class="game-tile"><span class="icon">&#x1F409;</span><span class="name">World of Warcraft</span><span class="meta">73 actions &middot; 640p</span></div>
+      <div class="game-tile"><span class="icon">&#x1F52E;</span><span class="name">Final Fantasy XIV</span><span class="meta">73 actions &middot; 640p</span></div>
+      <div class="game-tile"><span class="icon">&#x1F6E1;&#xFE0F;</span><span class="name">Guild Wars 2</span><span class="meta">48 actions &middot; 480p</span></div>
+      <div class="game-tile"><span class="icon">&#x26A1;</span><span class="name">Lost Ark</span><span class="meta">48 actions &middot; 640p</span></div>
+      <div class="game-tile"><span class="icon">&#x1F3F9;</span><span class="name">New World</span><span class="meta">48 actions &middot; 480p</span></div>
+    </div>
+
+    <!-- Game Recommendation Cards -->
+    <div style="margin-top:48px">
+      <h3 style="font-size:20px;font-weight:700;color:var(--text-bright);margin-bottom:20px">Recommended Settings per Game</h3>
+      <div class="rec-grid">
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x2694;&#xFE0F;</span><h3>Genshin Impact</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">combat (48)</span>
+            <span class="spec-tag">480x270</span>
+            <span class="spec-tag">LR 0.001</span>
+          </div>
+        </div>
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x1F409;</span><h3>World of Warcraft</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">extended (73)</span>
+            <span class="spec-tag">640x360</span>
+            <span class="spec-tag">LR 0.0008</span>
+          </div>
+        </div>
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x1F52E;</span><h3>Final Fantasy XIV</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">extended (73)</span>
+            <span class="spec-tag">640x360</span>
+            <span class="spec-tag">LR 0.0008</span>
+          </div>
+        </div>
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x1F6E1;&#xFE0F;</span><h3>Guild Wars 2</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">combat (48)</span>
+            <span class="spec-tag">480x270</span>
+            <span class="spec-tag">LR 0.0006</span>
+          </div>
+        </div>
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x26A1;</span><h3>Lost Ark</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">combat (48)</span>
+            <span class="spec-tag">640x360</span>
+            <span class="spec-tag">LR 0.0005</span>
+          </div>
+        </div>
+        <div class="rec-card">
+          <div class="header"><span class="icon">&#x1F3F9;</span><h3>New World</h3></div>
+          <div class="specs">
+            <span class="spec-tag">efficientnet_lstm</span>
+            <span class="spec-tag">combat (48)</span>
+            <span class="spec-tag">480x270</span>
+            <span class="spec-tag">LR 0.0006</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     ARCHITECTURE DIAGRAM
+     ============================================================ -->
+<section id="architecture">
+  <div class="section-inner reveal">
+    <span class="section-label purple">Under The Hood</span>
+    <h2>The Tech Behind The Magic</h2>
+    <p class="section-desc">Three stages: Capture your plays, train the AI on your data, then unleash it in-game. Mouse support is optional &mdash; toggle it on if your game needs it.</p>
+
+    <div class="arch-diagram">
+      <svg viewBox="0 0 840 420" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background grid -->
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+          </pattern>
+          <linearGradient id="gGold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#FFD700"/>
+            <stop offset="100%" stop-color="#FFA500"/>
+          </linearGradient>
+          <linearGradient id="gCyan" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#00F0FF"/>
+            <stop offset="100%" stop-color="#0099CC"/>
+          </linearGradient>
+          <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#A855F7"/>
+            <stop offset="100%" stop-color="#7C3AED"/>
+          </linearGradient>
+          <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#22C55E"/>
+            <stop offset="100%" stop-color="#16A34A"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <rect width="840" height="420" fill="url(#grid)"/>
+
+        <!-- Stage 1: RECORD -->
+        <rect x="20" y="30" width="180" height="360" rx="16" fill="rgba(255,215,0,.06)" stroke="rgba(255,215,0,.2)" stroke-width="1.5"/>
+        <text x="110" y="62" text-anchor="middle" fill="#FFD700" font-size="14" font-weight="800" letter-spacing="2">RECORD</text>
+
+        <!-- Screen capture -->
+        <rect class="pulse-node" x="45" y="80" width="130" height="60" rx="10" fill="rgba(255,215,0,.1)" stroke="url(#gGold)" stroke-width="1.5" filter="url(#glow)"/>
+        <text x="110" y="106" text-anchor="middle" fill="#FFD700" font-size="12" font-weight="700">Screen</text>
+        <text x="110" y="122" text-anchor="middle" fill="#9CA3AF" font-size="10">480x270 @ 10fps</text>
+
+        <!-- Keyboard -->
+        <rect x="45" y="155" width="130" height="44" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)" stroke-width="1"/>
+        <text x="110" y="182" text-anchor="middle" fill="#E5E7EB" font-size="11" font-weight="600">Keyboard (9)</text>
+
+        <!-- Gamepad -->
+        <rect x="45" y="210" width="130" height="44" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)" stroke-width="1"/>
+        <text x="110" y="237" text-anchor="middle" fill="#E5E7EB" font-size="11" font-weight="600">Gamepad (20)</text>
+
+        <!-- Mouse (optional) -->
+        <rect x="45" y="265" width="130" height="56" rx="10" fill="rgba(168,85,247,.06)" stroke="rgba(168,85,247,.25)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="110" y="290" text-anchor="middle" fill="#A855F7" font-size="11" font-weight="600">Mouse (10)</text>
+        <text x="110" y="306" text-anchor="middle" fill="#9CA3AF" font-size="9">pos + delta + vel + btn</text>
+
+        <!-- .npy output -->
+        <rect x="52" y="338" width="116" height="36" rx="8" fill="rgba(34,197,94,.08)" stroke="rgba(34,197,94,.3)" stroke-width="1"/>
+        <text x="110" y="361" text-anchor="middle" fill="#22C55E" font-size="11" font-weight="700">.npy dataset</text>
+
+        <!-- Flow arrows Record -> Train -->
+        <line class="data-flow" x1="200" y1="210" x2="260" y2="210" stroke="var(--gold)" stroke-width="2"/>
+        <polygon points="258,204 270,210 258,216" fill="var(--gold)"/>
+
+        <!-- Stage 2: TRAIN -->
+        <rect x="270" y="30" width="260" height="360" rx="16" fill="rgba(0,240,255,.04)" stroke="rgba(0,240,255,.15)" stroke-width="1.5"/>
+        <text x="400" y="62" text-anchor="middle" fill="#00F0FF" font-size="14" font-weight="800" letter-spacing="2">TRAIN</text>
+
+        <!-- EfficientNet backbone -->
+        <rect class="pulse-node" x="295" y="80" width="210" height="50" rx="10" fill="rgba(0,240,255,.08)" stroke="url(#gCyan)" stroke-width="1.5" filter="url(#glow)"/>
+        <text x="400" y="102" text-anchor="middle" fill="#00F0FF" font-size="12" font-weight="700">EfficientNet-B0 Backbone</text>
+        <text x="400" y="118" text-anchor="middle" fill="#9CA3AF" font-size="9">Feature Extraction (5M params)</text>
+
+        <!-- Arrow down -->
+        <line x1="400" y1="130" x2="400" y2="148" stroke="rgba(0,240,255,.4)" stroke-width="1.5"/>
+        <polygon points="394,146 400,154 406,146" fill="rgba(0,240,255,.6)"/>
+
+        <!-- LSTM Head -->
+        <rect x="295" y="155" width="210" height="50" rx="10" fill="rgba(0,240,255,.06)" stroke="rgba(0,240,255,.2)" stroke-width="1"/>
+        <text x="400" y="177" text-anchor="middle" fill="#00F0FF" font-size="12" font-weight="700">LSTM Temporal Head</text>
+        <text x="400" y="193" text-anchor="middle" fill="#9CA3AF" font-size="9">Sequence Memory (4 frames)</text>
+
+        <!-- Arrow down -->
+        <line x1="400" y1="205" x2="400" y2="223" stroke="rgba(0,240,255,.4)" stroke-width="1.5"/>
+        <polygon points="394,221 400,229 406,221" fill="rgba(0,240,255,.6)"/>
+
+        <!-- Action output -->
+        <rect x="295" y="230" width="100" height="44" rx="10" fill="rgba(255,215,0,.06)" stroke="rgba(255,215,0,.2)" stroke-width="1"/>
+        <text x="345" y="250" text-anchor="middle" fill="#FFD700" font-size="11" font-weight="600">Actions</text>
+        <text x="345" y="264" text-anchor="middle" fill="#9CA3AF" font-size="9">9-73 discrete</text>
+
+        <!-- Mouse output -->
+        <rect x="405" y="230" width="100" height="44" rx="10" fill="rgba(168,85,247,.06)" stroke="rgba(168,85,247,.2)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="455" y="250" text-anchor="middle" fill="#A855F7" font-size="11" font-weight="600">Mouse</text>
+        <text x="455" y="264" text-anchor="middle" fill="#9CA3AF" font-size="9">10 continuous</text>
+
+        <!-- Loss function -->
+        <rect x="310" y="292" width="180" height="40" rx="10" fill="rgba(255,68,68,.06)" stroke="rgba(255,68,68,.2)" stroke-width="1"/>
+        <text x="400" y="316" text-anchor="middle" fill="#FF4444" font-size="11" font-weight="600">BCEWithLogitsLoss</text>
+
+        <!-- Optimizer -->
+        <rect x="335" y="346" width="130" height="36" rx="8" fill="rgba(34,197,94,.08)" stroke="rgba(34,197,94,.3)" stroke-width="1"/>
+        <text x="400" y="369" text-anchor="middle" fill="#22C55E" font-size="11" font-weight="700">Adam Optimizer</text>
+
+        <!-- Flow arrows Train -> Infer -->
+        <line class="data-flow" x1="530" y1="210" x2="580" y2="210" stroke="var(--cyan)" stroke-width="2"/>
+        <polygon points="578,204 590,210 578,216" fill="var(--cyan)"/>
+
+        <!-- Stage 3: INFER -->
+        <rect x="590" y="30" width="230" height="360" rx="16" fill="rgba(34,197,94,.04)" stroke="rgba(34,197,94,.15)" stroke-width="1.5"/>
+        <text x="705" y="62" text-anchor="middle" fill="#22C55E" font-size="14" font-weight="800" letter-spacing="2">INFERENCE</text>
+
+        <!-- Model -->
+        <rect class="pulse-node" x="615" y="80" width="180" height="50" rx="10" fill="rgba(34,197,94,.08)" stroke="url(#gGreen)" stroke-width="1.5" filter="url(#glow)"/>
+        <text x="705" y="102" text-anchor="middle" fill="#22C55E" font-size="12" font-weight="700">Trained Model</text>
+        <text x="705" y="118" text-anchor="middle" fill="#9CA3AF" font-size="9">.pt checkpoint + metadata</text>
+
+        <!-- Arrow down -->
+        <line x1="705" y1="130" x2="705" y2="148" stroke="rgba(34,197,94,.4)" stroke-width="1.5"/>
+        <polygon points="699,146 705,154 711,146" fill="rgba(34,197,94,.6)"/>
+
+        <!-- Action Weights -->
+        <rect x="615" y="155" width="180" height="44" rx="10" fill="rgba(255,215,0,.06)" stroke="rgba(255,215,0,.2)" stroke-width="1"/>
+        <text x="705" y="175" text-anchor="middle" fill="#FFD700" font-size="11" font-weight="600">Action Weights</text>
+        <text x="705" y="190" text-anchor="middle" fill="#9CA3AF" font-size="9">Dynamic per action-space size</text>
+
+        <!-- Arrow down -->
+        <line x1="705" y1="199" x2="705" y2="217" stroke="rgba(34,197,94,.4)" stroke-width="1.5"/>
+        <polygon points="699,215 705,223 711,215" fill="rgba(34,197,94,.6)"/>
+
+        <!-- Stuck Detection -->
+        <rect x="615" y="222" width="180" height="44" rx="10" fill="rgba(255,68,68,.06)" stroke="rgba(255,68,68,.2)" stroke-width="1"/>
+        <text x="705" y="242" text-anchor="middle" fill="#FF4444" font-size="11" font-weight="600">Stuck Detection</text>
+        <text x="705" y="257" text-anchor="middle" fill="#9CA3AF" font-size="9">Escalating evasive maneuvers</text>
+
+        <!-- Arrow down -->
+        <line x1="705" y1="266" x2="705" y2="284" stroke="rgba(34,197,94,.4)" stroke-width="1.5"/>
+        <polygon points="699,282 705,290 711,282" fill="rgba(34,197,94,.6)"/>
+
+        <!-- Execute -->
+        <rect x="615" y="290" width="85" height="40" rx="10" fill="rgba(34,197,94,.1)" stroke="rgba(34,197,94,.3)" stroke-width="1"/>
+        <text x="657" y="314" text-anchor="middle" fill="#22C55E" font-size="11" font-weight="600">Keys</text>
+
+        <rect x="710" y="290" width="85" height="40" rx="10" fill="rgba(168,85,247,.06)" stroke="rgba(168,85,247,.2)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="752" y="314" text-anchor="middle" fill="#A855F7" font-size="11" font-weight="600">Mouse</text>
+
+        <!-- Game output -->
+        <rect x="640" y="348" width="130" height="36" rx="8" fill="rgba(34,197,94,.12)" stroke="rgba(34,197,94,.4)" stroke-width="1.5"/>
+        <text x="705" y="371" text-anchor="middle" fill="#22C55E" font-size="12" font-weight="800">GAME</text>
+      </svg>
+    </div>
+
+    <!-- Input vector breakdown -->
+    <div style="margin-top:32px">
+      <h3 style="font-size:18px;font-weight:700;color:var(--text-bright);margin-bottom:16px">Input Vector Anatomy</h3>
+      <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;color:var(--gold)">Keyboard (9 values)</h3>
+          <p style="font-size:12px">W, S, A, D, WA, WD, SA, SD, NOKEY. One-hot directional encoding for 8-way movement.</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;color:var(--cyan)">Gamepad (20 values)</h3>
+          <p style="font-size:12px">LT, RT, Lx, Ly, Rx, Ry, D-Pad (4), Face buttons (A/B/X/Y), Bumpers, Start/Select, Sticks.</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;color:var(--purple)">Mouse (10 values) <span class="badge adv">BETA</span></h3>
+          <p style="font-size:12px">X, Y (position), dX, dY (delta), vX, vY (velocity), LMB, RMB, MMB (buttons), scroll.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     NEURAL NETWORK MODELS
+     ============================================================ -->
+<section id="models" style="background:rgba(0,0,0,.2)">
+  <div class="section-inner reveal">
+    <span class="section-label green">Choose Your Build</span>
+    <h2>9 Neural Nets. Pick Your Weapon.</h2>
+    <p class="section-desc">From lightweight speed-runners to heavy-hitting transformer tanks &mdash; 9 architectures tested end-to-end across all 6 games. Every single one passed quality gates.</p>
+
+    <table class="model-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Params</th>
+          <th>Temporal</th>
+          <th>Speed</th>
+          <th>Best For</th>
+          <th>Tier</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>EfficientNet-LSTM</strong></td>
+          <td>~5M</td>
+          <td>LSTM (4 frames)</td>
+          <td>~8ms</td>
+          <td>Best overall accuracy</td>
+          <td><span class="badge rec">Recommended</span></td>
+        </tr>
+        <tr>
+          <td><strong>EfficientNet-Simple</strong></td>
+          <td>~5M</td>
+          <td>None</td>
+          <td>~5ms</td>
+          <td>Single-frame prediction</td>
+          <td><span class="badge rec">Recommended</span></td>
+        </tr>
+        <tr>
+          <td><strong>MobileNetV3</strong></td>
+          <td>~2M</td>
+          <td>None</td>
+          <td>~3ms</td>
+          <td>Low-end / real-time</td>
+          <td><span class="badge rec">Recommended</span></td>
+        </tr>
+        <tr>
+          <td><strong>ResNet18-LSTM</strong></td>
+          <td>~12M</td>
+          <td>LSTM (4 frames)</td>
+          <td>~10ms</td>
+          <td>Speed / accuracy balance</td>
+          <td><span class="badge rec">Recommended</span></td>
+        </tr>
+        <tr>
+          <td><strong>EfficientNet-Transformer</strong></td>
+          <td>~12M</td>
+          <td>Transformer</td>
+          <td>~15ms</td>
+          <td>Long action sequences</td>
+          <td><span class="badge adv">Advanced</span></td>
+        </tr>
+        <tr>
+          <td><strong>Multi-Head Action</strong></td>
+          <td>~6M</td>
+          <td>Multi-head</td>
+          <td>~8ms</td>
+          <td>Simultaneous actions</td>
+          <td><span class="badge adv">Advanced</span></td>
+        </tr>
+        <tr>
+          <td><strong>Game Attention Net</strong></td>
+          <td>~6M</td>
+          <td>Spatial attn</td>
+          <td>~10ms</td>
+          <td>Complex UIs</td>
+          <td><span class="badge adv">Advanced</span></td>
+        </tr>
+        <tr>
+          <td>InceptionV3</td>
+          <td>~7M</td>
+          <td>None</td>
+          <td>~12ms</td>
+          <td>Legacy support</td>
+          <td><span class="badge leg">Legacy</span></td>
+        </tr>
+        <tr>
+          <td>AlexNet</td>
+          <td>~60M</td>
+          <td>None</td>
+          <td>~5ms</td>
+          <td>Legacy support</td>
+          <td><span class="badge leg">Legacy</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="rec-box-glow" style="margin-top:24px;padding:20px 24px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:12px">
+      <p style="font-size:14px;color:var(--green);font-weight:700;margin-bottom:4px">Recommendation</p>
+      <p style="font-size:14px;color:var(--text-dim)">Use <strong style="color:var(--text-bright)">EfficientNet-LSTM</strong> for all MMORPGs. It delivers the best accuracy with temporal awareness across all 6 tested game profiles while maintaining &gt;30 FPS inference on GPU. Use <strong style="color:var(--text-bright)">MobileNetV3</strong> only on low-end hardware (&lt;4GB VRAM).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     INSTALLATION GUIDE
+     ============================================================ -->
+<section id="install">
+  <div class="section-inner reveal">
+    <span class="section-label gold">Quick Start</span>
+    <h2>From Zero to Auto-Farm in 5 Minutes</h2>
+    <p class="section-desc">No PhD required. Just follow these steps and your AI will be farming while you sleep. Windows 10/11 for gameplay; training works on any OS.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Install Prerequisites</h3>
+          <p>You need Python 3.10+, Git, and optionally Rust (for the Tauri desktop app).</p>
+          <pre class="code-block"><span class="comment"># Check Python version</span>
+<span class="cmd">python</span> <span class="flag">--version</span>   <span class="comment"># Should be 3.10+</span>
+
+<span class="comment"># Install Rust (optional, for Tauri desktop app)</span>
+<span class="cmd">curl</span> <span class="flag">--proto '=https' --tlsv1.2 -sSf</span> https://sh.rustup.rs | sh</pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Clone &amp; Install</h3>
+          <p>Clone the repository and install all dependencies with a single command.</p>
+          <pre class="code-block"><span class="cmd">git clone</span> https://github.com/ruslanmv/BOT-MMORPG-AI.git
+<span class="cmd">cd</span> BOT-MMORPG-AI
+<span class="cmd">make</span> install          <span class="comment"># Core + PyTorch</span>
+<span class="cmd">make</span> install-launcher  <span class="comment"># Desktop launcher (optional)</span>
+<span class="cmd">make</span> install-tauri     <span class="comment"># Tauri desktop app (optional)</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Record Your Gameplay</h3>
+          <p>Play your game normally for 10-15 minutes. The bot watches and records screen + inputs.</p>
+          <pre class="code-block"><span class="comment"># Via command line</span>
+<span class="cmd">make</span> collect-data
+
+<span class="comment"># Or use the Launcher / Tauri app GUI</span>
+<span class="comment"># Controls: T = pause/resume, Q = stop and save</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Train the Neural Network</h3>
+          <p>One command trains the model. Auto-detects action space and hardware tier.</p>
+          <pre class="code-block"><span class="cmd">make</span> train-model
+
+<span class="comment"># GPU: ~30-60 minutes  |  CPU: ~2-4 hours</span>
+<span class="comment"># Default: efficientnet_lstm (recommended for all games)</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Let the AI Play</h3>
+          <p>Start the bot, switch to your game window, and watch the AI play using your learned strategy.</p>
+          <pre class="code-block"><span class="cmd">make</span> test-model
+
+<span class="comment"># Controls: T = pause/resume, ESC = stop completely</span>
+<span class="comment"># Built-in stuck detection + evasive maneuvers</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h3>Verify Everything Works</h3>
+          <p>Run the full test suite to confirm all 401 tests pass on your system.</p>
+          <pre class="code-block"><span class="cmd">make</span> test
+
+<span class="comment"># Expected: 401 passed, 1 skipped</span>
+<span class="comment"># Covers: profiles, networks, mouse, training, inference</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     BEST PRACTICES
+     ============================================================ -->
+<section id="best-practices" style="background:rgba(0,0,0,.2)">
+  <div class="section-inner reveal">
+    <span class="section-label red">Min-Max Your Setup</span>
+    <h2>Pro Strats for Maximum Performance</h2>
+    <p class="section-desc">These are the optimization tips the top players use. Follow them and your bot will perform like a speedrunner, not a noob.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon gold">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3>Record Quality Data</h3>
+        <p>Play consistently for 10-15 minutes. Repeat the same route 2-3 times. Set in-game time to noon for consistent lighting. Avoid AFK or idle moments during recording.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon cyan">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><path d="M1 10h22"/></svg>
+        </div>
+        <h3>Use 480x270 Resolution</h3>
+        <p>Lower capture resolution = faster training and inference. 480x270 captures all essential UI elements for most games. Only use 640x360 for complex UIs (WoW addons, FFXIV hotbars).</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </div>
+        <h3>Start with EfficientNet-LSTM</h3>
+        <p>It is the proven default for all 6 tested MMORPGs. Only switch to MobileNetV3 on low-end hardware (&lt;4GB VRAM) or if you need maximum FPS. Advanced architectures are experimental.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon green">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Use Game Presets</h3>
+        <p>Select your game in the launcher or Tauri app. Presets auto-configure resolution, action space, architecture, learning rate, and temporal frames for optimal results.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon gold">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+        </div>
+        <h3>Mouse is Optional</h3>
+        <p>Mouse recording is a beta feature, disabled by default. Enable it in the UI checkbox only if your game relies heavily on mouse aim (action combat, camera control). It is purely additive and non-destructive.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon cyan">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <h3>Hardware Tier Matters</h3>
+        <p><strong>Low (&lt;4GB):</strong> MobileNetV3, batch 8, 160x160. <strong>Medium (4-8GB):</strong> EfficientNet-Simple, batch 16, 224x224. <strong>High (&gt;8GB):</strong> EfficientNet-LSTM, batch 32, 224x224 with 4 temporal frames.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     GITHUB STAR CTA
+     ============================================================ -->
+<div class="star-banner">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="var(--gold)" style="margin-bottom:16px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+  <h2>Enjoying the Bot? <span style="color:var(--gold)">Drop a Star!</span></h2>
+  <p>Help us reach more gamers. A GitHub star takes 1 second and means the world to our dev party. Let's hit the leaderboard together.</p>
+  <a class="star-btn-big" href="https://github.com/ruslanmv/BOT-MMORPG-AI" target="_blank" rel="noopener">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#000"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    Star on GitHub
+  </a>
+  <p style="margin-top:16px;font-size:12px;color:var(--text-dim)">Open source &middot; Apache 2.0 &middot; Free forever &middot; No strings attached</p>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer>
+  <p style="font-size:14px;color:var(--text-dim)">
+    <strong style="color:var(--gold)">BOT-MMORPG-AI</strong> &mdash; Apache 2.0 License &mdash; Free &amp; Open Source Forever
+  </p>
+  <p style="margin-top:8px;font-size:12px">
+    Built with PyTorch &middot; 9 Neural Nets &middot; 6 MMORPGs &middot; 401 Tests Passing &middot;
+    <a href="https://github.com/ruslanmv/BOT-MMORPG-AI">GitHub</a>
+  </p>
+  <p style="margin-top:12px">
+    <a href="https://github.com/ruslanmv/BOT-MMORPG-AI" style="color:var(--gold);font-weight:700;font-size:13px">
+      Give us a Star and join the party!
+    </a>
+  </p>
+</footer>
+
+<!-- ============================================================
+     SCRIPTS
+     ============================================================ -->
+<script>
+// =============================================
+// PARTICLE BACKGROUND ANIMATION
+// =============================================
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  const particles = [];
+  const PARTICLE_COUNT = 80;
+  const CONNECT_DIST = 150;
+
+  function resize(){
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Particle {
+    constructor(){
+      this.x = Math.random() * W;
+      this.y = Math.random() * H;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.4;
+      this.r = Math.random() * 2 + 0.5;
+      const colors = ['rgba(255,215,0,','rgba(0,240,255,','rgba(168,85,247,'];
+      this.color = colors[Math.floor(Math.random()*colors.length)];
+    }
+    update(){
+      this.x += this.vx;
+      this.y += this.vy;
+      if(this.x < 0 || this.x > W) this.vx *= -1;
+      if(this.y < 0 || this.y > H) this.vy *= -1;
+    }
+    draw(){
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = this.color + '0.6)';
+      ctx.fill();
+    }
+  }
+
+  for(let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+  function animate(){
+    ctx.clearRect(0, 0, W, H);
+    for(let i = 0; i < particles.length; i++){
+      particles[i].update();
+      particles[i].draw();
+      for(let j = i + 1; j < particles.length; j++){
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < CONNECT_DIST){
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = 'rgba(255,215,0,' + (1 - dist/CONNECT_DIST) * 0.08 + ')';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// =============================================
+// SCROLL REVEAL ANIMATIONS
+// =============================================
+(function(){
+  const observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {threshold: 0.1});
+
+  document.querySelectorAll('.reveal').forEach(function(el){
+    observer.observe(el);
+  });
+})();
+
+// =============================================
+// FLOATING RUNE PARTICLES (per section)
+// =============================================
+(function(){
+  const runes = ['\u2694','\u2728','\u269B','\u2726','\u272A','\u2742','\u2756','\u25C6','\u2605','\u2661'];
+  const sections = document.querySelectorAll('section');
+  sections.forEach(function(sec){
+    const container = document.createElement('div');
+    container.className = 'section-runes';
+    sec.style.position = 'relative';
+    sec.insertBefore(container, sec.firstChild);
+    for(let i = 0; i < 8; i++){
+      const rune = document.createElement('span');
+      rune.className = 'rune';
+      rune.textContent = runes[Math.floor(Math.random() * runes.length)];
+      rune.style.left = Math.random() * 100 + '%';
+      rune.style.fontSize = (16 + Math.random() * 20) + 'px';
+      rune.style.animationDuration = (15 + Math.random() * 20) + 's';
+      rune.style.animationDelay = (-Math.random() * 20) + 's';
+      container.appendChild(rune);
+    }
+  });
+})();
+
+// =============================================
+// NAV SCROLL EFFECT (shrink on scroll)
+// =============================================
+(function(){
+  var nav = document.querySelector('nav');
+  window.addEventListener('scroll', function(){
+    if(window.scrollY > 50){
+      nav.style.background = 'rgba(10,14,23,.95)';
+      nav.style.boxShadow = '0 4px 24px rgba(0,0,0,.3)';
+    } else {
+      nav.style.background = 'rgba(10,14,23,.85)';
+      nav.style.boxShadow = 'none';
+    }
+  });
+})();
+
+// =============================================
+// SMOOTH SCROLL FOR NAV LINKS
+// =============================================
+document.querySelectorAll('nav a[href^="#"]').forEach(function(link){
+  link.addEventListener('click', function(e){
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if(target){
+      target.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  });
+});
+
+// =============================================
+// ANIMATED STAT COUNTERS
+// =============================================
+(function(){
+  var animated = false;
+  var observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting && !animated){
+        animated = true;
+        document.querySelectorAll('.stat-num').forEach(function(el){
+          var text = el.textContent.trim();
+          if(text.match(/^\d+$/)){
+            var target = parseInt(text);
+            var current = 0;
+            var step = Math.max(1, Math.floor(target / 40));
+            var interval = setInterval(function(){
+              current += step;
+              if(current >= target){
+                current = target;
+                clearInterval(interval);
+              }
+              el.textContent = current;
+            }, 30);
+          }
+        });
+      }
+    });
+  }, {threshold: 0.5});
+  var stats = document.querySelector('.hero-stats');
+  if(stats) observer.observe(stats);
+})();
+</script>
+</body>
+</html>

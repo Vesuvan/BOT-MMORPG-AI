@@ -1009,13 +1009,24 @@ fn start_sidecar_server(app: &AppHandle) -> Result<(SidecarApi, Child), String> 
 // ---------------------------
 // HTTP HELPERS
 // ---------------------------
+/// Wait up to ~5 seconds for the sidecar to become ready, polling every 500ms.
+async fn wait_for_sidecar(inner: &Arc<AppStateInner>) -> Result<SidecarApi, String> {
+    for attempt in 0..10 {
+        {
+            let guard = inner.sidecar.lock().unwrap();
+            if let Some(ref api) = *guard {
+                return Ok(api.clone());
+            }
+        }
+        if attempt < 9 {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    }
+    Err("Sidecar API not ready after 5 s — check terminal for startup errors".to_string())
+}
+
 async fn api_get_with(inner: &Arc<AppStateInner>, path: &str) -> Result<Value, String> {
-    let api = inner
-        .sidecar
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "Sidecar API not ready".to_string())?;
+    let api = wait_for_sidecar(inner).await?;
     let url = format!("{}{}", api.base_url, path);
 
     let res = inner
@@ -1040,12 +1051,7 @@ async fn api_post_with(
     path: &str,
     payload: Value,
 ) -> Result<Value, String> {
-    let api = inner
-        .sidecar
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "Sidecar API not ready".to_string())?;
+    let api = wait_for_sidecar(inner).await?;
     let url = format!("{}{}", api.base_url, path);
 
     let res = inner
@@ -1418,19 +1424,28 @@ async fn start_recording(
     window: Window,
     game_id: Option<String>,
     dataset_name: Option<String>,
+    capture_mouse: Option<bool>,
 ) -> Result<String, String> {
     let gid = normalize_game_id(game_id);
     let name = dataset_name.unwrap_or_else(|| "Untitled".to_string());
+    let cap_mouse = capture_mouse.unwrap_or(false);
     let inner = state.inner.clone();
 
     if let Err(e) = api_post_with(
         &inner,
         "/session/begin_recording",
-        json!({"game_id": gid, "dataset_name": name}),
+        json!({"game_id": gid, "dataset_name": name, "capture_mouse": cap_mouse}),
     )
     .await
     {
         let _ = window.emit("terminal_update", format!("[Warning] begin_recording failed: {}", e));
+    }
+
+    // Pass mouse capture preference as env var for the Python script
+    if cap_mouse {
+        std::env::set_var("BOTMMO_CAPTURE_MOUSE", "true");
+    } else {
+        std::env::set_var("BOTMMO_CAPTURE_MOUSE", "false");
     }
 
     run_python_script(app, "1-collect_data.py", window, inner)
@@ -1579,17 +1594,34 @@ fn install_drivers(app: tauri::AppHandle) -> Value {
             None => return json!({"ok": false, "error": "Could not find install_drivers.ps1"}),
         };
 
+        // Use -Wait so we know when the elevated process finishes,
+        // and -Verb RunAs to request administrator privileges via UAC.
         let ps = format!(
-            "Start-Process PowerShell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File \"{}\"'",
+            "Start-Process PowerShell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{}\"'",
             script.display()
         );
 
         let out = Command::new("powershell")
-            .args(["-NoProfile", "-Command", &ps])
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps])
             .output();
 
         match out {
-            Ok(o) => json!({ "ok": o.status.success(), "code": o.status.code() }),
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                if o.status.success() {
+                    json!({ "ok": true, "code": o.status.code() })
+                } else {
+                    json!({
+                        "ok": false,
+                        "code": o.status.code(),
+                        "error": if stderr.is_empty() {
+                            "User may have declined the UAC elevation prompt".to_string()
+                        } else {
+                            stderr.to_string()
+                        }
+                    })
+                }
+            }
             Err(e) => json!({ "ok": false, "error": e.to_string() }),
         }
     }

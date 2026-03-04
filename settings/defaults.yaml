@@ -25,6 +25,7 @@ data_collection:
     skip_loading_screens: true
     minimum_action_interval_ms: 50
     buffer_size: 1000
+    capture_mouse: false  # Beta: record mouse position/clicks (adds 6 values to action vector)
 
   # Quality checks
   quality:
