@@ -1,0 +1,192 @@
+# Dragon Ball Online Profile
+# Optimized for Ultimate Dragon Ball Online (UDBO) private server
+# Tab-target MMORPG with ki-based combat, flight, and farming
+#
+# DBO uses the classic Korean MMO tab-target system:
+#   - WASD movement, TAB targeting, F basic attack
+#   - Hotbar skills on 1-9, ki charge on C, transform on V
+#   - Mouse for camera control and target selection
+#   - Flight via double-tap SPACE
+#
+# Typical farming loop: move to mob -> TAB target -> skill rotation -> loot -> repeat
+
+game:
+  id: "dragon_ball_online"
+  name: "Dragon Ball Online (Ultimate)"
+  publisher: "UDBO Community (Private Server)"
+
+display:
+  # DBO client supports 1024x768, 1280x720, 1280x1024, 1920x1080
+  # The older engine renders UI at fixed pixel sizes; on 2K+ monitors
+  # the UI becomes very small. Recommended: run at 1280x720 or 1920x1080.
+  typical_resolution: [1280, 720]
+  ui_scale_range: [0.8, 1.0]
+  # Screen regions of interest (x%, y%, width%, height%) normalized 0-1
+  # Based on the classic DBO HUD layout:
+  #   - HP/LP bar: top-left (player portrait + green bar)
+  #   - EP/KI bar: just below HP bar (blue bar)
+  #   - Target frame: top-center (when a target is selected)
+  #   - Action bar / quickslots: bottom-center (2 rows of skill icons)
+  #   - Minimap / radar: top-right corner
+  #   - Chat window: bottom-left
+  #   - EXP bar: very bottom of screen (thin bar)
+  #   - Center focus: main gameplay area
+  important_regions:
+    health_bar: [0.01, 0.01, 0.18, 0.04]
+    ki_bar: [0.01, 0.05, 0.18, 0.03]
+    target_frame: [0.30, 0.01, 0.20, 0.06]
+    action_bar: [0.25, 0.88, 0.50, 0.10]
+    minimap: [0.82, 0.01, 0.17, 0.22]
+    chat_window: [0.01, 0.70, 0.25, 0.18]
+    exp_bar: [0.0, 0.97, 1.0, 0.03]
+    center_focus: [0.20, 0.15, 0.55, 0.60]
+
+input:
+  # DBO is a tab-target MMO: discrete key presses + mouse for camera/selection
+  action_space: "hybrid"
+  num_actions: 24
+  requires_mouse: true
+  # Mouse is used for camera rotation and target clicking, not precision aiming
+  mouse_precision: "medium"
+  # Default keybindings for DBO/UDBO
+  # Movement + combat + utility actions for farming
+  default_bindings:
+    # Movement (WASD)
+    - {key: "W", action: "move_forward"}
+    - {key: "A", action: "strafe_left"}
+    - {key: "S", action: "move_back"}
+    - {key: "D", action: "strafe_right"}
+    - {key: "SPACE", action: "jump_fly"}
+    # Targeting
+    - {key: "TAB", action: "target_next"}
+    # Basic attack
+    - {key: "F", action: "basic_attack"}
+    # Skill hotbar (1-9)
+    - {key: "1", action: "skill_1"}
+    - {key: "2", action: "skill_2"}
+    - {key: "3", action: "skill_3"}
+    - {key: "4", action: "skill_4"}
+    - {key: "5", action: "skill_5"}
+    - {key: "6", action: "skill_6"}
+    - {key: "7", action: "skill_7"}
+    - {key: "8", action: "skill_8"}
+    - {key: "9", action: "skill_9"}
+    # Ki / Energy
+    - {key: "C", action: "charge_ki"}
+    # Transformation (Super Saiyan, Great Namekian, etc.)
+    - {key: "V", action: "transform"}
+    # Interaction / loot pickup
+    - {key: "G", action: "interact_loot"}
+    # Mouse actions
+    - {key: "LMOUSE", action: "select_target"}
+    - {key: "RMOUSE", action: "camera_rotate"}
+    # Menu / map
+    - {key: "M", action: "map"}
+    - {key: "I", action: "inventory"}
+
+training:
+  # For farming (repetitive routes), EfficientNet-LSTM captures the route
+  # patterns well. For simpler mob grinding, mobilenetv3 is sufficient.
+  recommended_architecture: "efficientnet_lstm"
+  recommended_input_size: [224, 224]
+  # DBO tab-target combat benefits from temporal context:
+  # the model needs to see skill cooldowns and mob HP changes over time
+  temporal_frames: 4
+  # DBO farming is repetitive; 5000 frames (~5-8 min of gameplay at 15fps)
+  # covers a typical farming route loop 2-3 times
+  minimum_samples: 5000
+  # Farming actions are imbalanced (lots of movement, few skill presses)
+  class_balance_tolerance: 0.35
+  learning_rate:
+    initial: 0.001
+    decay_factor: 0.1
+    decay_epochs: [20, 40]
+
+# Hardware-specific configurations
+hardware_tiers:
+  # Low-end: DBO is an old game, many players use older hardware
+  low:
+    architecture: "mobilenetv3"
+    batch_size: 8
+    input_size: [160, 160]
+    temporal_frames: 0
+    workers: 2
+
+  # Medium: Most DBO players (GTX 1050-1070 era cards)
+  medium:
+    architecture: "efficientnet_simple"
+    batch_size: 16
+    input_size: [224, 224]
+    temporal_frames: 2
+    workers: 4
+
+  # High: Modern GPU (RTX series)
+  high:
+    architecture: "efficientnet_lstm"
+    batch_size: 32
+    input_size: [224, 224]
+    temporal_frames: 4
+    workers: 8
+
+# Task-specific configurations for DBO
+tasks:
+  farming:
+    description: "Mob grinding and material farming routes (primary use case)"
+    priority: "accuracy"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation:
+      - brightness
+      - color_jitter
+      - rotation
+    fps_target: 15
+
+  combat:
+    description: "Tab-target skill rotation against mobs and bosses"
+    priority: "reaction_time"
+    temporal: true
+    recommended_architecture: "efficientnet_lstm"
+    augmentation:
+      - brightness
+      - contrast
+      - noise
+    fps_target: 20
+
+  navigation:
+    description: "Route following and map traversal (including flight)"
+    priority: "spatial_awareness"
+    temporal: true
+    recommended_architecture: "resnet18_lstm"
+    augmentation:
+      - brightness
+      - perspective
+    fps_target: 15
+
+  questing:
+    description: "Quest NPC interaction and objective completion"
+    priority: "accuracy"
+    temporal: false
+    recommended_architecture: "efficientnet_simple"
+    augmentation:
+      - brightness
+      - contrast
+    fps_target: 10
+
+# DBO-specific notes for users
+notes:
+  anti_cheat: >
+    Ultimate DBO (private server) does not use aggressive anti-cheat.
+    vJoy and Interception drivers should work without issues.
+    Always verify with the server rules before using automation tools.
+  recording_tips: >
+    For farming routes, record 3-5 complete loops of your route.
+    Use --region to match your game window exactly.
+    Common regions: 1280x720 windowed = '0,0,1280,720',
+    1920x1080 fullscreen = '0,0,1920,1080'.
+    If the game runs windowed, account for the title bar (~30px offset).
+  recommended_workflow: >
+    1. Set DBO to windowed mode at 1280x720
+    2. Position window at top-left corner of screen
+    3. Use --region '0,30,1280,750' (30px for title bar)
+    4. Record 5-8 minutes of your farming route
+    5. Train with mobilenetv3 for quick iteration, efficientnet_lstm for best results

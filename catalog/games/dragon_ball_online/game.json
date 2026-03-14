@@ -1,0 +1,9 @@
+{
+  "id": "dragon_ball_online",
+  "display_name": "Dragon Ball Online (Ultimate)",
+  "recommended_resolution": [1280, 720],
+  "supported_inputs": ["keyboard", "mouse"],
+  "expected_input_shape": [480, 270, 3],
+  "expected_classes": 24,
+  "notes": "Optimized for Ultimate DBO private server. Tab-target combat with ki-based skills and flight. Use windowed mode at 1280x720 for best recording results."
+}

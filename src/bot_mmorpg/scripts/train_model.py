@@ -583,17 +583,29 @@ def main(argv=None) -> int:
     use_amp = args.amp
     use_grad_ckpt = args.gradient_checkpointing
 
-    # Auto-detect safe batch-size for GPU VRAM
+    # Auto-detect safe batch-size for GPU VRAM (fixes #27 — CUDA OOM on 8GB cards)
     batch_size = args.batch_size
     if device.type == "cuda" and not args.cpu:
         total_mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
-        if total_mem_gb <= 8 and batch_size > 8:
+        if total_mem_gb <= 6 and batch_size > 4:
+            old_bs = batch_size
+            batch_size = 4
+            use_amp = True
+            use_grad_ckpt = True
+            print(
+                f"[Auto] GPU has {total_mem_gb:.1f}GB VRAM — "
+                f"reducing batch_size {old_bs} -> {batch_size}, "
+                f"enabling AMP (fp16) and gradient checkpointing"
+            )
+        elif total_mem_gb <= 8 and batch_size > 8:
             old_bs = batch_size
             batch_size = 8
             use_amp = True  # Auto-enable AMP for small GPUs
+            use_grad_ckpt = True  # Also enable grad checkpointing (#27)
             print(
                 f"[Auto] GPU has {total_mem_gb:.1f}GB VRAM — "
-                f"reducing batch_size {old_bs} -> {batch_size} and enabling AMP (fp16)"
+                f"reducing batch_size {old_bs} -> {batch_size}, "
+                f"enabling AMP (fp16) and gradient checkpointing"
             )
         elif total_mem_gb <= 12 and batch_size > 16:
             old_bs = batch_size

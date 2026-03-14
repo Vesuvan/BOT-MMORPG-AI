@@ -222,6 +222,8 @@ settings/session/
 # Whitelist Tauri/app config JSON files that must be tracked
 !src-tauri/tauri.conf.json
 !src-tauri/catalog/**/*.json
+!catalog/catalog.json
+!catalog/games/**/*.json
 !package.json
 !package-lock.json
 !tsconfig.json

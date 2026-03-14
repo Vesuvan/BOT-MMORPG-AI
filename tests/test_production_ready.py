@@ -67,6 +67,7 @@ class TestAllGameProfiles:
         "final_fantasy_xiv",
         "lost_ark",
         "new_world",
+        "dragon_ball_online",
     ]
 
     def test_profile_index_exists(self, game_profiles_dir):

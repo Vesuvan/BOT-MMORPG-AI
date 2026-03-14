@@ -227,14 +227,90 @@ def create_app(token: str):
     @app.get("/health")
     async def health(x_auth_token: Optional[str] = Header(default=None)):
         _auth(x_auth_token)
+
+        # Collect diagnostic info for troubleshooting (#26, #37)
+        diagnostics = {}
+        if not MODELHUB_AVAILABLE:
+            diagnostics["warning"] = _MODELHUB_INIT_ERROR
+            diagnostics["troubleshooting"] = (
+                "The sidecar API started but ModelHub failed to initialize. "
+                "Check that all Python dependencies are installed (pip install -e .) "
+                "and that the catalog/ and game_profiles/ directories exist."
+            )
+
+        # Check writable data root
+        try:
+            test_file = DATA_ROOT / ".write_test"
+            test_file.touch()
+            test_file.unlink()
+        except Exception:
+            diagnostics["data_root_writable"] = False
+            diagnostics["data_root_error"] = (
+                f"Cannot write to {DATA_ROOT}. "
+                "Check file permissions or set MODELHUB_DATA_ROOT env var."
+            )
+
         return {
             "ok": True,
             "modelhub": MODELHUB_AVAILABLE,
             "resource_root": str(RESOURCE_ROOT),
             "data_root": str(DATA_ROOT),
-            "version": "0.1.8",
-            **({"warning": _MODELHUB_INIT_ERROR} if not MODELHUB_AVAILABLE else {}),
+            "version": "0.1.9",
+            "session_manager": session_manager is not None,
+            **diagnostics,
         }
+
+    @app.get("/diagnostics")
+    async def diagnostics(x_auth_token: Optional[str] = Header(default=None)):
+        """Extended diagnostics endpoint for debugging setup issues (#26, #37)."""
+        _auth(x_auth_token)
+        import platform as plat
+
+        diag = {
+            "ok": True,
+            "python_version": plat.python_version(),
+            "platform": plat.system(),
+            "modelhub_available": MODELHUB_AVAILABLE,
+            "session_manager": session_manager is not None,
+            "resource_root": str(RESOURCE_ROOT),
+            "resource_root_exists": RESOURCE_ROOT.exists(),
+            "data_root": str(DATA_ROOT),
+            "data_root_exists": DATA_ROOT.exists(),
+        }
+
+        # Check key directories
+        for name in ["catalog", "game_profiles", "versions"]:
+            p = RESOURCE_ROOT / name
+            diag[f"{name}_exists"] = p.exists()
+
+        # Check PyTorch availability
+        try:
+            import torch
+            diag["pytorch_version"] = torch.__version__
+            diag["cuda_available"] = torch.cuda.is_available()
+            if torch.cuda.is_available():
+                diag["gpu_name"] = torch.cuda.get_device_name(0)
+                diag["gpu_vram_gb"] = round(
+                    torch.cuda.get_device_properties(0).total_mem / 1e9, 1
+                )
+        except ImportError:
+            diag["pytorch_version"] = None
+            diag["cuda_available"] = False
+
+        # List available games
+        if mh_list_games:
+            try:
+                games = mh_list_games() or []
+                diag["available_games"] = [
+                    g["id"] if isinstance(g, dict) else g for g in games
+                ]
+            except Exception as e:
+                diag["available_games_error"] = str(e)
+
+        if not MODELHUB_AVAILABLE:
+            diag["init_error"] = _MODELHUB_INIT_ERROR
+
+        return diag
 
     # -------- Session endpoints --------
 
