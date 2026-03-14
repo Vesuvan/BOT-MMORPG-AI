@@ -7,6 +7,12 @@
 !include "MUI2.nsh"
 !include "Sections.nsh"
 
+; Use LZMA solid compression to handle large file counts efficiently.
+; SOLID mode compresses all data as a single stream, reducing both
+; installer size and NSIS compile-time memory issues with many files.
+SetCompressor /SOLID lzma
+SetDatablockOptimize on
+
 Name "{{product_name}}"
 OutFile "{{out_file}}"
 
