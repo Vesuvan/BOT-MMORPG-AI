@@ -258,7 +258,12 @@ def find_window_region(window_title):
                 parts = line.split()
                 # wmctrl -lG format: id desktop x y w h hostname title...
                 if len(parts) >= 7:
-                    x, y, w, h = int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5])
+                    x, y, w, h = (
+                        int(parts[2]),
+                        int(parts[3]),
+                        int(parts[4]),
+                        int(parts[5]),
+                    )
                     return (x, y, x + w, y + h)
     except (FileNotFoundError, subprocess.CalledProcessError):
         pass

@@ -501,7 +501,7 @@ footer a{color:var(--gold)}
       <a href="#install">Install</a>
       <a href="#best-practices">Best Practices</a>
     </div>
-    <a class="nav-cta" href="https://github.com/ruslanmv/BOT-MMORPG-AI/releases/download/v0.2.0/BOT-MMORPG-AI_0.1.5_x64-setup.exe">Download</a>
+    <a class="nav-cta" href="https://github.com/ruslanmv/BOT-MMORPG-AI/releases">Download</a>
   </div>
 </nav>
 
@@ -993,30 +993,6 @@ footer a{color:var(--gold)}
     <h2>From Zero to Auto-Farm in 5 Minutes</h2>
     <p class="section-desc">No PhD required. Just follow these steps and your AI will be farming while you sleep. Windows 10/11 for gameplay; training works on any OS.</p>
 
-    <!-- ===== ONE-CLICK INSTALLER DOWNLOAD ===== -->
-    <div style="text-align:center;margin:0 0 48px">
-      <a id="download-installer-btn"
-         class="btn btn-primary"
-         href="https://github.com/ruslanmv/BOT-MMORPG-AI/releases/download/v0.2.0/BOT-MMORPG-AI_0.1.5_x64-setup.exe"
-         data-download-url="https://github.com/ruslanmv/BOT-MMORPG-AI/releases/download/v0.2.0/BOT-MMORPG-AI_0.1.5_x64-setup.exe"
-         data-asset-name="BOT-MMORPG-AI_0.1.5_x64-setup.exe"
-         data-asset-size="181"
-         data-release-tag="v0.2.0"
-         style="font-size:18px;padding:16px 36px;gap:10px;display:inline-flex;align-items:center">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-        Download Windows Installer
-      </a>
-      <div style="margin-top:12px">
-        <span id="installer-version" style="font-size:13px;color:var(--text-dim)">v0.2.0 — 181 MB</span>
-        <span style="font-size:13px;color:var(--text-dim);margin-left:8px">|</span>
-        <a href="https://github.com/ruslanmv/BOT-MMORPG-AI/releases" style="font-size:13px;color:var(--cyan);margin-left:8px">All releases</a>
-      </div>
-    </div>
-
-    <p style="text-align:center;margin-bottom:32px;color:var(--text-dim);font-size:14px">
-      Or install from source using the steps below:
-    </p>
-
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
@@ -1325,62 +1301,6 @@ document.querySelectorAll('nav a[href^="#"]').forEach(function(link){
     }
   });
 });
-
-// =============================================
-// AUTO-RESOLVE LATEST INSTALLER FROM GITHUB RELEASES
-// Fetches the latest release, finds the largest .exe
-// asset (the real NSIS installer), and updates all
-// download links on the page.
-// =============================================
-(function(){
-  var REPO = 'ruslanmv/BOT-MMORPG-AI';
-  var API  = 'https://api.github.com/repos/' + REPO + '/releases/latest';
-
-  fetch(API)
-    .then(function(r){ return r.json(); })
-    .then(function(release){
-      if (!release || !release.assets) return;
-
-      // Find the largest .exe asset (the real installer, not stubs)
-      var best = null;
-      release.assets.forEach(function(a){
-        if (a.name.endsWith('.exe') && (!best || a.size > best.size)) {
-          best = a;
-        }
-      });
-      if (!best) return;
-
-      var url     = best.browser_download_url;
-      var name    = best.name;
-      var sizeMB  = (best.size / 1048576).toFixed(0);
-      var tag     = release.tag_name;
-
-      // Update the main installer download button
-      var dlBtn = document.getElementById('download-installer-btn');
-      if (dlBtn) {
-        dlBtn.href = url;
-        dlBtn.setAttribute('data-download-url', url);
-        dlBtn.setAttribute('data-asset-name', name);
-        dlBtn.setAttribute('data-asset-size', sizeMB);
-        dlBtn.setAttribute('data-release-tag', tag);
-      }
-
-      // Update version badge
-      var verSpan = document.getElementById('installer-version');
-      if (verSpan) {
-        verSpan.textContent = tag + ' \u2014 ' + sizeMB + ' MB';
-      }
-
-      // Update nav download link
-      var navCta = document.querySelector('.nav-cta');
-      if (navCta) {
-        navCta.href = url;
-      }
-    })
-    .catch(function(){
-      // Silently fall back to the static URL already in the HTML
-    });
-})();
 
 // =============================================
 // ANIMATED STAT COUNTERS

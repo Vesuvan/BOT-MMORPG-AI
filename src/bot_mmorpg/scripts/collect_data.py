@@ -412,7 +412,9 @@ Example:
                     )
             except FileNotFoundError:
                 logger.error(f"Game profile '{args.game}' not found.")
-                logger.error("Available profiles are listed in game_profiles/index.yaml")
+                logger.error(
+                    "Available profiles are listed in game_profiles/index.yaml"
+                )
                 return 1
 
     # --- Auto-detect game window region ---

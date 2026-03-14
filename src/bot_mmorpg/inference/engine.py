@@ -175,7 +175,7 @@ class InferenceEngine:
 
         # Load checkpoint
         device = cls._detect_device_static()
-        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
 
         # Extract metadata
         metadata = cls._extract_metadata(checkpoint)
@@ -270,11 +270,12 @@ class InferenceEngine:
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
 
-        from bot_mmorpg.scripts.models_pytorch import get_model
+        from bot_mmorpg.scripts.models_pytorch import create_model
 
-        model = get_model(
-            model_name=metadata.architecture,
-            num_actions=metadata.num_classes,
+        model = create_model(
+            architecture=metadata.architecture,
+            num_classes=metadata.num_classes,
+            input_size=metadata.input_size,
             temporal_frames=metadata.temporal_frames,
             pretrained=False,  # We'll load weights separately
         )
