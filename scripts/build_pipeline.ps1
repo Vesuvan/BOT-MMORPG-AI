@@ -477,6 +477,37 @@ function Ensure-BundledSitePackages {
     Log-Info "TensorFlow not detected (optional ml-legacy); skipping tf import test."
   }
 
+  # ---- Prune site-packages to reduce NSIS file count ----
+  # NSIS can fail or timeout when bundling >30k files. Remove unnecessary items.
+  Log-Info "Pruning bundled site-packages to reduce installer file count..."
+
+  $pruneCountBefore = (Get-ChildItem -Path $sitePkgs -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
+
+  # Remove __pycache__ directories and .pyc files (not needed for embedded python)
+  Get-ChildItem -Path $sitePkgs -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  # Remove test/tests directories inside packages (not needed at runtime)
+  Get-ChildItem -Path $sitePkgs -Recurse -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match "^(tests?|testing)$" } |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  # Remove .dist-info directories (metadata only, not needed at runtime)
+  Get-ChildItem -Path $sitePkgs -Directory -Filter "*.dist-info" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  # Remove stray .pyc files outside __pycache__
+  Get-ChildItem -Path $sitePkgs -Recurse -File -Filter "*.pyc" -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+  # Remove type stubs (.pyi files) - not needed at runtime
+  Get-ChildItem -Path $sitePkgs -Recurse -File -Filter "*.pyi" -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+  $pruneCountAfter = (Get-ChildItem -Path $sitePkgs -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
+  $pruned = $pruneCountBefore - $pruneCountAfter
+  Log-Ok "Pruned $pruned files from site-packages ($pruneCountBefore -> $pruneCountAfter files)"
+
   Log-Ok "Bundled site-packages ready (production-safe install strategy)."
 }
 
