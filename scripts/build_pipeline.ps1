@@ -335,16 +335,55 @@ function Ensure-BundledSitePackages {
   Log-Info "Wheelhouse Source: $whWheels"
 
   # ---- Host Python (drives pip install into target) ----
-  # Prefer .venv if it exists (local dev), otherwise fall back to system Python (CI)
-  $hostPy = Join-Path $RootDir ".venv\Scripts\python.exe"
-  if (-not (Test-Path $hostPy)) {
-    Log-Info "Build venv not found at $hostPy, falling back to system Python..."
+  # Prefer .venv if it exists (local dev), otherwise discover Python 3.10 (CI)
+  $hostPy = $null
+
+  # 1) Local dev venv
+  $venvPy = Join-Path $RootDir ".venv\Scripts\python.exe"
+  if (Test-Path $venvPy) {
+    $hostPy = $venvPy
+    Log-Info "Using build venv Python: $hostPy"
+  }
+
+  # 2) Windows Python Launcher (py -3.10)
+  if (-not $hostPy) {
+    Log-Info "Build venv not found at $venvPy, searching for Python 3.10..."
+    try {
+      $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+      if ($pyLauncher) {
+        $pyPath = & py -3.10 -c "import sys; print(sys.executable)" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $pyPath -and (Test-Path $pyPath)) {
+          $hostPy = $pyPath.Trim()
+          Log-Info "Found Python 3.10 via py launcher: $hostPy"
+        }
+      }
+    } catch {}
+  }
+
+  # 3) GitHub Actions hostedtoolcache (setup-python puts 3.10 here)
+  if (-not $hostPy) {
+    $toolcacheBase = "C:\hostedtoolcache\windows\Python"
+    if (Test-Path $toolcacheBase) {
+      $py310Dir = Get-ChildItem -Path $toolcacheBase -Directory -Filter "3.10*" -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1
+      if ($py310Dir) {
+        $candidate = Join-Path $py310Dir.FullName "x64\python.exe"
+        if (Test-Path $candidate) {
+          $hostPy = $candidate
+          Log-Info "Found Python 3.10 in hostedtoolcache: $hostPy"
+        }
+      }
+    }
+  }
+
+  # 4) Generic 'python' in PATH (last resort)
+  if (-not $hostPy) {
     $sysPy = Get-Command python -ErrorAction SilentlyContinue
     if ($sysPy) {
       $hostPy = $sysPy.Source
-      Log-Info "Using system Python: $hostPy"
+      Log-Info "Using system Python (may not be 3.10): $hostPy"
     } else {
-      throw "No Python found: neither .venv\Scripts\python.exe nor system 'python' in PATH"
+      throw "No Python found: neither .venv, py launcher, hostedtoolcache, nor system 'python' in PATH"
     }
   }
 
