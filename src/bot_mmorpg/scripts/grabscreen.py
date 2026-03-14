@@ -214,6 +214,97 @@ def _grab_screen_mss(region=None):
         return cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
 
+def find_window_region(window_title):
+    """
+    Find a game window by title and return its screen region.
+
+    Searches for windows whose title contains the given string
+    (case-insensitive). Useful for auto-detecting game window position
+    instead of requiring manual --region coordinates.
+
+    Args:
+        window_title: Partial or full window title to search for.
+
+    Returns:
+        tuple: (left, top, right, bottom) pixel coordinates, or None if not found.
+    """
+    if IS_WINDOWS and _WIN32_AVAILABLE:
+        result = []
+
+        def _enum_callback(hwnd, _):
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if window_title.lower() in title.lower():
+                    rect = win32gui.GetWindowRect(hwnd)
+                    # rect is (left, top, right, bottom)
+                    result.append(rect)
+
+        win32gui.EnumWindows(_enum_callback, None)
+        if result:
+            left, top, right, bottom = result[0]
+            # Compensate for window borders / title bar (~30px on Windows 10/11)
+            return (left, top, right, bottom)
+        return None
+
+    # On Linux, attempt wmctrl-style detection via subprocess
+    try:
+        import subprocess
+
+        output = subprocess.check_output(
+            ["wmctrl", "-lG"], stderr=subprocess.DEVNULL, text=True
+        )
+        for line in output.strip().split("\n"):
+            if window_title.lower() in line.lower():
+                parts = line.split()
+                # wmctrl -lG format: id desktop x y w h hostname title...
+                if len(parts) >= 7:
+                    x, y, w, h = int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5])
+                    return (x, y, x + w, y + h)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    return None
+
+
+# Common window titles for supported games (used by --game auto-detect)
+GAME_WINDOW_TITLES = {
+    "dragon_ball_online": [
+        "Dragon Ball Online",
+        "DragonBall Online",
+        "DBO",
+        "DBOG",
+        "Ultimate DBO",
+        "UltimateDBO",
+    ],
+    "genshin_impact": ["Genshin Impact", "GenshinImpact", "原神"],
+    "world_of_warcraft": ["World of Warcraft", "WoW", "Wow-64"],
+    "final_fantasy_xiv": ["FINAL FANTASY XIV", "FFXIV"],
+    "guild_wars_2": ["Guild Wars 2"],
+    "lost_ark": ["LOST ARK", "Lost Ark"],
+    "new_world": ["New World"],
+}
+
+
+def find_game_window(game_id):
+    """
+    Auto-detect a game window region by game profile ID.
+
+    Tries multiple known window titles for the given game.
+
+    Args:
+        game_id: Game identifier from game_profiles (e.g., "dragon_ball_online")
+
+    Returns:
+        tuple: (left, top, right, bottom) pixel coordinates, or None if not found.
+    """
+    titles = GAME_WINDOW_TITLES.get(game_id, [])
+    for title in titles:
+        region = find_window_region(title)
+        if region is not None:
+            return region
+    return None
+
+
 def grab_screen(region=None):
     """
     Capture a region of the screen.

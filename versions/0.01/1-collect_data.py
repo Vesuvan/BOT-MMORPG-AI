@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import signal
 from pathlib import Path
@@ -9,6 +10,18 @@ import numpy as np
 from grabscreen import grab_screen
 from getkeys import key_check
 from getgamepad import gamepad_check
+
+# Optional mouse capture (issues #21, #33, #36)
+# Enable via: set BOTMMO_CAPTURE_MOUSE=true (Windows) or --mouse flag
+try:
+    # Try importing from the modern package first
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    from bot_mmorpg.scripts.mouse_capture import MouseCapture
+
+    _MOUSE_AVAILABLE = True
+except ImportError:
+    _MOUSE_AVAILABLE = False
+    MouseCapture = None
 
 
 # ============================================================
@@ -129,14 +142,27 @@ def keys_to_output(keys):
     return NK
 
 
+EXPECTED_GAMEPAD_LEN = 20  # 2 triggers + 4 axes + 14 buttons
+
+
 def gamepad_keys_to_output(values):
     """
-    Convert gamepad list to ints.
+    Convert gamepad list to ints with fixed-length output.
     Expected order from your getgamepad.py:
     ['LT','RT','Lx','Ly','Rx','Ry','UP','DOWN','LEFT','RIGHT',
      'START','SELECT','L3','R3','LB','RB','A','B','X','Y']
+
+    Returns a list of exactly EXPECTED_GAMEPAD_LEN integers.
+    Pads with zeros if gamepad returns fewer values, truncates if more.
+    This prevents the inhomogeneous shape ValueError in np.save (issue #15).
     """
-    return [int(v) for v in values]
+    out = [int(v) for v in values]
+    # Ensure consistent length to avoid inhomogeneous numpy array shapes
+    if len(out) < EXPECTED_GAMEPAD_LEN:
+        out.extend([0] * (EXPECTED_GAMEPAD_LEN - len(out)))
+    elif len(out) > EXPECTED_GAMEPAD_LEN:
+        out = out[:EXPECTED_GAMEPAD_LEN]
+    return out
 
 
 def next_available_file(output_dir: Path, prefix: str) -> tuple[Path, int]:
@@ -165,6 +191,9 @@ def save_chunk(path: Path, data: list) -> None:
 def main():
     out_path, idx = next_available_file(OUTPUT_DIR, FILE_PREFIX)
 
+    # Mouse recording support (issues #21, #33, #36)
+    mouse_enabled = os.getenv("BOTMMO_CAPTURE_MOUSE", "").lower() == "true"
+
     print("=================================================")
     print("[Collector] 1-collect_data.py")
     print(f"[Collector] Game ID      : {GAME_ID}")
@@ -172,11 +201,34 @@ def main():
     print(f"[Collector] Monitor ID   : {MONITOR_ID}")
     print(f"[Collector] CaptureRegion: {CAPTURE_REGION}")
     print(f"[Collector] Resolution   : {RESOLUTION}")
+    print(f"[Collector] Mouse Record : {'ENABLED' if mouse_enabled else 'DISABLED'}")
     print(f"[Collector] Output Dir   : {OUTPUT_DIR.resolve()}")
     print(f"[Collector] Output File  : {out_path.name}")
     print("=================================================")
+    if not mouse_enabled:
+        print("[Tip] Mouse recording is available! Enable with:")
+        print("      set BOTMMO_CAPTURE_MOUSE=true   (Windows cmd)")
+        print("      $env:BOTMMO_CAPTURE_MOUSE='true' (PowerShell)")
+        print("      export BOTMMO_CAPTURE_MOUSE=true (Linux/macOS)")
+        print("      Or use the modern script: python -m bot_mmorpg.scripts.collect_data --mouse")
+        print("")
+    print("[Tip] Windows users: use 'set' instead of 'export' for env vars (#34)")
+    print("[Tip] Custom region: set BOTMMO_CAPTURE_REGION=0,0,1280,720")
+    print("")
 
     training_data = []
+
+    # Initialize mouse capture if enabled (#21, #33, #36)
+    mouse_capturer = None
+    if mouse_enabled:
+        if _MOUSE_AVAILABLE and MouseCapture is not None:
+            mouse_capturer = MouseCapture(capture_region=CAPTURE_REGION)
+            mouse_capturer.start()
+            print("[Mouse] Recording ENABLED (adds 10 values: x, y, dx, dy, vx, vy, lmb, rmb, mmb, scroll)")
+        else:
+            print("[Mouse] WARNING: Mouse recording requested but pynput is not installed.")
+            print("        Install with: pip install pynput")
+            print("        Continuing without mouse recording.")
 
     # Countdown (kept from your original behavior)
     for i in range(4, 0, -1):
@@ -227,7 +279,11 @@ def main():
             # Capture
             screen = grab_screen(region=CAPTURE_REGION)
 
-            # Resize for model input
+            # Validate capture (fixes #15 - empty/invalid screens cause shape errors)
+            if screen is None or screen.size == 0:
+                continue
+
+            # Resize for model input (enforces consistent shape)
             screen = cv2.resize(screen, RESOLUTION)
 
             # BGR -> RGB (kept from original)
@@ -235,10 +291,24 @@ def main():
 
             # Keys + gamepad
             output_keys = keys_to_output(keys_now)
-            output_gp = gamepad_keys_to_output(gamepad_check())
+            try:
+                gp_raw = gamepad_check()
+            except Exception:
+                gp_raw = [0] * EXPECTED_GAMEPAD_LEN
+            output_gp = gamepad_keys_to_output(gp_raw)
 
-            # Concat (9 + 20 = 29)
-            output = np.concatenate((output_keys, output_gp), axis=None)
+            # Build action vector: keyboard (9) + gamepad (20) = 29 base
+            parts = [np.array(output_keys), np.array(output_gp)]
+
+            # Append mouse state if enabled (adds 10 values, issues #21/#33/#36)
+            if mouse_capturer is not None:
+                try:
+                    mouse_state = mouse_capturer.snapshot()
+                    parts.append(mouse_state.to_array())  # float32, shape (10,)
+                except Exception:
+                    pass  # Mouse failure must never break recording
+
+            output = np.concatenate(parts, axis=None)
 
             # Append sample (kept exact structure)
             training_data.append([screen, output])
@@ -262,6 +332,11 @@ def main():
         # Save remainder so stopping from launcher doesn't lose data
         if training_data:
             save_chunk(out_path, training_data)
+
+        # Stop mouse capture if it was started
+        if mouse_capturer is not None:
+            mouse_capturer.stop()
+            print("[Mouse] Capture stopped.")
 
         cv2.destroyAllWindows()
         print("[Info] Exited cleanly.")

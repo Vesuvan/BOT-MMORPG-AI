@@ -33,5 +33,10 @@ profiles:
     status: "supported"
     path: "new_world/profile.yaml"
 
+  dragon_ball_online:
+    name: "Dragon Ball Online (Ultimate)"
+    status: "supported"
+    path: "dragon_ball_online/profile.yaml"
+
 # Users can add custom profiles here
 custom_profiles: []

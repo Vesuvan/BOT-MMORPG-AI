@@ -322,7 +322,23 @@ Example:
         "--out", default="data/raw", help="Output folder for training data"
     )
     parser.add_argument(
-        "--region", default="0,40,1920,1120", help="Screen capture region (x1,y1,x2,y2)"
+        "--region",
+        default=None,
+        help="Screen capture region (x1,y1,x2,y2). Auto-detected when --game is used.",
+    )
+    parser.add_argument(
+        "--game",
+        default=None,
+        help=(
+            "Game profile ID (e.g., dragon_ball_online). "
+            "Auto-detects window region and sets output folder. "
+            "Use with --task to select a specific task config."
+        ),
+    )
+    parser.add_argument(
+        "--task",
+        default="farming",
+        help="Task type from game profile (default: farming). Used with --game.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -347,6 +363,93 @@ Example:
         env_mouse = os.environ.get("BOTMMO_CAPTURE_MOUSE", "").lower()
         if env_mouse == "true":
             args.mouse = True
+
+    # --- Game profile integration ---
+    game_profile = None
+    if args.game:
+        try:
+            from ..config.profile_loader import GameProfileLoader
+        except ImportError:
+            try:
+                import sys
+
+                sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+                from bot_mmorpg.config.profile_loader import GameProfileLoader
+            except ImportError:
+                logger.warning(
+                    "Could not load profile_loader; --game flag ignored. "
+                    "Falling back to manual --region."
+                )
+                GameProfileLoader = None
+
+        if GameProfileLoader is not None:
+            try:
+                loader = GameProfileLoader()
+                game_profile = loader.load(args.game)
+                logger.info(f"Loaded game profile: {game_profile.name}")
+
+                # Auto-configure output directory
+                if args.out == "data/raw":
+                    import datetime
+
+                    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    args.out = f"datasets/{args.game}/{ts}_{args.task}"
+                    logger.info(f"Output directory set to: {args.out}")
+
+                # Log task config if available
+                task_cfg = game_profile.get_task_config(args.task)
+                if task_cfg:
+                    logger.info(
+                        f"Task '{args.task}': {task_cfg.description} "
+                        f"(fps_target={task_cfg.fps_target})"
+                    )
+
+                # Enable mouse if the game profile requires it
+                if game_profile.requires_mouse and not args.mouse:
+                    logger.info(
+                        "Game profile requires mouse. "
+                        "Enable with --mouse for best results."
+                    )
+            except FileNotFoundError:
+                logger.error(f"Game profile '{args.game}' not found.")
+                logger.error("Available profiles are listed in game_profiles/index.yaml")
+                return 1
+
+    # --- Auto-detect game window region ---
+    if args.region is None and args.game:
+        try:
+            from .grabscreen import find_game_window
+        except ImportError:
+            try:
+                from grabscreen import find_game_window
+            except ImportError:
+                find_game_window = None
+
+        if find_game_window is not None:
+            detected = find_game_window(args.game)
+            if detected is not None:
+                args.region = ",".join(str(v) for v in detected)
+                logger.info(f"Auto-detected game window region: {args.region}")
+            else:
+                # Fallback to game profile typical resolution
+                if game_profile is not None:
+                    w, h = game_profile.typical_resolution
+                    args.region = f"0,0,{w},{h}"
+                    logger.warning(
+                        f"Game window not found. Using profile resolution: {args.region}. "
+                        "Position your game window at the top-left corner of your screen, "
+                        "or specify --region manually."
+                    )
+                else:
+                    args.region = "0,0,1280,720"
+                    logger.warning(
+                        "Game window not found. Using default 1280x720. "
+                        "Specify --region manually for best results."
+                    )
+
+    # Final fallback for region
+    if args.region is None:
+        args.region = "0,40,1920,1120"
 
     # Parse region
     try:

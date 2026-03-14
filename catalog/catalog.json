@@ -2,6 +2,7 @@
   "version": "1.0",
   "games": [
     "genshin_impact",
-    "world_of_warcraft"
+    "world_of_warcraft",
+    "dragon_ball_online"
   ]
 }

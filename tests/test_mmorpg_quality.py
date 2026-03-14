@@ -41,6 +41,7 @@ GAME_PROFILES = [
     "final_fantasy_xiv",
     "lost_ark",
     "new_world",
+    "dragon_ball_online",
 ]
 
 # Recommended architectures that work with standard 2D input
@@ -386,6 +387,7 @@ class TestCrossGameArchMatrix:
         ("lost_ark", "efficientnet_simple", 48),
         ("guild_wars_2", "mobilenet_v3", 29),
         ("new_world", "mobilenet_v3", 48),
+        ("dragon_ball_online", "efficientnet_lstm", 24),
     ]
 
     @pytest.mark.parametrize("game_id,arch,num_actions", GAME_ARCH_MATRIX)

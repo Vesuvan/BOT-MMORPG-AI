@@ -29,6 +29,8 @@ class ResolutionTier(Enum):
     LOW = "low"  # 640x360 - Good performance
     MEDIUM = "medium"  # 960x540 - Moderate performance
     HD = "hd"  # 1280x720 - Experimental, not recommended
+    FHD = "fhd"  # 1920x1080 - Full HD capture (fixes #8)
+    QHD = "qhd"  # 2560x1440 - 2K/QHD support (fixes #8)
     NATIVE = "native"  # Full screen capture
 
 
@@ -111,6 +113,24 @@ RESOLUTION_720P = Resolution(
     description="EXPERIMENTAL: Maximum supported. Large datasets, slow training.",
 )
 
+RESOLUTION_1080P = Resolution(
+    width=1920,
+    height=1080,
+    name="1920x1080 (Full HD)",
+    recommended=False,
+    experimental=True,
+    description="EXPERIMENTAL: Full HD capture. Large datasets, very slow training.",
+)
+
+RESOLUTION_1440P = Resolution(
+    width=2560,
+    height=1440,
+    name="2560x1440 (2K/QHD)",
+    recommended=False,
+    experimental=True,
+    description="EXPERIMENTAL: 2K capture for high-res monitors (fixes #8). Very large datasets.",
+)
+
 RESOLUTION_NATIVE = Resolution(
     width=0,
     height=0,  # Determined at runtime
@@ -126,6 +146,16 @@ STANDARD_RESOLUTIONS = [
     RESOLUTION_640P,
     RESOLUTION_960P,
     RESOLUTION_720P,
+]
+
+# Extended resolutions including 2K support (for users who need higher res, issue #8)
+EXTENDED_RESOLUTIONS = [
+    RESOLUTION_480P,
+    RESOLUTION_640P,
+    RESOLUTION_960P,
+    RESOLUTION_720P,
+    RESOLUTION_1080P,
+    RESOLUTION_1440P,
 ]
 
 
@@ -254,6 +284,29 @@ GAME_CONFIGS: Dict[str, GameResolutionConfig] = {
         notes="Isometric view scales well. 480x270 recommended.",
     ),
     # =========================================================================
+    # Community-Requested Games (issues #14, #20, Dragon Ball Online)
+    # =========================================================================
+    "dragon_ball_online": GameResolutionConfig(
+        game_id="dragon_ball_online",
+        game_name="Dragon Ball Online (Ultimate)",
+        min_resolution=RESOLUTION_480P,
+        recommended_resolution=RESOLUTION_480P,
+        max_resolution=RESOLUTION_720P,
+        supported_resolutions=STANDARD_RESOLUTIONS,
+        min_ui_width=640,
+        notes="Tab-target MMO. Older engine, 480x270 captures all essential UI elements.",
+    ),
+    "tibia": GameResolutionConfig(
+        game_id="tibia",
+        game_name="Tibia",
+        min_resolution=RESOLUTION_480P,
+        recommended_resolution=RESOLUTION_480P,
+        max_resolution=RESOLUTION_720P,
+        supported_resolutions=STANDARD_RESOLUTIONS,
+        min_ui_width=480,
+        notes="Isometric 2D game. Low resolution captures all detail. 480x270 ideal.",
+    ),
+    # =========================================================================
     # Default / Custom Games
     # =========================================================================
     "custom": GameResolutionConfig(
@@ -326,8 +379,8 @@ def get_resolution_for_model(
     width, height = parse_resolution(resolution_str)
 
     if width == 0 or height == 0:
-        # Cap native at HD for model compatibility
-        return (min(native_width, 1280), min(native_height, 720))
+        # Cap native at 2K for model compatibility (extended from HD for #8)
+        return (min(native_width, 2560), min(native_height, 1440))
 
     return (width, height)
 
@@ -352,6 +405,21 @@ def get_resolution_options_for_ui() -> List[Dict[str, str]]:
                 "label": label,
                 "recommended": res.recommended,
                 "experimental": res.experimental,
+                "description": res.description,
+            }
+        )
+
+    # Add high-res options (issue #8 — 2K resolution support)
+    for res in [RESOLUTION_1080P, RESOLUTION_1440P]:
+        label = res.name
+        if res.experimental:
+            label += " [Experimental]"
+        options.append(
+            {
+                "value": str(res),
+                "label": label,
+                "recommended": False,
+                "experimental": True,
                 "description": res.description,
             }
         )
@@ -419,10 +487,12 @@ RESOLUTION_TABLE = """
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
 Performance Notes:
-- 480x270:  1.0x speed, 1.0x memory, 1.0x dataset size (RECOMMENDED)
-- 640x360:  0.56x speed, 1.78x memory, 1.78x dataset size (Good)
-- 960x540:  0.25x speed, 4.0x memory, 4.0x dataset size (Moderate)
-- 1280x720: 0.14x speed, 7.1x memory, 7.1x dataset size (EXPERIMENTAL)
+- 480x270:   1.0x speed, 1.0x memory, 1.0x dataset size (RECOMMENDED)
+- 640x360:   0.56x speed, 1.78x memory, 1.78x dataset size (Good)
+- 960x540:   0.25x speed, 4.0x memory, 4.0x dataset size (Moderate)
+- 1280x720:  0.14x speed, 7.1x memory, 7.1x dataset size (EXPERIMENTAL)
+- 1920x1080: 0.063x speed, 16x memory, 16x dataset size (EXPERIMENTAL)
+- 2560x1440: 0.035x speed, 28.4x memory, 28.4x dataset size (EXPERIMENTAL - 2K, #8)
 
 4K (3840x2160) is NOT SUPPORTED - reserved for future hyperresolution mapping.
 """
